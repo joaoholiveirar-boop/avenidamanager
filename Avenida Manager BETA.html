@@ -941,6 +941,10 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
         <span class="nav-icon">🎭</span> Equipe Artística
         <span class="nav-badge red hidden" id="badge-team">!</span>
       </div>
+      <div class="nav-item" onclick="showTab('rainha')">
+        <span class="nav-icon">👸</span> Rainha de Bateria
+        <span class="nav-badge red hidden" id="badge-rainha">!</span>
+      </div>
       <div class="nav-section">Gestão</div>
       <div class="nav-item" onclick="showTab('ensaios')">
         <span class="nav-icon">🎺</span> Ensaios
@@ -973,6 +977,9 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
       <div class="nav-section">Jogo</div>
       <div class="nav-item" onclick="saveGame()">
         <span class="nav-icon">💾</span> Salvar Jogo
+      </div>
+      <div class="nav-item" onclick="confirmGoToMenu()" style="color:var(--text3)">
+        <span class="nav-icon">🏠</span> Menu Principal
       </div>
       <div class="nav-item" id="advanceMonthBtn" onclick="advanceMonth()">
         <span class="nav-icon">⏩</span> Avançar Mês
@@ -1007,6 +1014,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
     <div class="content-body hidden" id="tabBarracao"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabAlas"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabTeam"><!-- rendered by JS --></div>
+    <div class="content-body hidden" id="tabRainha"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabEnsaios"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabCommunity"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabEventos"><!-- rendered by JS --></div>
@@ -1058,23 +1066,23 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
   <div class="apuracao-title" id="apuracaoTitle">⭐ Apuração do Carnaval ⭐</div>
   <div class="apuracao-subtitle" id="apuracaoSubtitle">Aguardando leitura das notas...</div>
 
-  <div style="width:100%;max-width:1000px;display:grid;grid-template-columns:1fr minmax(200px,320px);gap:1rem;margin-bottom:1.5rem" id="apuracaoGrid">
+  <div style="width:100%;max-width:1400px;display:grid;grid-template-columns:1fr minmax(240px,360px);gap:1.25rem;margin-bottom:1.5rem" id="apuracaoGrid">
 
     <!-- LEFT: current quesito notes for ALL schools -->
     <div class="panel">
       <div class="panel-header" id="apuracaoQuesHeader"><span class="panel-title">📊 Quesito Atual</span></div>
-      <div class="panel-body" id="apuracaoQuesBody" style="min-height:200px"></div>
+      <div class="panel-body" id="apuracaoQuesBody" style="min-height:220px"></div>
     </div>
 
     <!-- RIGHT: cumulative ranking -->
     <div class="panel">
       <div class="panel-header"><span class="panel-title">🏆 Classificação Parcial</span></div>
-      <div class="panel-body" id="apuracaoRanking" style="font-size:.82rem"></div>
+      <div class="panel-body" id="apuracaoRanking" style="font-size:.85rem"></div>
     </div>
   </div>
 
   <!-- Bottom: quesitos progress bar -->
-  <div style="width:100%;max-width:1000px;margin-bottom:1.5rem" id="apuracaoQuesBar"></div>
+  <div style="width:100%;max-width:1400px;margin-bottom:1.5rem" id="apuracaoQuesBar"></div>
 
   <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;padding-bottom:2rem">
     <button class="btn btn-gold hidden" id="continueApuracaoBtn" onclick="continueApuracao()">▶ Próximo Quesito</button>
@@ -1275,17 +1283,68 @@ const PROFESSIONALS_DATA = {
     {id:'dc6',name:'Diretor Interno',role:'diretorCarnaval',emoji:'📋',creativity:62,discipline:82,experience:60,popularity:60,management:72,cost:80000},
   ],
   harmonia: [
-    {id:'ha1',name:'Marcos Ferreira',role:'harmonia',emoji:'🎯',creativity:80,discipline:95,experience:90,popularity:78,management:92,cost:350000},
-    {id:'ha2',name:'Fátima Gomes',role:'harmonia',emoji:'🎯',creativity:78,discipline:93,experience:85,popularity:75,management:90,cost:280000},
-    {id:'ha3',name:'Roberto Klein',role:'harmonia',emoji:'🎯',creativity:75,discipline:92,experience:80,popularity:72,management:88,cost:220000},
-    {id:'ha4',name:'Interno Harmonia',role:'harmonia',emoji:'🎯',creativity:62,discipline:82,experience:60,popularity:65,management:75,cost:80000},
+    {id:'ha01',name:'João Carlos',role:'harmonia',emoji:'🎯',creativity:82,discipline:96,experience:92,popularity:80,management:94,cost:380000},
+    {id:'ha02',name:'José Luiz',role:'harmonia',emoji:'🎯',creativity:80,discipline:95,experience:90,popularity:78,management:93,cost:360000},
+    {id:'ha03',name:'Carlos Roberto',role:'harmonia',emoji:'🎯',creativity:79,discipline:94,experience:89,popularity:77,management:92,cost:340000},
+    {id:'ha04',name:'Paulo Roberto',role:'harmonia',emoji:'🎯',creativity:78,discipline:94,experience:88,popularity:76,management:91,cost:320000},
+    {id:'ha05',name:'Marcelo Pires',role:'harmonia',emoji:'🎯',creativity:77,discipline:93,experience:87,popularity:75,management:90,cost:300000},
+    {id:'ha06',name:'Ricardo Gomes',role:'harmonia',emoji:'🎯',creativity:76,discipline:93,experience:86,popularity:74,management:90,cost:280000},
+    {id:'ha07',name:'Fernando Costa',role:'harmonia',emoji:'🎯',creativity:75,discipline:92,experience:84,popularity:73,management:89,cost:260000},
+    {id:'ha08',name:'Luiz Antônio',role:'harmonia',emoji:'🎯',creativity:75,discipline:92,experience:83,popularity:72,management:88,cost:250000},
+    {id:'ha09',name:'Roberto Carlos',role:'harmonia',emoji:'🎯',creativity:74,discipline:91,experience:82,popularity:71,management:88,cost:240000},
+    {id:'ha10',name:'Cláudio Silva',role:'harmonia',emoji:'🎯',creativity:73,discipline:91,experience:81,popularity:70,management:87,cost:230000},
+    {id:'ha11',name:'Marcos Antônio',role:'harmonia',emoji:'🎯',creativity:73,discipline:90,experience:80,popularity:70,management:87,cost:220000},
+    {id:'ha12',name:'André Luiz',role:'harmonia',emoji:'🎯',creativity:72,discipline:90,experience:79,popularity:69,management:86,cost:210000},
+    {id:'ha13',name:'Rodrigo Oliveira',role:'harmonia',emoji:'🎯',creativity:72,discipline:89,experience:78,popularity:68,management:85,cost:200000},
+    {id:'ha14',name:'Fábio Santos',role:'harmonia',emoji:'🎯',creativity:71,discipline:89,experience:77,popularity:68,management:85,cost:190000},
+    {id:'ha15',name:'Rogério Ferreira',role:'harmonia',emoji:'🎯',creativity:70,discipline:88,experience:76,popularity:67,management:84,cost:180000},
+    {id:'ha16',name:'Alexandre Pereira',role:'harmonia',emoji:'🎯',creativity:70,discipline:88,experience:75,popularity:66,management:83,cost:170000},
+    {id:'ha17',name:'Eduardo Souza',role:'harmonia',emoji:'🎯',creativity:69,discipline:87,experience:74,popularity:66,management:83,cost:160000},
+    {id:'ha18',name:'Leonardo Alves',role:'harmonia',emoji:'🎯',creativity:68,discipline:86,experience:72,popularity:65,management:82,cost:150000},
+    {id:'ha19',name:'Sérgio Rodrigues',role:'harmonia',emoji:'🎯',creativity:68,discipline:86,experience:71,popularity:64,management:81,cost:140000},
+    {id:'ha20',name:'Renato Carvalho',role:'harmonia',emoji:'🎯',creativity:67,discipline:85,experience:70,popularity:63,management:80,cost:130000},
+    {id:'ha21',name:'Márcio Fernandes',role:'harmonia',emoji:'🎯',creativity:66,discipline:85,experience:69,popularity:63,management:80,cost:120000},
+    {id:'ha22',name:'Thiago Ribeiro',role:'harmonia',emoji:'🎯',creativity:66,discipline:84,experience:68,popularity:62,management:79,cost:115000},
+    {id:'ha23',name:'Daniel Martins',role:'harmonia',emoji:'🎯',creativity:65,discipline:84,experience:67,popularity:62,management:78,cost:110000},
+    {id:'ha24',name:'Gustavo Barros',role:'harmonia',emoji:'🎯',creativity:65,discipline:83,experience:66,popularity:61,management:77,cost:105000},
+    {id:'ha25',name:'Bruno Teixeira',role:'harmonia',emoji:'🎯',creativity:64,discipline:83,experience:65,popularity:60,management:77,cost:100000},
+    {id:'ha26',name:'Felipe Nascimento',role:'harmonia',emoji:'🎯',creativity:64,discipline:82,experience:64,popularity:60,management:76,cost:95000},
+    {id:'ha27',name:'Diego Moraes',role:'harmonia',emoji:'🎯',creativity:63,discipline:82,experience:63,popularity:59,management:76,cost:90000},
+    {id:'ha28',name:'Vinícius Duarte',role:'harmonia',emoji:'🎯',creativity:63,discipline:81,experience:62,popularity:59,management:75,cost:85000},
+    {id:'ha29',name:'Rafael Andrade',role:'harmonia',emoji:'🎯',creativity:62,discipline:81,experience:61,popularity:58,management:74,cost:80000},
+    {id:'ha30',name:'Henrique Campos',role:'harmonia',emoji:'🎯',creativity:62,discipline:80,experience:60,popularity:57,management:74,cost:75000},
   ],
   comissaoFrente: [
-    {id:'cf1',name:'Cia. Teatral Sapucaí',role:'comissaoFrente',emoji:'💃',creativity:95,discipline:90,experience:92,popularity:88,management:80,cost:500000},
-    {id:'cf2',name:'Cia. Arte Viva',role:'comissaoFrente',emoji:'💃',creativity:90,discipline:88,experience:85,popularity:82,management:78,cost:380000},
-    {id:'cf3',name:'Grupo Dança Brasil',role:'comissaoFrente',emoji:'💃',creativity:85,discipline:88,experience:80,popularity:78,management:75,cost:300000},
-    {id:'cf4',name:'Cia. Movimentos',role:'comissaoFrente',emoji:'💃',creativity:80,discipline:85,experience:75,popularity:72,management:72,cost:220000},
-    {id:'cf5',name:'Grupo Local',role:'comissaoFrente',emoji:'💃',creativity:68,discipline:78,experience:60,popularity:65,management:65,cost:80000},
+    {id:'cf01',name:'Deborah Colker',role:'comissaoFrente',emoji:'💃',creativity:98,discipline:92,experience:95,popularity:96,management:88,cost:680000},
+    {id:'cf02',name:'Carlinhos de Jesus',role:'comissaoFrente',emoji:'💃',creativity:96,discipline:90,experience:97,popularity:98,management:85,cost:650000},
+    {id:'cf03',name:'Jaime Arôxa',role:'comissaoFrente',emoji:'💃',creativity:95,discipline:92,experience:96,popularity:95,management:87,cost:620000},
+    {id:'cf04',name:'Rodrigo Pederneiras',role:'comissaoFrente',emoji:'💃',creativity:97,discipline:88,experience:90,popularity:88,management:82,cost:590000},
+    {id:'cf05',name:'Ana Botafogo',role:'comissaoFrente',emoji:'💃',creativity:94,discipline:95,experience:98,popularity:97,management:90,cost:580000},
+    {id:'cf06',name:'Hélio Bejani',role:'comissaoFrente',emoji:'💃',creativity:93,discipline:90,experience:92,popularity:90,management:85,cost:520000},
+    {id:'cf07',name:'Marcelo Misailidis',role:'comissaoFrente',emoji:'💃',creativity:92,discipline:88,experience:90,popularity:88,management:83,cost:500000},
+    {id:'cf08',name:'Alice Arja',role:'comissaoFrente',emoji:'💃',creativity:91,discipline:87,experience:88,popularity:86,management:82,cost:480000},
+    {id:'cf09',name:'Jorge Teixeira',role:'comissaoFrente',emoji:'💃',creativity:90,discipline:88,experience:92,popularity:85,management:84,cost:460000},
+    {id:'cf10',name:'Renato Vieira',role:'comissaoFrente',emoji:'💃',creativity:89,discipline:87,experience:88,popularity:84,management:82,cost:440000},
+    {id:'cf11',name:'Rodrigo Negri',role:'comissaoFrente',emoji:'💃',creativity:88,discipline:86,experience:85,popularity:82,management:80,cost:400000},
+    {id:'cf12',name:'Priscilla Mota',role:'comissaoFrente',emoji:'💃',creativity:87,discipline:88,experience:83,popularity:82,management:80,cost:380000},
+    {id:'cf13',name:'Alex Neoral',role:'comissaoFrente',emoji:'💃',creativity:86,discipline:85,experience:82,popularity:80,management:78,cost:360000},
+    {id:'cf14',name:'Claudia Mota e Edifranc Alves',role:'comissaoFrente',emoji:'💃',creativity:85,discipline:87,experience:84,popularity:82,management:79,cost:350000},
+    {id:'cf15',name:'Lucas Maciel e Karina Dias',role:'comissaoFrente',emoji:'💃',creativity:84,discipline:86,experience:80,popularity:78,management:78,cost:320000},
+    {id:'cf16',name:'Roberto Lima',role:'comissaoFrente',emoji:'💃',creativity:83,discipline:85,experience:82,popularity:78,management:77,cost:300000},
+    {id:'cf17',name:'Márcio Moura',role:'comissaoFrente',emoji:'💃',creativity:82,discipline:85,experience:80,popularity:76,management:76,cost:280000},
+    {id:'cf18',name:'Alan Keller',role:'comissaoFrente',emoji:'💃',creativity:81,discipline:84,experience:78,popularity:75,management:75,cost:260000},
+    {id:'cf19',name:'Patrick Carvalho',role:'comissaoFrente',emoji:'💃',creativity:80,discipline:83,experience:76,popularity:74,management:74,cost:240000},
+    {id:'cf20',name:'Fábio Batista',role:'comissaoFrente',emoji:'💃',creativity:79,discipline:82,experience:74,popularity:72,management:73,cost:220000},
+    {id:'cf21',name:'Marcelo Chocolate',role:'comissaoFrente',emoji:'💃',creativity:78,discipline:82,experience:75,popularity:72,management:72,cost:200000},
+    {id:'cf22',name:'Luciana Yegros',role:'comissaoFrente',emoji:'💃',creativity:78,discipline:83,experience:73,popularity:72,management:72,cost:190000},
+    {id:'cf23',name:'Carlos Aleixo',role:'comissaoFrente',emoji:'💃',creativity:77,discipline:80,experience:72,popularity:70,management:70,cost:180000},
+    {id:'cf24',name:'Márcio Alves',role:'comissaoFrente',emoji:'💃',creativity:76,discipline:80,experience:70,popularity:68,management:70,cost:170000},
+    {id:'cf25',name:'Handerson Big',role:'comissaoFrente',emoji:'💃',creativity:75,discipline:79,experience:68,popularity:67,management:68,cost:160000},
+    {id:'cf26',name:'Marlon Cruz',role:'comissaoFrente',emoji:'💃',creativity:74,discipline:79,experience:66,popularity:66,management:68,cost:150000},
+    {id:'cf27',name:'Anderson Couto',role:'comissaoFrente',emoji:'💃',creativity:73,discipline:78,experience:65,popularity:65,management:67,cost:140000},
+    {id:'cf28',name:'Carla Caffé',role:'comissaoFrente',emoji:'💃',creativity:72,discipline:78,experience:64,popularity:64,management:66,cost:130000},
+    {id:'cf29',name:'Gislaine Cavalcanti',role:'comissaoFrente',emoji:'💃',creativity:71,discipline:77,experience:62,popularity:63,management:65,cost:120000},
+    {id:'cf30',name:'Regina Sauer',role:'comissaoFrente',emoji:'💃',creativity:70,discipline:77,experience:62,popularity:62,management:65,cost:110000},
   ],
   casal: [
     {id:'ca1',name:'Anderson & Viviane',role:'casal',emoji:'👑',creativity:95,discipline:88,experience:95,popularity:95,management:75,cost:450000},
@@ -1299,6 +1358,7 @@ const PROFESSIONALS_DATA = {
 const ENREDO_TYPES = [
   {id:'historico',name:'Histórico',icon:'📜',desc:'Mergulha na história do Brasil ou do mundo com narrativa épica.',
    potVisual:80,cost:1.0,riskLevel:0.2,communityAccept:75,noteBonus:{enredo:0.3},notePenalty:{},
+   authoralCost:0,
    impacts:[{t:'+ Nota de Enredo',p:true},{t:'Pesquisa Necessária',p:false},{t:'Impacto Médio',p:null}]},
   {id:'afro',name:'Afro-Brasileiro',icon:'🌍',desc:'Celebra a cultura, resistência e riqueza da herança africana.',
    potVisual:88,cost:0.9,riskLevel:0.2,communityAccept:95,noteBonus:{enredo:0.2,harmonia:0.2},notePenalty:{},
@@ -1312,12 +1372,12 @@ const ENREDO_TYPES = [
   {id:'cultural',name:'Cultural',icon:'🎭',desc:'Celebra manifestações artísticas, musicais ou culturais brasileiras.',
    potVisual:82,cost:1.0,riskLevel:0.2,communityAccept:85,noteBonus:{samba:0.15},notePenalty:{},
    impacts:[{t:'+ Samba-Enredo',p:true},{t:'Alta Versatilidade',p:true},{t:'Custo Normal',p:null}]},
-  {id:'geografico',name:'Geográfico',icon:'🗺️',desc:'Explora regiões, países, paisagens e suas histórias.',
-   potVisual:85,cost:1.05,riskLevel:0.2,communityAccept:78,noteBonus:{alegorias:0.2},notePenalty:{},
-   impacts:[{t:'+ Visual/Alegorias',p:true},{t:'Custo Levemente Maior',p:false},{t:'Exótico',p:null}]},
+  {id:'geografico',name:'Geográfico',icon:'🗺️',desc:'Explora regiões, países, paisagens e suas histórias. Requer pesquisa in loco.',
+   potVisual:85,cost:0,travelCost:120000,riskLevel:0.2,communityAccept:78,noteBonus:{alegorias:0.2},notePenalty:{},
+   impacts:[{t:'+ Visual/Alegorias',p:true},{t:'Custo de Viagem de Pesquisa',p:false},{t:'Exótico',p:null}]},
   {id:'patrocinado',name:'Patrocinado',icon:'💼',desc:'Enredo criado em parceria com empresa ou instituição patrocinadora.',
-   potVisual:70,cost:0.5,riskLevel:0.4,communityAccept:55,noteBonus:{},notePenalty:{harmonia:-0.1,enredo:-0.2},
-   impacts:[{t:'Grande Receita Extra',p:true},{t:'- Comunidade',p:false},{t:'- Nota Enredo',p:false}],sponsored:true},
+   potVisual:72,cost:0,travelCost:80000,riskLevel:0.4,communityAccept:55,noteBonus:{},notePenalty:{harmonia:-0.05},
+   impacts:[{t:'Grande Receita Extra',p:true},{t:'- Comunidade',p:false},{t:'Nota sem penalidade extra',p:true}],sponsored:true},
   {id:'abstrato',name:'Abstrato/Poético',icon:'✨',desc:'Conceito poético, filosófico ou vanguardista de alto risco e impacto.',
    potVisual:95,cost:1.1,riskLevel:0.5,communityAccept:65,noteBonus:{alegorias:0.3,comissao:0.2},notePenalty:{harmonia:-0.1},
    impacts:[{t:'+ Máximo Visual',p:true},{t:'Alto Risco',p:false},{t:'- Harmonia',p:false}]},
@@ -3432,6 +3492,17 @@ function initGameState(school, difficulty) {
 
     // Renovations state
     renovationsDone: false,
+
+    // Rainha de Bateria — sistema completo
+    rainha: null,          // objeto da rainha atual
+    rainhaType: null,      // 'comunidade' | 'famosa' | 'celebridade'
+    rainhaContrato: 1,     // anos de contrato restantes
+    rei: null,             // Rei de Bateria (opcional)
+    musaComunidade: null,  // Musa honorária da comunidade
+    rainhaEscandalos: [],  // histórico de escândalos desta rainha
+    rainhaAwardsThisYear: [], // prêmios de imprensa desta rainha
+    rainhaNotoriedade: 0,  // mídia acumulada por esta rainha (0-100)
+    eventoRainhaGratis: null, // evento raro: famosa quer desfilar grátis
   };
 }
 
@@ -3456,6 +3527,57 @@ function saveGame(slot) {
   } catch(e) {
     toast('Erro ao salvar: '+e.message,'error');
   }
+}
+
+function confirmGoToMenu() {
+  if(!gameState) { showScreen('screen-intro'); return; }
+  const schoolName = gameState.school ? gameState.school.name : 'sua escola';
+  const season = gameState.season || '?';
+  openModal(
+    '🏠 Voltar ao Menu Principal',
+    `<div style="text-align:center;padding:.5rem 0">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">🎭</div>
+      <p style="color:var(--text);font-size:.95rem;margin-bottom:.5rem">
+        Você está saindo da temporada de <strong style="color:var(--gold)">${schoolName}</strong> — ${season}.
+      </p>
+      <p style="color:var(--text2);font-size:.85rem;margin-bottom:1rem">
+        Deseja salvar o jogo antes de voltar ao menu principal?
+      </p>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;font-size:.8rem;color:var(--text3)">
+        ⚠️ Progresso não salvo será perdido permanentemente.
+      </div>
+    </div>`,
+    [
+      {
+        text: '💾 Salvar e Sair',
+        cls: 'btn-gold',
+        action: () => {
+          saveGame();
+          closeModal();
+          setTimeout(() => {
+            gameState = null;
+            showScreen('screen-intro');
+            document.getElementById('introSaves').classList.add('hidden');
+          }, 600);
+        }
+      },
+      {
+        text: '🚪 Sair sem Salvar',
+        cls: 'btn-danger',
+        action: () => {
+          closeModal();
+          gameState = null;
+          showScreen('screen-intro');
+          document.getElementById('introSaves').classList.add('hidden');
+        }
+      },
+      {
+        text: 'Cancelar',
+        cls: 'btn-gray',
+        action: closeModal
+      }
+    ]
+  );
 }
 
 function loadGame(slot) {
@@ -3507,7 +3629,7 @@ function showTab(tab) {
   const titles = {
     dashboard:'📊 Dashboard',historico:'📚 Histórico da Escola',finances:'💰 Finanças',enredo:'📜 Enredo',
     samba:'🎶 Disputa de Samba-Enredo',barracão:'🏗️ Barracão',
-    alas:'👥 Alas e Componentes',team:'🎭 Equipe Artística',
+    alas:'👥 Alas e Componentes',team:'🎭 Equipe Artística',rainha:'👸 Rainha de Bateria',
     ensaios:'🎺 Ensaios',community:'❤️ Comunidade',
     eventos:'🎉 Eventos de Quadra',patrocinadores:'🤝 Patrocinadores',talentos:'🌟 Talentos da Comunidade',
     politics:'🏛️ Sistema Político',press:'📰 Imprensa',negociacoes:'🤝 Negociações — Mercado de Profissionais',
@@ -3525,7 +3647,7 @@ function renderTab(tab) {
   const fns = {
     dashboard:renderDashboard, historico:renderHistorico, finances:renderFinances, enredo:renderEnredo,
     samba:renderSamba, barracão:renderBarracão, alas:renderAlas,
-    team:renderTeam, ensaios:renderEnsaios, community:renderCommunity,
+    team:renderTeam, rainha:renderRainha, ensaios:renderEnsaios, community:renderCommunity,
     eventos:renderEventos, patrocinadores:renderPatrocinadores, talentos:renderTalentos,
     politics:renderPolitics, press:renderPress, negociacoes:renderNegociacoes,
   };
@@ -4105,6 +4227,21 @@ function renderSidebar() {
   }
 }
 
+
+// Hook: verificar evento rainha grátis mensalmente
+function checkEventoRainhaGratisHook() {
+  const m = gameState.month;
+  // Roda em Abril-Outubro, sem rainha, sem evento pendente
+  if(m >= 1 && m <= 7 && !gameState.rainha && !gameState.eventoRainhaGratis) {
+    checkEventoRainhaGratis();
+  }
+  // Se tem evento pendente de rainha grátis, mostra badge
+  if(gameState.eventoRainhaGratis) {
+    const b = document.getElementById('badge-rainha');
+    if(b) {b.textContent='🎁';b.classList.remove('hidden');}
+  }
+}
+
 function checkBadges() {
   if(!gameState) return;
   const b = (id,show)=>{
@@ -4403,7 +4540,7 @@ function renderDashboard() {
         <div class="prog-wrap"><div class="prog-label"><span>Bateria</span><span>${Math.round(gameState.scores.bateria)}%</span></div><div class="prog-track"><div class="prog-fill red" style="width:${gameState.scores.bateria}%"></div></div></div>
         <div style="margin-top:.75rem;text-align:center">
           <div style="font-size:.7rem;color:var(--text3)">Nota Estimada</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:2rem;color:var(--gold)">${noteEst.toFixed(2)}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:2rem;color:var(--gold)">${noteEst.toFixed(1)}</div>
         </div>
       </div>
     </div>
@@ -4885,8 +5022,9 @@ function renderEnredo() {
 
 function selectEnredo(id, isSuggestion=false) {
   const e = ENREDO_TYPES.find(x=>x.id===id);
+  // Enredo autoral: grátis. Geográfico/patrocinado: só custo de viagem de pesquisa.
   const baseCost = gameState.school.group==='especial'?1500000:500000;
-  const cost = Math.floor(baseCost * e.cost);
+  const cost = e.cost === 0 ? (e.travelCost || 0) : Math.floor(baseCost * e.cost);
 
   let extraInfo = '';
   if(e.sponsored) {
@@ -4915,8 +5053,8 @@ function selectEnredo(id, isSuggestion=false) {
     <p>${e.desc}</p>
     <div style="margin-top:1rem">
       <div class="stat-block" style="display:inline-block;padding:.5rem 1rem">
-        <div class="sb-val" style="font-size:1.3rem">R$ ${fmt(cost)}</div>
-        <div class="sb-lbl">Custo de Desenvolvimento</div>
+        <div class="sb-val" style="font-size:1.3rem">${cost===0?'Grátis':'R$ '+fmt(cost)}</div>
+        <div class="sb-lbl">${e.travelCost&&e.cost===0?'Custo de Pesquisa (Viagem)':'Custo de Desenvolvimento'}</div>
       </div>
     </div>
     <div style="margin-top:1rem;font-size:.85rem;color:var(--text2)">
@@ -6527,6 +6665,897 @@ function recruitComponents() {
 // ==================== TEAM ==================================
 // ============================================================
 
+
+// ============================================================
+// ==================== RAINHA DE BATERIA =====================
+// ============================================================
+
+const DB_GAROTAS_COMUNIDADE = [
+  'Ana Clara Souza','Maria Eduarda Silva','Beatriz Santos','Larissa Oliveira',
+  'Camila Ferreira','Jéssica Rodrigues','Letícia Almeida','Amanda Pereira',
+  'Bruna Costa','Rafaela Gomes','Vitória Barbosa','Gabriela Ribeiro',
+  'Thais Martins','Luana Carvalho','Bianca Lopes','Aline Fernandes',
+  'Priscila Nascimento','Daniele Rocha','Patrícia Teixeira',
+];
+
+const DB_FAMOSAS = [
+  // MUSAS DO CARNAVAL — samba forte, legado histórico
+  {name:'Viviane Araújo',    tier:'musa_carnaval', pop:98, samba:96, carisma:95, beleza:94, presenca:96, ligacao:85, conexaoBateria:92, cost:3500000, anos:1},
+  {name:'Camila Silva',      tier:'musa_carnaval', pop:88, samba:90, carisma:86, beleza:88, presenca:90, ligacao:78, conexaoBateria:88, cost:1200000, anos:1},
+  {name:'Raíssa Machado',    tier:'musa_carnaval', pop:84, samba:88, carisma:82, beleza:86, presenca:87, ligacao:75, conexaoBateria:84, cost:900000,  anos:1},
+  {name:'Milena Nogueira',   tier:'musa_carnaval', pop:80, samba:85, carisma:78, beleza:82, presenca:84, ligacao:72, conexaoBateria:80, cost:650000,  anos:1},
+
+  // EX-RAINHAS HISTÓRICAS — prestígio e conexão com bateria
+  {name:'Gracyanne Barbosa', tier:'ex_rainha', pop:92, samba:78, carisma:90, beleza:96, presenca:88, ligacao:60, conexaoBateria:75, cost:2200000, anos:1},
+  {name:'Tati Minerato',     tier:'ex_rainha', pop:82, samba:80, carisma:80, beleza:84, presenca:82, ligacao:68, conexaoBateria:78, cost:800000,  anos:1},
+  {name:'Ana Paula Minerato',tier:'ex_rainha', pop:78, samba:82, carisma:78, beleza:80, presenca:80, ligacao:70, conexaoBateria:80, cost:700000,  anos:1},
+  {name:'Pepita',            tier:'ex_rainha', pop:76, samba:84, carisma:75, beleza:78, presenca:82, ligacao:72, conexaoBateria:82, cost:550000,  anos:1},
+  {name:'Erika Schneider',   tier:'ex_rainha', pop:76, samba:84, carisma:74, beleza:80, presenca:82, ligacao:68, conexaoBateria:80, cost:500000,  anos:1},
+  {name:'Babi Muniz',        tier:'ex_rainha', pop:72, samba:80, carisma:70, beleza:74, presenca:78, ligacao:65, conexaoBateria:76, cost:400000,  anos:1},
+
+  // INFLUENCERS — mega mídia, samba fraco, risco de rejeição
+  {name:'Jade Picon',        tier:'influencer', pop:95, samba:62, carisma:90, beleza:95, presenca:78, ligacao:30, conexaoBateria:45, cost:3000000, anos:1},
+  {name:'Larissa Manoela',   tier:'influencer', pop:94, samba:68, carisma:92, beleza:93, presenca:80, ligacao:35, conexaoBateria:50, cost:2800000, anos:1},
+  {name:'Virginia Fonseca',  tier:'influencer', pop:96, samba:60, carisma:94, beleza:88, presenca:75, ligacao:28, conexaoBateria:40, cost:4000000, anos:1},
+  {name:'Jojo Todynho',      tier:'influencer', pop:92, samba:75, carisma:95, beleza:82, presenca:90, ligacao:55, conexaoBateria:65, cost:1800000, anos:1},
+  {name:'Deolane Bezerra',   tier:'influencer', pop:88, samba:65, carisma:88, beleza:85, presenca:82, ligacao:42, conexaoBateria:52, cost:1200000, anos:1},
+
+  // SUBCELEBRIDADES — custo médio, efeito médio
+  {name:'Gretchen',          tier:'subcelebridade', pop:82, samba:88, carisma:88, beleza:78, presenca:86, ligacao:65, conexaoBateria:80, cost:600000, anos:1},
+  {name:'Nicole Bahls',      tier:'subcelebridade', pop:80, samba:72, carisma:80, beleza:90, presenca:76, ligacao:50, conexaoBateria:60, cost:520000, anos:1},
+  {name:'Andressa Urach',    tier:'subcelebridade', pop:78, samba:70, carisma:76, beleza:88, presenca:72, ligacao:45, conexaoBateria:55, cost:480000, anos:1},
+  {name:'MC Mirella',        tier:'subcelebridade', pop:80, samba:78, carisma:82, beleza:84, presenca:80, ligacao:58, conexaoBateria:68, cost:550000, anos:1},
+  {name:'Kerline Cardoso',   tier:'subcelebridade', pop:72, samba:68, carisma:70, beleza:82, presenca:70, ligacao:48, conexaoBateria:58, cost:350000, anos:1},
+  {name:'Raissa Barbosa',    tier:'subcelebridade', pop:74, samba:70, carisma:72, beleza:84, presenca:72, ligacao:50, conexaoBateria:60, cost:380000, anos:1},
+  {name:'Valesca Popozuda',  tier:'subcelebridade', pop:80, samba:76, carisma:84, beleza:80, presenca:82, ligacao:60, conexaoBateria:70, cost:500000, anos:1},
+  {name:'Inês Brasil',       tier:'subcelebridade', pop:74, samba:62, carisma:86, beleza:70, presenca:80, ligacao:55, conexaoBateria:52, cost:300000, anos:1},
+  {name:'Geisy Arruda',      tier:'subcelebridade', pop:78, samba:68, carisma:78, beleza:88, presenca:74, ligacao:48, conexaoBateria:55, cost:420000, anos:1},
+  {name:'Juju Salimeni',     tier:'subcelebridade', pop:84, samba:72, carisma:82, beleza:90, presenca:76, ligacao:52, conexaoBateria:62, cost:560000, anos:1},
+  {name:'Liziane Gutierrez', tier:'subcelebridade', pop:70, samba:66, carisma:70, beleza:82, presenca:70, ligacao:44, conexaoBateria:54, cost:320000, anos:1},
+  {name:'Dayanne Bezerra',   tier:'subcelebridade', pop:74, samba:68, carisma:74, beleza:80, presenca:72, ligacao:48, conexaoBateria:56, cost:370000, anos:1},
+
+  // CELEBRIDADES A-LIST
+  {name:'Bruna Marquezine',  tier:'celebridade', pop:98, samba:72, carisma:96, beleza:98, presenca:88, ligacao:32, conexaoBateria:50, cost:4500000, anos:1},
+  {name:'Marina Ruy Barbosa',tier:'celebridade', pop:95, samba:68, carisma:93, beleza:97, presenca:84, ligacao:30, conexaoBateria:46, cost:3800000, anos:1},
+  {name:'Isis Valverde',     tier:'celebridade', pop:92, samba:74, carisma:90, beleza:94, presenca:86, ligacao:36, conexaoBateria:54, cost:3200000, anos:1},
+  {name:'Juliana Paes',      tier:'celebridade', pop:94, samba:88, carisma:92, beleza:93, presenca:92, ligacao:50, conexaoBateria:78, cost:4000000, anos:1},
+  {name:'Paolla Oliveira',   tier:'celebridade', pop:96, samba:90, carisma:94, beleza:96, presenca:94, ligacao:52, conexaoBateria:82, cost:4800000, anos:1},
+  {name:'Giovanna Ewbank',   tier:'celebridade', pop:90, samba:76, carisma:88, beleza:92, presenca:84, ligacao:38, conexaoBateria:58, cost:3000000, anos:1},
+  {name:'Taís Araujo',       tier:'celebridade', pop:92, samba:82, carisma:90, beleza:90, presenca:88, ligacao:55, conexaoBateria:72, cost:3200000, anos:1},
+  {name:'Grazi Massafera',   tier:'celebridade', pop:88, samba:78, carisma:86, beleza:92, presenca:84, ligacao:42, conexaoBateria:62, cost:2800000, anos:1},
+  {name:'Camila Queiroz',    tier:'celebridade', pop:88, samba:72, carisma:86, beleza:90, presenca:80, ligacao:36, conexaoBateria:54, cost:2600000, anos:1},
+  {name:'Sheron Menezes',    tier:'celebridade', pop:84, samba:80, carisma:84, beleza:86, presenca:84, ligacao:48, conexaoBateria:68, cost:2200000, anos:1},
+];
+
+// ============================================================
+// ==================== RAINHA DE BATERIA — SISTEMA COMPLETO ==
+// ============================================================
+
+let concursoRainhaState = null;
+
+// Nível de nível/tier das famosas
+const RAINHA_TIERS = {
+  'musa_carnaval':  {label:'👑 Musa do Carnaval',  color:'var(--gold)',      pressBump:25, communityRisk:0.15, bateriaBonus:8},
+  'influencer':     {label:'📱 Influencer',         color:'var(--accent)',    pressBump:30, communityRisk:0.25, bateriaBonus:3},
+  'ex_rainha':      {label:'🏅 Ex-Rainha Histórica',color:'var(--success)',   pressBump:18, communityRisk:0.10, bateriaBonus:10},
+  'subcelebridade': {label:'⭐ Subcelebridade',      color:'var(--info)',      pressBump:15, communityRisk:0.30, bateriaBonus:4},
+  'celebridade':    {label:'🌟 Celebridade A-List',  color:'var(--gold-light)',pressBump:35, communityRisk:0.35, bateriaBonus:5},
+  'comunidade':     {label:'🌸 Garota da Comunidade',color:'var(--green-light)',pressBump:5, communityRisk:0.05, bateriaBonus:6},
+};
+
+// Portais de imprensa carnavalesca
+const PORTAIS_IMPRENSA = ['SRzd','Carnavalesco.com','Samba-Net','Minha São Paulo','GazetaDoPovo Carnaval','O Globo Carnaval','Extra Carnaval','G1 Carnaval'];
+
+// Possíveis escândalos
+const RAINHA_ESCANDALOS = [
+  {id:'cachê', text:'Atraso no pagamento do cachê! A rainha ameaça não desfilar.',  effect:{budget:-80000, reputation:-8, press:-5}, icon:'💸'},
+  {id:'rival', text:'foi flagrada curtindo posts de escola rival nas redes sociais!', effect:{community:-8, reputation:-6},            icon:'😱'},
+  {id:'briga',  text:'Briga nos bastidores com integrante da bateria vaza para a imprensa!', effect:{bateria:-5, press:-8, community:-5}, icon:'🥊'},
+  {id:'entrevista', text:'Deu entrevista polêmica criticando a organização da escola!', effect:{reputation:-10, community:-6},         icon:'🎙️'},
+  {id:'falta', text:'Faltou ao ensaio geral sem justificativa!',                     effect:{bateria:-6, harmonia:-3},                icon:'🚫'},
+  {id:'foto',  text:'Fotos comprometedoras da rainha vazam na internet!',            effect:{press:+15, community:-12, reputation:-8},icon:'📸'},
+  {id:'contrato', text:'Quer renegociar o contrato no meio da temporada!',           effect:{budget:-150000},                         icon:'📋'},
+  {id:'saida', text:'Abandonou a escola! Vaga de rainha aberta.',                   effect:{community:-15, reputation:-12, force_exit:true}, icon:'💔'},
+];
+
+// Prêmios possíveis de imprensa para a rainha
+const RAINHA_PREMIOS = [
+  {id:'rainha_ano',   label:'👑 Rainha do Ano',      threshold:85, bonus:{reputation:15, press:20}},
+  {id:'destaque',     label:'⭐ Destaque do Carnaval',threshold:70, bonus:{reputation:8,  press:12}},
+  {id:'revelacao',    label:'🌟 Revelação do Carnaval',threshold:60,bonus:{reputation:5,  press:8}},
+  {id:'rei_bateria',  label:'🥁 Rei da Bateria (Destaque)', threshold:75, bonus:{reputation:6, bateria:5}},
+];
+
+// Possíveis Reis de Bateria (personagens masculinos famosos)
+const DB_REIS = [
+  {name:'Neymar',        pop:98, carisma:92, cost:5000000, icon:'⚽'},
+  {name:'Thiaguinho',    pop:88, carisma:90, cost:1500000, icon:'🎵'},
+  {name:'Seu Jorge',     pop:82, carisma:85, cost:900000,  icon:'🎸'},
+  {name:'Diogo Nogueira',pop:80, carisma:88, cost:800000,  icon:'🎤'},
+  {name:'Mumuzinho',     pop:76, carisma:82, cost:600000,  icon:'🎶'},
+  {name:'Ferrugem',      pop:74, carisma:80, cost:500000,  icon:'🎵'},
+  {name:'Péricles',      pop:72, carisma:84, cost:450000,  icon:'🎤'},
+  {name:'Exaltasamba',   pop:70, carisma:78, cost:400000,  icon:'🥁'},
+  {name:'Rodriguinho',   pop:68, carisma:76, cost:350000,  icon:'🎸'},
+  {name:'Alexandre Pires',pop:78,carisma:82, cost:700000,  icon:'🎵'},
+];
+
+// ============================================================
+// RENDER PRINCIPAL
+// ============================================================
+function renderRainha() {
+  const el = document.getElementById('tabRainha');
+  if(!el) return;
+  const rainha = gameState.rainha;
+  const rei = gameState.rei;
+
+  let body = '';
+
+  if(rainha) {
+    body += renderRainhaAtual(rainha);
+  } else {
+    body += renderRainhaVazia();
+  }
+
+  body += renderReiDaBateria(rei);
+  body += renderMusaComunidade();
+
+  if(rainha && (gameState.rainhaEscandalos||[]).length > 0) {
+    body += renderRainhaHistorico();
+  }
+
+  if(concursoRainhaState) body += renderConcursoAndamento();
+
+  el.innerHTML = body;
+}
+
+// ============================================================
+// RAINHA ATUAL — painel detalhado
+// ============================================================
+function renderRainhaAtual(r) {
+  const tier = RAINHA_TIERS[r.tipo] || RAINHA_TIERS.comunidade;
+  const notoriedade = gameState.rainhaNotoriedade || 0;
+  const conexao = r.conexaoBateria || 50;
+  const carisma  = r.carisma  || r.pop || 60;
+  const beleza   = r.beleza   || Math.round((r.pop||60)*0.9);
+  const presenca = r.presenca || Math.round((r.samba||60)*0.8);
+  const ligacao  = r.ligacao  || (r.tipo==='comunidade'?80:40);
+
+  const escandalos = (gameState.rainhaEscandalos||[]).length;
+  const awards = (gameState.rainhaAwardsThisYear||[]);
+
+  return `
+  <div class="panel">
+    <div class="panel-header" style="background:linear-gradient(90deg,rgba(212,175,55,.08),transparent)">
+      <span class="panel-title">👸 Rainha Atual</span>
+      <span style="font-size:.72rem;padding:.2rem .6rem;border-radius:10px;background:rgba(212,175,55,.15);color:${tier.color};border:1px solid ${tier.color}33">${tier.label}</span>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
+        <div style="font-size:4rem;flex-shrink:0">👑</div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.8rem;color:var(--gold);line-height:1">${r.name}</div>
+          ${r.salario ? `<div style="font-size:.8rem;color:var(--text3);margin-top:.2rem">💰 Contrato: R$ ${fmt(r.salario)}/ano · ${gameState.rainhaContrato||1} ano(s) restante(s)</div>` : '<div style="font-size:.8rem;color:var(--success);margin-top:.2rem">🌸 Eleita pela comunidade</div>'}
+          ${awards.length ? `<div style="margin-top:.4rem">${awards.map(a=>`<span style="font-size:.65rem;padding:.15rem .4rem;border-radius:3px;background:rgba(212,175,55,.2);color:var(--gold);margin-right:.3rem">${a}</span>`).join('')}</div>` : ''}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.5rem;margin-top:1rem">
+        ${[
+          ['💃','Samba no Pé', r.samba||60],
+          ['✨','Carisma',     carisma],
+          ['💄','Beleza',      beleza],
+          ['🎭','Presença Palco', presenca],
+          ['❤️','Lig. Comunidade', ligacao],
+          ['🥁','Conexão Bateria', conexao],
+        ].map(([ico,lbl,val])=>`
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:.5rem .65rem">
+            <div style="font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">${ico} ${lbl}</div>
+            <div style="display:flex;align-items:center;gap:.4rem;margin-top:.2rem">
+              <div style="flex:1;background:var(--bg);border-radius:2px;height:5px;overflow:hidden">
+                <div style="width:${val}%;height:100%;background:${val>=80?'var(--success)':val>=60?'var(--gold)':'var(--danger)'}"></div>
+              </div>
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;color:${val>=80?'var(--success)':val>=60?'var(--gold)':'var(--danger)'}">${val}</span>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+        <div style="flex:1;font-size:.78rem;color:var(--text2)">
+          📺 Notoriedade na mídia: <strong style="color:var(--gold)">${notoriedade}</strong>/100
+          ${escandalos>0?`&nbsp;💥 <span style="color:var(--danger)">${escandalos} escândalo(s)</span>`:''}
+        </div>
+      </div>
+      <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn btn-blue btn-sm" onclick="gerarEventoImprensaRainha()">📰 Evento de Mídia</button>
+        <button class="btn btn-gray btn-sm" onclick="verificarEscandalos()">💥 Verificar Escândalos</button>
+        ${r.tipo!=='comunidade' ? `<button class="btn btn-gray btn-sm" onclick="renegociarContrato()">📋 Renegociar</button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="dispensarRainha()">❌ Dispensar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Helper: evento especial rainha grátis (evita template aninhado)
+function _rainhaGratisHtml() {
+  if(!gameState || !gameState.eventoRainhaGratis) return '';
+  const f = gameState.eventoRainhaGratis;
+  return '<div style="margin-top:.85rem;padding:.85rem;background:rgba(212,175,55,.1);border:2px solid var(--gold);border-radius:8px">'
+    + '<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);font-weight:700;margin-bottom:.3rem">🎁 EVENTO ESPECIAL</div>'
+    + '<div style="font-size:.9rem;color:var(--text)"><strong style="color:var(--gold)">' + f.name + '</strong> quer desfilar de <strong style="color:var(--success)">GRAÇA</strong> pela escola!</div>'
+    + '<div style="font-size:.75rem;color:var(--text2);margin:.3rem 0">Ela é fã da escola e quer exposição na avenida. Oferta por tempo limitado!</div>'
+    + '<div style="display:flex;gap:.5rem;margin-top:.6rem">'
+    + '<button class="btn btn-gold btn-sm" onclick="aceitarRainhaGratis()">🎉 Aceitar!</button>'
+    + '<button class="btn btn-gray btn-sm" onclick="recusarRainhaGratis()">Recusar</button>'
+    + '</div></div>';
+}
+
+// ============================================================
+// SEM RAINHA — opções
+// ============================================================
+function renderRainhaVazia() {
+  return `
+  <div class="panel">
+    <div class="panel-header"><span class="panel-title">👸 Sem Rainha de Bateria</span></div>
+    <div class="panel-body">
+      <p style="color:var(--text2);font-size:.85rem;margin-bottom:1.25rem">
+        A rainha de bateria é o maior símbolo da escola na avenida. Ela impacta bateria, mídia, comunidade e patrocinadores.
+        Escola sem rainha perde décimos no quesito bateria e atenção da imprensa.
+      </p>
+      <div class="grid-2" style="gap:.85rem">
+        <div class="card" onclick="abrirConcurso()">
+          <div style="font-size:1.8rem">🏆</div>
+          <div class="card-title" style="margin-top:.4rem">Concurso da Comunidade</div>
+          <div class="card-desc">Organize um concurso com 3 fases eliminatórias. Gera receita de ingressos, engaja a torcida e fortalece o vínculo com a comunidade.</div>
+          <div style="margin-top:.6rem;display:flex;gap:.35rem;flex-wrap:wrap">
+            <span class="card-tag tag-green">✅ Grátis</span>
+            <span class="card-tag tag-blue">❤️ +Comunidade</span>
+            <span class="card-tag tag-green">💰 Renda de ingressos</span>
+          </div>
+        </div>
+        <div class="card" onclick="abrirContratarFamosa()">
+          <div style="font-size:1.8rem">⭐</div>
+          <div class="card-title" style="margin-top:.4rem">Contratar Famosa</div>
+          <div class="card-desc">Convide uma celebridade diretamente. Gera mais mídia e patrocinadores, mas pode gerar rejeição da torcida.</div>
+          <div style="margin-top:.6rem;display:flex;gap:.35rem;flex-wrap:wrap">
+            <span class="card-tag tag-gold">💰 Custo alto</span>
+            <span class="card-tag tag-purple">📺 +Mídia</span>
+            <span class="card-tag tag-red">⚠️ Risco comunidade</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:.85rem;padding:.65rem;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.2);border-radius:6px;font-size:.78rem;color:var(--text3)">
+        💡 Às vezes uma famosa pode aparecer pedindo para desfilar de graça por admiração à escola. Fique atento aos eventos!
+      </div>
+      ${_rainhaGratisHtml()}
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// REI DE BATERIA
+// ============================================================
+function renderReiDaBateria(rei) {
+  if(rei) {
+    return `
+    <div class="panel" style="margin-top:1rem">
+      <div class="panel-header"><span class="panel-title">🥁 Rei de Bateria</span></div>
+      <div class="panel-body">
+        <div style="display:flex;align-items:center;gap:1rem">
+          <span style="font-size:2.5rem">${rei.icon||'🥁'}</span>
+          <div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.2rem;color:var(--gold)">${rei.name}</div>
+            <div style="font-size:.78rem;color:var(--text2)">Pop: <strong>${rei.pop}</strong> · Carisma: <strong>${rei.carisma}</strong> · Custo: R$ ${fmt(rei.cost)}/ano</div>
+          </div>
+          <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="dispensarRei()">Dispensar</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="panel" style="margin-top:1rem">
+    <div class="panel-header"><span class="panel-title">🥁 Rei de Bateria <span style="font-size:.7rem;color:var(--text3)">(opcional)</span></span></div>
+    <div class="panel-body" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <p style="color:var(--text2);font-size:.83rem;flex:1">O Rei de Bateria é uma figura masculina que acompanha a rainha e amplifica a repercussão na mídia e na bateria.</p>
+      <button class="btn btn-outline btn-sm" onclick="abrirContratarRei()">+ Contratar Rei</button>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// MUSA DA COMUNIDADE
+// ============================================================
+function renderMusaComunidade() {
+  const musa = gameState.musaComunidade;
+  if(musa) {
+    return `
+    <div class="panel" style="margin-top:1rem">
+      <div class="panel-header"><span class="panel-title">🌸 Musa da Comunidade <span style="font-size:.7rem;color:var(--success)">(honorária)</span></span></div>
+      <div class="panel-body" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <span style="font-size:2rem">🌸</span>
+        <div>
+          <div style="font-weight:700;color:var(--text)">${musa.name}</div>
+          <div style="font-size:.75rem;color:var(--text2)">Ligação: <strong>${musa.ligacao}</strong> · Samba: <strong>${musa.samba}</strong> · <span style="color:var(--success)">Gratuita — eleita pela torcida</span></div>
+        </div>
+        <button class="btn btn-gray btn-sm" style="margin-left:auto" onclick="dispensarMusa()">Dispensar</button>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="panel" style="margin-top:1rem">
+    <div class="panel-header"><span class="panel-title">🌸 Musa da Comunidade <span style="font-size:.7rem;color:var(--text3)">(opcional)</span></span></div>
+    <div class="panel-body" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <p style="color:var(--text2);font-size:.83rem;flex:1">Uma musa honorária eleita pela torcida. Gratuita, sem contrato. Fortalece os laços com a comunidade.</p>
+      <button class="btn btn-outline btn-sm" onclick="elegerMusaComunidade()">🌸 Eleger Musa</button>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// HISTÓRICO DE ESCÂNDALOS
+// ============================================================
+function renderRainhaHistorico() {
+  const esc = gameState.rainhaEscandalos || [];
+  return `
+  <div class="panel" style="margin-top:1rem">
+    <div class="panel-header"><span class="panel-title">💥 Histórico de Polêmicas</span></div>
+    <div class="panel-body" style="display:flex;flex-direction:column;gap:.35rem;max-height:160px;overflow-y:auto">
+      ${esc.slice().reverse().map(e=>`
+        <div style="display:flex;gap:.5rem;align-items:flex-start;font-size:.8rem;padding:.35rem;border-bottom:1px solid var(--border)">
+          <span>${e.icon}</span>
+          <span style="color:var(--text2)">${e.text}</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// CONCURSO DA COMUNIDADE — render
+// ============================================================
+function renderConcursoAndamento() {
+  if(!concursoRainhaState) return '';
+  const etapas = [
+    {nome:'Inscrições',      emoji:'📋', desc:'Candidatas inscritas'},
+    {nome:'Eliminatória',    emoji:'💃', desc:'Metade eliminada — samba no pé'},
+    {nome:'Semifinal',       emoji:'🎭', desc:'4 finalistas — simpatia e presença'},
+    {nome:'Final',           emoji:'🏆', desc:'Grande final — vencedora proclamada'},
+  ];
+  const atual = concursoRainhaState.etapa;
+  const candidatas = concursoRainhaState.candidatas;
+  const ativas = candidatas.filter(x=>!x.eliminada);
+
+  return `
+  <div class="panel" style="margin-top:1rem">
+    <div class="panel-header">
+      <span class="panel-title">🏆 Concurso de Rainha — ${etapas[Math.min(atual,3)].nome}</span>
+      <span style="font-size:.72rem;color:var(--text3)">${ativas.length} candidatas ativas</span>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap">
+        ${etapas.map((e,i)=>`
+          <div style="flex:1;min-width:80px;text-align:center;padding:.35rem .5rem;border-radius:6px;
+            background:${i<atual?'rgba(46,204,113,.15)':i===atual?'rgba(212,175,55,.2)':'var(--bg2)'};
+            border:1px solid ${i<atual?'rgba(46,204,113,.4)':i===atual?'var(--gold)':'var(--border)'}">
+            <div style="font-size:1rem">${e.emoji}</div>
+            <div style="font-size:.62rem;font-weight:700;color:${i<atual?'var(--success)':i===atual?'var(--gold)':'var(--text3)'}">${i<atual?'✓ ':i===atual?'▶ ':''}${e.nome}</div>
+          </div>`).join('')}
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.5rem;margin-bottom:1rem">
+        ${candidatas.map(c=>{
+          const score = Math.round((c.samba+c.carisma+c.beleza+c.presenca+c.ligacao)/5);
+          return `<div style="background:var(--bg2);border:1px solid ${c.eliminada?'var(--border)':'rgba(212,175,55,.25)'};border-radius:6px;padding:.55rem .7rem;${c.eliminada?'opacity:.38':''}">
+            <div style="font-weight:700;font-size:.82rem;color:${c.eliminada?'var(--text3)':'var(--text)'}">${c.name}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.12rem;margin-top:.3rem;font-size:.65rem;color:var(--text3)">
+              <span>💃 Samba: <strong style="color:var(--text2)">${c.samba}</strong></span>
+              <span>✨ Carisma: <strong style="color:var(--text2)">${c.carisma}</strong></span>
+              <span>💄 Beleza: <strong style="color:var(--text2)">${c.beleza}</strong></span>
+              <span>🎭 Presença: <strong style="color:var(--text2)">${c.presenca}</strong></span>
+              <span>❤️ Lig.: <strong style="color:var(--text2)">${c.ligacao}</strong></span>
+              <span>📊 Score: <strong style="color:${c.eliminada?'var(--text3)':'var(--gold)'}">${score}</strong></span>
+            </div>
+            <div style="margin-top:.3rem;font-size:.65rem;font-weight:700;color:${c.eliminada?'var(--danger)':'var(--success)'}">
+              ${c.eliminada?'❌ Eliminada':'✅ Na disputa'}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      ${concursoRainhaState.rendaTotal ? `<div style="font-size:.8rem;color:var(--success);margin-bottom:.6rem">💰 Renda de ingressos arrecadada: <strong>R$ ${fmt(concursoRainhaState.rendaTotal)}</strong></div>` : ''}
+
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        ${atual < 3
+          ? `<button class="btn btn-gold" onclick="proximaEtapaConcurso()">▶ Realizar ${etapas[Math.min(atual+1,3)].nome}</button>`
+          : `<button class="btn btn-gold" onclick="finalizarConcurso()">🏆 Proclamar Vencedora!</button>`
+        }
+        <button class="btn btn-gray btn-sm" onclick="cancelarConcurso()">Cancelar Concurso</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// CONCURSO — Funções
+// ============================================================
+function abrirConcurso() {
+  if(concursoRainhaState) { toast('Concurso já em andamento!','warn'); return; }
+  if(gameState.rainha) { toast('Dispense a rainha atual primeiro.','warn'); return; }
+
+  const pool = DB_GAROTAS_COMUNIDADE.filter(n => !_usedProfNames.has(n));
+  const n = 8 + Math.floor(Math.random()*9); // 8 a 16 candidatas
+  const selecionadas = pool.sort(()=>Math.random()-.5).slice(0, Math.min(n, pool.length));
+
+  concursoRainhaState = {
+    etapa: 0,
+    rendaTotal: 0,
+    candidatas: selecionadas.map(name => ({
+      name,
+      samba:   40 + Math.floor(Math.random()*55),
+      carisma: 40 + Math.floor(Math.random()*55),
+      beleza:  40 + Math.floor(Math.random()*55),
+      presenca:40 + Math.floor(Math.random()*55),
+      ligacao: 50 + Math.floor(Math.random()*45), // garotas da comunidade têm maior ligação
+      eliminada: false,
+    }))
+  };
+
+  const renda = 15000 + Math.floor(Math.random()*25000);
+  concursoRainhaState.rendaTotal += renda;
+  gameState.budget += renda;
+  gameState.income.eventos = (gameState.income.eventos||0) + renda;
+  gameState.community = clamp(gameState.community+4, 0, 100);
+  addEvent(`🏆 Concurso de rainha iniciado com ${selecionadas.length} candidatas! Renda de ingressos: R$ ${fmt(renda)}.`,'gold');
+  toast('Concurso iniciado! Inscrições realizadas.','success');
+  renderRainha();
+}
+
+function proximaEtapaConcurso() {
+  if(!concursoRainhaState) return;
+  const c = concursoRainhaState;
+  c.etapa++;
+  const ativas = c.candidatas.filter(x=>!x.eliminada);
+
+  // Quantas eliminar em cada etapa
+  const targets = {1: Math.ceil(ativas.length/2), 2: Math.max(0,ativas.length-4), 3: 0};
+  const qtElim = targets[c.etapa] ?? 0;
+
+  // Pontua candidatas conforme atributo da etapa
+  const scored = ativas.map(x=>{
+    const jitter = (Math.random()-.5)*12;
+    let sc;
+    if(c.etapa===1) sc = x.samba*0.6 + x.presenca*0.4 + jitter;
+    else if(c.etapa===2) sc = x.carisma*0.5 + x.beleza*0.3 + x.ligacao*0.2 + jitter;
+    else sc = (x.samba+x.carisma+x.beleza+x.presenca+x.ligacao)/5 + jitter;
+    return {...x, sc};
+  }).sort((a,b)=>a.sc-b.sc);
+
+  // Elimina as piores
+  const eliminadas = [];
+  for(let i=0;i<qtElim;i++) {
+    scored[i].eliminada = true;
+    eliminadas.push(scored[i].name);
+  }
+  c.candidatas = c.candidatas.map(x=> eliminadas.includes(x.name)?{...x,eliminada:true}:x);
+
+  // Renda de ingressos para semifinal/final
+  const renda = c.etapa >= 2 ? (25000 + Math.floor(Math.random()*40000)) : 0;
+  if(renda) {
+    c.rendaTotal += renda;
+    gameState.budget += renda;
+    gameState.income.eventos = (gameState.income.eventos||0) + renda;
+  }
+  if(c.etapa===2) { gameState.community = clamp(gameState.community+5, 0, 100); }
+
+  const etapasNome = ['','Eliminatória','Semifinal','Final'];
+  if(eliminadas.length>0) toast(`${etapasNome[c.etapa]}: ${eliminadas.join(', ')} eliminada(s)!`,'info');
+  else toast(`${etapasNome[c.etapa]} realizada! Finais a caminho.`,'info');
+  renderRainha();
+}
+
+function finalizarConcurso() {
+  if(!concursoRainhaState) return;
+  const ativas = concursoRainhaState.candidatas.filter(x=>!x.eliminada);
+  const vencedora = ativas.sort((a,b)=>{
+    const sa = (a.samba+a.carisma+a.beleza+a.presenca+a.ligacao)/5;
+    const sb = (b.samba+b.carisma+b.beleza+b.presenca+b.ligacao)/5;
+    return sb-sa;
+  })[0];
+
+  _usedProfNames.add(vencedora.name);
+  gameState.rainha = {
+    ...vencedora,
+    tipo:'comunidade',
+    salario:0,
+    conexaoBateria: Math.round(vencedora.ligacao*0.7 + vencedora.presenca*0.3),
+  };
+  gameState.rainhaType = 'comunidade';
+  gameState.rainhaContrato = 1;
+  gameState.rainhaNotoriedade = Math.round((vencedora.carisma+vencedora.beleza)/2 * 0.5);
+  gameState.rainhaEscandalos = [];
+  gameState.rainhaAwardsThisYear = [];
+  concursoRainhaState = null;
+
+  gameState.community = clamp(gameState.community+15, 0, 100);
+  gameState.scores.bateria = clamp(gameState.scores.bateria+vencedora.ligacao/15, 0, 100);
+  gameState.scores.harmonia = clamp(gameState.scores.harmonia+3, 0, 100);
+
+  addEvent(`👸 ${vencedora.name} venceu o concurso e é a nova Rainha de Bateria! Comunidade em êxtase.`,'gold');
+  toast(`${vencedora.name} é a nova Rainha!`,'success');
+  openModal('🏆 Nova Rainha de Bateria!', `
+    <div style="text-align:center;padding:1rem 0">
+      <div style="font-size:4rem">👑</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--gold);font-style:italic;margin:.5rem 0">${vencedora.name}</div>
+      <div style="color:var(--success);font-size:.9rem">🌸 Eleita pela comunidade</div>
+      <div style="margin-top:1rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;font-size:.8rem">
+        <div style="background:var(--panel);padding:.5rem;border-radius:5px"><div style="color:var(--text3)">Samba</div><strong style="color:var(--gold)">${vencedora.samba}</strong></div>
+        <div style="background:var(--panel);padding:.5rem;border-radius:5px"><div style="color:var(--text3)">Carisma</div><strong style="color:var(--gold)">${vencedora.carisma}</strong></div>
+        <div style="background:var(--panel);padding:.5rem;border-radius:5px"><div style="color:var(--text3)">Ligação</div><strong style="color:var(--gold)">${vencedora.ligacao}</strong></div>
+      </div>
+      <div style="margin-top:1rem;font-size:.82rem;color:var(--text2)">
+        ❤️ Comunidade +15 &nbsp; 🥁 Bateria +${Math.round(vencedora.ligacao/15)}
+      </div>
+    </div>
+  `, [{text:'Celebrar! 🎉', action:closeModal, cls:'btn-gold'}]);
+  renderRainha();
+}
+
+function cancelarConcurso() {
+  openModal('Cancelar Concurso?','<p style="color:var(--text2)">Cancelar o concurso pode desagradar a comunidade.</p>',[
+    {text:'Sim, cancelar', action:()=>{
+      concursoRainhaState=null;
+      gameState.community=clamp(gameState.community-5,0,100);
+      closeModal(); renderRainha();
+    }, cls:'btn-danger'},
+    {text:'Não', action:closeModal, cls:'btn-gray'}
+  ]);
+}
+
+// ============================================================
+// CONTRATAR FAMOSA
+// ============================================================
+function abrirContratarFamosa() {
+  if(gameState.rainha) { toast('Dispense a rainha atual primeiro.','warn'); return; }
+  const disponiveis = DB_FAMOSAS.filter(f => !_usedProfNames.has(f.name));
+  const selecionadas = [...disponiveis].sort(()=>Math.random()-.5).slice(0,15);
+
+  const categorias = {
+    'musa_carnaval':'👑 Musas do Carnaval',
+    'ex_rainha':'🏅 Ex-Rainhas',
+    'influencer':'📱 Influencers',
+    'subcelebridade':'⭐ Subcelebridades',
+    'celebridade':'🌟 Celebridades A-List',
+  };
+
+  const grupos = {};
+  selecionadas.forEach(f=>{
+    const cat = f.tier||f.tipo||'subcelebridade';
+    if(!grupos[cat]) grupos[cat]=[];
+    grupos[cat].push(f);
+  });
+
+  let html = '<div style="max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:1rem">';
+  for(const [cat, lista] of Object.entries(grupos)) {
+    if(!lista.length) continue;
+    const tier = RAINHA_TIERS[cat]||RAINHA_TIERS.subcelebridade;
+    html += `<div>
+      <div style="font-size:.72rem;font-weight:700;color:${tier.color};text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">${categorias[cat]||cat}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem">`;
+    lista.forEach(f=>{
+      const tierInfo = RAINHA_TIERS[f.tier||f.tipo||'subcelebridade']||RAINHA_TIERS.subcelebridade;
+      const gratuito = f._free;
+      html += `<div style="background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:.7rem;cursor:pointer;transition:all .2s"
+        onclick="contratarFamosa('${encodeURIComponent(JSON.stringify(f))}')"
+        onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-weight:700;font-size:.9rem;color:var(--gold)">${f.name}</div>
+        <div style="font-size:.65rem;color:${tierInfo.color};margin:.15rem 0">${tierInfo.label}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.1rem;font-size:.7rem;color:var(--text2)">
+          <span>💃 ${f.samba}</span><span>🌟 ${f.pop}</span>
+          <span>✨ ${f.carisma||Math.round(f.pop*.9)}</span><span>🥁 ${f.conexaoBateria||Math.round(f.samba*.7)}</span>
+        </div>
+        <div style="margin-top:.4rem;font-size:.8rem;font-weight:700;color:${gratuito?'var(--success)':'var(--gold)'}">
+          ${gratuito?'🎁 Quer desfilar GRÁTIS!':'R$ '+fmt(f.cost)+'/ano'}
+        </div>
+        <div style="font-size:.65rem;color:var(--text3);margin-top:.15rem">📺 Mídia +${tierInfo.pressBump} &nbsp; ⚠️ Risco: ${Math.round(tierInfo.communityRisk*100)}%</div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  openModal('⭐ Contratar Rainha Famosa', html, [{text:'Cancelar',action:closeModal,cls:'btn-gray'}], '85vh');
+}
+
+function contratarFamosa(fJson) {
+  const f = JSON.parse(decodeURIComponent(fJson));
+  const tier = RAINHA_TIERS[f.tier||f.tipo||'subcelebridade']||RAINHA_TIERS.subcelebridade;
+  const gratuito = !!f._free;
+  const custo = gratuito ? 0 : f.cost;
+
+  if(gameState.budget < custo) { toast('Orçamento insuficiente!','error'); closeModal(); return; }
+
+  gameState.budget -= custo;
+  if(custo>0) gameState.expenses.equipe = (gameState.expenses.equipe||0) + custo;
+  _usedProfNames.add(f.name);
+
+  gameState.rainha = {
+    ...f,
+    tipo: f.tier||f.tipo||'subcelebridade',
+    salario: gratuito ? 0 : custo,
+    carisma: f.carisma || Math.round(f.pop*0.9),
+    beleza:  f.beleza  || Math.round(f.pop*0.85),
+    presenca:f.presenca|| Math.round(f.samba*0.75),
+    ligacao: f.ligacao || 35,
+    conexaoBateria: f.conexaoBateria || Math.round(f.samba*0.7),
+  };
+  gameState.rainhaType = gameState.rainha.tipo;
+  gameState.rainhaContrato = f.anos || 1;
+  gameState.rainhaNotoriedade = Math.round(f.pop * 0.6);
+  gameState.rainhaEscandalos = [];
+  gameState.rainhaAwardsThisYear = [];
+
+  // Efeitos imediatos
+  gameState.scores.bateria = clamp(gameState.scores.bateria + tier.bateriaBonus, 0, 100);
+  gameState.reputation = clamp(gameState.reputation + Math.round(tier.pressBump*0.5), 0, 100);
+
+  // Risco de rejeição da comunidade
+  if(Math.random() < tier.communityRisk) {
+    gameState.community = clamp(gameState.community-10, 0, 100);
+    addEvent(`⚠️ Parte da torcida rejeitou a contratação de ${f.name}. Comunidade -10.`,'bad');
+  }
+
+  addEvent(`👸 ${f.name} é a nova Rainha de Bateria!${gratuito?' Ela quis desfilar de graça por admiração à escola!':` Contrato: R$ ${fmt(custo)}/ano.`}`,'gold');
+  toast(`${f.name} contratada!`,'success');
+  closeModal();
+  renderRainha();
+}
+
+// ============================================================
+// REI DE BATERIA
+// ============================================================
+function abrirContratarRei() {
+  const disponiveis = DB_REIS.filter(r=>!_usedProfNames.has(r.name));
+  const selecionados = [...disponiveis].sort(()=>Math.random()-.5).slice(0,8);
+  const html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.6rem;max-height:400px;overflow-y:auto">
+    ${selecionados.map(r=>`<div style="background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:.7rem;cursor:pointer"
+      onclick="contratarRei('${encodeURIComponent(JSON.stringify(r))}')"
+      onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-size:1.5rem">${r.icon}</div>
+      <div style="font-weight:700;color:var(--gold);margin-top:.2rem">${r.name}</div>
+      <div style="font-size:.72rem;color:var(--text2)">Pop: <strong>${r.pop}</strong> · Carisma: <strong>${r.carisma}</strong></div>
+      <div style="font-size:.78rem;color:var(--gold);font-weight:700;margin-top:.3rem">R$ ${fmt(r.cost)}/ano</div>
+    </div>`).join('')}
+  </div>`;
+  openModal('🥁 Contratar Rei de Bateria', html, [{text:'Cancelar',action:closeModal,cls:'btn-gray'}]);
+}
+
+function contratarRei(rJson) {
+  const r = JSON.parse(decodeURIComponent(rJson));
+  if(gameState.budget < r.cost) { toast('Orçamento insuficiente!','error'); closeModal(); return; }
+  gameState.budget -= r.cost;
+  gameState.expenses.equipe = (gameState.expenses.equipe||0) + r.cost;
+  _usedProfNames.add(r.name);
+  gameState.rei = {...r, salario:r.cost};
+  gameState.scores.bateria = clamp(gameState.scores.bateria + Math.round(r.carisma/20), 0, 100);
+  gameState.reputation = clamp(gameState.reputation + Math.round(r.pop/15), 0, 100);
+  addEvent(`🥁 ${r.name} é o novo Rei de Bateria! Escola ganha ainda mais visibilidade.`,'gold');
+  toast(`${r.name} contratado como Rei!`,'success');
+  closeModal(); renderRainha();
+}
+
+function dispensarRei() {
+  if(!gameState.rei) return;
+  openModal('Dispensar Rei?',`<p>Dispensar ${gameState.rei.name}?</p>`,[
+    {text:'Sim', action:()=>{addEvent(`${gameState.rei.name} dispensado como Rei de Bateria.`,'bad'); gameState.rei=null; closeModal(); renderRainha();}, cls:'btn-danger'},
+    {text:'Não', action:closeModal, cls:'btn-gray'}
+  ]);
+}
+
+// ============================================================
+// MUSA DA COMUNIDADE
+// ============================================================
+function elegerMusaComunidade() {
+  const pool = DB_GAROTAS_COMUNIDADE.filter(n=>!_usedProfNames.has(n));
+  if(!pool.length) { toast('Sem candidatas disponíveis.','warn'); return; }
+  const candidatas = pool.sort(()=>Math.random()-.5).slice(0,5).map(name=>({
+    name,
+    ligacao: 60+Math.floor(Math.random()*35),
+    samba: 50+Math.floor(Math.random()*40),
+  }));
+  const html = `
+    <p style="color:var(--text2);font-size:.85rem;margin-bottom:1rem">A torcida sugeriu estas candidatas para Musa Honorária. Escolha uma:</p>
+    <div style="display:flex;flex-direction:column;gap:.4rem">
+      ${candidatas.map(c=>`<div style="display:flex;align-items:center;gap:1rem;padding:.5rem .75rem;background:var(--panel);border:1px solid var(--border);border-radius:6px;cursor:pointer"
+        onclick="confirmarMusa('${encodeURIComponent(JSON.stringify(c))}')"
+        onmouseover="this.style.borderColor='var(--success)'" onmouseout="this.style.borderColor='var(--border)'">
+        <span style="font-size:1.3rem">🌸</span>
+        <div style="flex:1"><strong>${c.name}</strong></div>
+        <div style="font-size:.75rem;color:var(--text2)">❤️ ${c.ligacao} &nbsp; 💃 ${c.samba}</div>
+      </div>`).join('')}
+    </div>`;
+  openModal('🌸 Eleger Musa da Comunidade', html, [{text:'Cancelar',action:closeModal,cls:'btn-gray'}]);
+}
+
+function confirmarMusa(cJson) {
+  const c = JSON.parse(decodeURIComponent(cJson));
+  _usedProfNames.add(c.name);
+  gameState.musaComunidade = c;
+  gameState.community = clamp(gameState.community+6, 0, 100);
+  addEvent(`🌸 ${c.name} eleita Musa da Comunidade! Torcida comemora.`,'gold');
+  toast(`${c.name} é a nova Musa!`,'success');
+  closeModal(); renderRainha();
+}
+
+function dispensarMusa() {
+  gameState.musaComunidade=null;
+  gameState.community=clamp(gameState.community-3,0,100);
+  toast('Musa dispensada.','info');
+  renderRainha();
+}
+
+// ============================================================
+// MÍDIA E ESCÂNDALOS
+// ============================================================
+function gerarEventoImprensaRainha() {
+  const r = gameState.rainha;
+  if(!r) { toast('Não há rainha contratada.','warn'); return; }
+  const tier = RAINHA_TIERS[r.tipo]||RAINHA_TIERS.comunidade;
+  const portal = PORTAIS_IMPRENSA[Math.floor(Math.random()*PORTAIS_IMPRENSA.length)];
+  const notoriedade = clamp((gameState.rainhaNotoriedade||0)+tier.pressBump*0.4, 0, 100);
+  gameState.rainhaNotoriedade = Math.round(notoriedade);
+
+  const eventos = [
+    `"${r.name} impressiona nos ensaios e é apontada como favorita ao título de Rainha do Ano"`,
+    `"${r.name} dá entrevista exclusiva ao ${portal} e fala sobre o amor pela escola"`,
+    `"Fotos dos bastidores: veja ${r.name} na preparação para o carnaval"`,
+    `"${r.name} mostra samba no pé em vídeo que viralizou nas redes"`,
+    `"${portal} elege ${r.name} como uma das rainhas mais aguardadas da temporada"`,
+    `"Torcida faz campanha nas redes: '${r.name} merece o prêmio de melhor rainha'"`,
+  ];
+  const manchete = eventos[Math.floor(Math.random()*eventos.length)];
+  gameState.reputation = clamp(gameState.reputation+3, 0, 100);
+
+  openModal(`📰 ${portal}`, `
+    <div style="padding:.5rem 0">
+      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">CARNAVAL · ${portal.toUpperCase()}</div>
+      <div style="font-size:1.05rem;font-weight:700;color:var(--text);line-height:1.5;margin-bottom:1rem">${manchete}</div>
+      <div style="font-size:.82rem;color:var(--text2)">
+        📺 Notoriedade da rainha aumentou para <strong style="color:var(--gold)">${Math.round(notoriedade)}</strong>/100<br>
+        ⭐ Reputação da escola +3
+      </div>
+    </div>
+  `, [{text:'Fechar',action:closeModal,cls:'btn-gold'}]);
+  addEvent(`📰 ${portal}: ${manchete}`,'info');
+}
+
+function verificarEscandalos() {
+  const r = gameState.rainha;
+  if(!r) return;
+  // 35% de chance de algum escândalo
+  if(Math.random() > 0.35) {
+    openModal('✅ Nada por Enquanto', `<p style="color:var(--success)">Nenhuma polêmica envolvendo ${r.name} foi identificada. Continue assim!</p>`,[{text:'OK',action:closeModal,cls:'btn-green'}]);
+    return;
+  }
+  const esc = RAINHA_ESCANDALOS[Math.floor(Math.random()*RAINHA_ESCANDALOS.length)];
+  gameState.rainhaEscandalos = gameState.rainhaEscandalos||[];
+
+  // Efeitos
+  const ef = esc.effect;
+  if(ef.budget) gameState.budget += ef.budget;
+  if(ef.reputation) gameState.reputation = clamp(gameState.reputation+ef.reputation,0,100);
+  if(ef.community) gameState.community = clamp(gameState.community+ef.community,0,100);
+  if(ef.press) gameState.rainhaNotoriedade = clamp((gameState.rainhaNotoriedade||0)+ef.press,0,100);
+  if(ef.bateria) gameState.scores.bateria = clamp(gameState.scores.bateria+ef.bateria,0,100);
+  if(ef.harmonia) gameState.scores.harmonia = clamp(gameState.scores.harmonia+ef.harmonia,0,100);
+
+  const escObj = {icon:esc.icon, text:`${r.name} ${esc.text}`};
+  gameState.rainhaEscandalos.push(escObj);
+  addEvent(`${esc.icon} Escândalo: ${r.name} ${esc.text}`,'bad');
+
+  if(ef.force_exit) {
+    openModal(`${esc.icon} CRISE: Rainha Abandona a Escola!`, `
+      <p style="color:var(--danger);font-weight:700">${r.name} ${esc.text}</p>
+      <p style="margin-top:.5rem;color:var(--text2)">A escola perde a rainha e sofre impacto na imagem.</p>
+    `,[{text:'Entendido', action:()=>{gameState.rainha=null; gameState.rainhaType=null; closeModal(); renderRainha();}, cls:'btn-danger'}]);
+  } else {
+    openModal(`${esc.icon} Escândalo!`, `
+      <p style="font-weight:700;color:var(--warn)">${r.name} ${esc.text}</p>
+      <div style="margin-top:.75rem;font-size:.82rem;color:var(--text2)">
+        ${ef.budget?`<div>💰 Custo: R$ ${fmt(Math.abs(ef.budget))}</div>`:''}
+        ${ef.reputation?`<div>⭐ Reputação: ${ef.reputation}</div>`:''}
+        ${ef.community?`<div>❤️ Comunidade: ${ef.community}</div>`:''}
+      </div>
+    `,[{text:'Administrar Crise',action:closeModal,cls:'btn-gold'}]);
+  }
+  renderRainha();
+}
+
+function renegociarContrato() {
+  const r = gameState.rainha;
+  if(!r||!r.salario) return;
+  const novoValor = Math.floor(r.salario * (1.1 + Math.random()*0.2));
+  openModal('📋 Renegociação de Contrato', `
+    <p>A rainha <strong style="color:var(--gold)">${r.name}</strong> quer renegociar seu contrato.</p>
+    <div style="margin:1rem 0;padding:.75rem;background:var(--bg2);border-radius:6px">
+      <div>Valor atual: <strong>R$ ${fmt(r.salario)}/ano</strong></div>
+      <div style="margin-top:.3rem">Nova proposta: <strong style="color:var(--warn)">R$ ${fmt(novoValor)}/ano</strong></div>
+    </div>
+  `,[
+    {text:'Aceitar', action:()=>{
+      const diff = novoValor - r.salario;
+      gameState.budget -= diff;
+      gameState.expenses.equipe = (gameState.expenses.equipe||0)+diff;
+      gameState.rainha.salario = novoValor;
+      gameState.rainhaContrato = (gameState.rainhaContrato||1)+1;
+      addEvent(`Contrato de ${r.name} renovado: R$ ${fmt(novoValor)}/ano.`,'info');
+      closeModal(); renderRainha();
+    }, cls:'btn-gold'},
+    {text:'Recusar', action:()=>{
+      gameState.community = clamp(gameState.community-3,0,100);
+      addEvent(`${r.name} insatisfeita com recusa na renegociação.`,'bad');
+      closeModal();
+    }, cls:'btn-danger'},
+  ]);
+}
+
+// ============================================================
+// EVENTO RARO: Famosa quer desfilar de graça
+// ============================================================
+function checkEventoRainhaGratis() {
+  if(gameState.rainha) return;
+  if(Math.random()>0.12) return; // 12% de chance por mês no período certo
+  const disponiveis = DB_FAMOSAS.filter(f=>!_usedProfNames.has(f.name));
+  if(!disponiveis.length) return;
+  const famosa = disponiveis[Math.floor(Math.random()*disponiveis.length)];
+  famosa._free = true;
+  // Marca como evento pendente no gameState
+  gameState.eventoRainhaGratis = famosa;
+  addEvent(`🎁 ${famosa.name} entrou em contato! Ela quer desfilar GRÁTIS pela escola por admiração.`,'gold');
+  const b = document.getElementById('badge-rainha');
+  if(b) {b.textContent='!'; b.classList.remove('hidden');}
+}
+
+// ============================================================
+// DISPENSA
+// ============================================================
+
+function aceitarRainhaGratis() {
+  const f = gameState.eventoRainhaGratis;
+  if(!f) return;
+  gameState.eventoRainhaGratis = null;
+  const b = document.getElementById('badge-rainha');
+  if(b) b.classList.add('hidden');
+  contratarFamosa(encodeURIComponent(JSON.stringify({...f, _free:true, cost:0})));
+}
+
+function recusarRainhaGratis() {
+  const f = gameState.eventoRainhaGratis;
+  gameState.eventoRainhaGratis = null;
+  const b = document.getElementById('badge-rainha');
+  if(b) b.classList.add('hidden');
+  addEvent(`Proposta de ${f?.name} recusada.`,'info');
+  toast('Proposta recusada.','info');
+  renderRainha();
+}
+
+function dispensarRainha() {
+  if(!gameState.rainha) return;
+  const r = gameState.rainha;
+  openModal('⚠️ Dispensar Rainha', `
+    <p>Tem certeza que deseja dispensar <strong style="color:var(--gold)">${r.name}</strong>?</p>
+    <p style="margin-top:.5rem;color:var(--text2);font-size:.85rem">Isso pode gerar polêmica na imprensa e desagradar a torcida.</p>
+  `,[
+    {text:'Confirmar Dispensa', action:()=>{
+      addEvent(`👸 ${r.name} dispensada da rainha de bateria.`,'bad');
+      gameState.community = clamp(gameState.community-(r.tipo==='comunidade'?10:5), 0, 100);
+      gameState.reputation = clamp(gameState.reputation-5, 0, 100);
+      gameState.rainha = null; gameState.rainhaType = null; gameState.rainhaContrato = 1;
+      gameState.rainhaEscandalos = []; gameState.rainhaAwardsThisYear = [];
+      closeModal(); renderRainha();
+    }, cls:'btn-danger'},
+    {text:'Cancelar', action:closeModal, cls:'btn-gray'}
+  ]);
+}
+
 function renderTeam() {
   const el = document.getElementById('tabTeam');
   const slots = [
@@ -8049,18 +9078,25 @@ const DB_MESTRES = [
   'Mestre Zinho','Mestre Vanderson','Mestre Kadu','Mestre Marcelo','Mestre Dedé',
 ];
 
-// Directores de harmonia / coreografia (apelidos de quadra)
+// Coreógrafos de Comissão de Frente (banco de nomes reais)
+const DB_COMISSAO_FRENTE = [
+  'Marcelo Misailidis','Priscilla Mota','Rodrigo Negri','Hélio Bejani','Alex Neoral',
+  'Claudia Mota e Edifranc Alves','Patrick Carvalho','Lucas Maciel e Karina Dias',
+  'Alan Keller','Fábio Batista','Marcelo Chocolate','Márcio Moura','Jorge Teixeira',
+  'Luciana Yegros','Carlos Aleixo','Márcio Alves','Handerson Big','Marlon Cruz',
+  'Anderson Couto','Carla Caffé','Gislaine Cavalcanti','Carlinhos de Jesus','Jaime Arôxa',
+  'Deborah Colker','Regina Sauer','Renato Vieira','Ana Botafogo','Alice Arja',
+  'Roberto Lima','Rodrigo Pederneiras',
+];
+
+// Diretores de Harmonia (banco de nomes)
 const DB_HARMONIA = [
-  'Paulão da Harmonia','Nego Balanço','Tião do Apito','Beto Cadência','Carlão da Ala',
-  'Dudu da Evolução','Marcão Grito','Jorginho Cadência','Rato de Quadra','Tico Balanço',
-  'Bira Apito','Nandinho Pulso','Cacá Harmonia','Zeca Passo Firme','Juninho Linha',
-  'Pardal de Quadra','Pipoca da Ala','Betinho Compasso','Xexéu Evolução','Buiu da Harmonia',
-  'Cezinha Ritmo','Magrão da Linha','Rafa Cadência','Paulinho da Pista','Tonhão Balanço',
-  'Naldo Evolução','Pablo Cadência','Sandro Linha','Jota Harmonia','Guga Compasso',
-  'Leleco da Ala','Pingo de Ritmo','Miltinho Harmonia','Buiu Cadência','Tavinho Evolução',
-  'Kiko Linha','Nego Pulso','Sorriso da Ala','Cris Passo Firme','Val Balanço',
-  'Rafa Compasso','Bira Evolução','Naldo Cadência','Paulinho da Harmonia','Japa da Ala',
-  'Marquinhos Ritmo','Beto Linha','Carlão Passo','Duda Cadência','Serginho Evolução',
+  'João Carlos','José Luiz','Carlos Roberto','Paulo Roberto','Marcelo Pires',
+  'Ricardo Gomes','Fernando Costa','Luiz Antônio','Roberto Carlos','Cláudio Silva',
+  'Marcos Antônio','André Luiz','Rodrigo Oliveira','Fábio Santos','Rogério Ferreira',
+  'Alexandre Pereira','Eduardo Souza','Leonardo Alves','Sérgio Rodrigues','Renato Carvalho',
+  'Márcio Fernandes','Thiago Ribeiro','Daniel Martins','Gustavo Barros','Bruno Teixeira',
+  'Felipe Nascimento','Diego Moraes','Vinícius Duarte','Rafael Andrade','Henrique Campos',
 ];
 
 // Map slot → which DB to draw from
@@ -8070,7 +9106,7 @@ const SLOT_NAME_DB = {
   mestre:          () => DB_MESTRES[Math.floor(Math.random()*DB_MESTRES.length)],
   diretorCarnaval: () => DB_DIRETORES_CARNAVAL[Math.floor(Math.random()*DB_DIRETORES_CARNAVAL.length)],
   harmonia:        () => DB_HARMONIA[Math.floor(Math.random()*DB_HARMONIA.length)],
-  comissaoFrente:  () => DB_HARMONIA[Math.floor(Math.random()*DB_HARMONIA.length)],
+  comissaoFrente:  () => DB_COMISSAO_FRENTE[Math.floor(Math.random()*DB_COMISSAO_FRENTE.length)],
   casal:           () => DB_CASAIS[Math.floor(Math.random()*DB_CASAIS.length)],
 };
 
@@ -8091,11 +9127,22 @@ const TEAM_SLOT_DEFS = [
 
 const QUALITY_LABEL = q => q>=96?'🌟 Lendário':q>=90?'⭐ Elite':q>=85?'👍 Ótimo':q>=80?'✅ Bom':q>=75?'🟡 Médio':q>=70?'🔸 Fraco':'🔴 Ruim';
 
+// Conjunto global de nomes já usados (reset a cada nova temporada via clearUsedProfNames)
+const _usedProfNames = new Set();
+function clearUsedProfNames() { _usedProfNames.clear(); }
+
 function generateFreeAgent(slotKey) {
   const def = TEAM_SLOT_DEFS.find(d=>d.key===slotKey);
   if(!def) return null;
   const nameGen = SLOT_NAME_DB[slotKey];
-  const name = nameGen ? nameGen() : (PROF_NAMES_M[Math.floor(Math.random()*PROF_NAMES_M.length)]+' '+PROF_SURNAMES[Math.floor(Math.random()*PROF_SURNAMES.length)]);
+  // Tenta até 20 vezes encontrar nome não usado
+  let name = null;
+  for(let attempt=0; attempt<20; attempt++) {
+    const candidate = nameGen ? nameGen() : (PROF_NAMES_M[Math.floor(Math.random()*PROF_NAMES_M.length)]+' '+PROF_SURNAMES[Math.floor(Math.random()*PROF_SURNAMES.length)]);
+    if(!_usedProfNames.has(candidate)) { name = candidate; break; }
+  }
+  if(!name) name = nameGen ? nameGen() : 'Profissional da Quadra'; // fallback
+  _usedProfNames.add(name);
   const q = def.qRange[0] + Math.floor(Math.random()*(def.qRange[1]-def.qRange[0]));
   const salFrac = (q - def.qRange[0])/(def.qRange[1]-def.qRange[0]);
   const salary = Math.floor(def.baseSalary[0] + salFrac*(def.baseSalary[1]-def.baseSalary[0]));
@@ -8883,20 +9930,25 @@ let apuracaoQuesIndex = 0;
 //   totais: 265–270 (máximo 270)
 // ============================================================
 
-const NOTE_STEPS = [9.6, 9.7, 9.8, 9.9, 10.0];
+// Escala expandida: inclui notas baixas para quesitos sem profissional
+// [9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0]
+const NOTE_STEPS = [9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0];
 
 // Distribuição probabilística por nível de qualidade
-// quality 0–100 → distribução de notas ponderada
+// quality 0–100 → array de pesos para NOTE_STEPS
+// Nota: abaixo de 9.7 é quase impossível para escolas boas (quality ≥ 76)
+//       Escolas sem profissional (quality ≤ 62) recebem 9.5 pra baixo
 function getNoteDist(quality) {
-  // Quanto melhor a qualidade, mais peso nas notas altas
-  // Retorna array de pesos para [9.6, 9.7, 9.8, 9.9, 10.0]
-  if(quality >= 96) return [0, 0, 5, 35, 60];       // elite: quase tudo 9.9 e 10
-  if(quality >= 92) return [0, 2, 15, 45, 38];       // ótimo: 9.9/10 dominam
-  if(quality >= 88) return [0, 5, 28, 42, 25];       // bom: 9.8/9.9
-  if(quality >= 84) return [1, 12, 42, 35, 10];      // médio-alto: 9.8 domina
-  if(quality >= 80) return [2, 22, 45, 25, 6];       // médio: 9.7/9.8
-  if(quality >= 76) return [5, 38, 40, 15, 2];       // médio-baixo: 9.7/9.8
-  return                    [10, 50, 35, 5, 0];      // fraco: 9.7 domina, 9.6 possível
+  //                              9.1  9.2  9.3  9.4  9.5  9.6  9.7  9.8  9.9  10.0
+  if(quality >= 98) return [      0,   0,   0,   0,   0,   0,   0,   8,  32,   60]; // perfeito: 9.9/10
+  if(quality >= 94) return [      0,   0,   0,   0,   0,   0,   3,  18,  45,   34]; // elite: 9.9/10 dominam
+  if(quality >= 90) return [      0,   0,   0,   0,   0,   0,   8,  32,  42,   18]; // excelente
+  if(quality >= 86) return [      0,   0,   0,   0,   0,   2,  18,  48,  28,    4]; // muito bom
+  if(quality >= 82) return [      0,   0,   0,   0,   0,   5,  32,  48,  14,    1]; // bom
+  if(quality >= 76) return [      0,   0,   0,   0,   1,  12,  48,  34,   5,    0]; // médio (9.6 raríssimo)
+  if(quality >= 68) return [      0,   0,   0,   2,   8,  28,  45,  15,   2,    0]; // sem profissional: 9.5-9.6
+  if(quality >= 58) return [      0,   0,   2,   8,  28,  40,  20,   2,   0,    0]; // sem profissional: 9.4-9.5
+  return                   [      0,   2,   8,  22,  40,  22,   6,   0,   0,    0]; // sem profissional: 9.3-9.4
 }
 
 function pickNote(dist) {
@@ -8926,18 +9978,21 @@ function judgeNote(quality, profile) {
   // sem ajuste
 
   const note = pickNote(dist);
-  // BLOQUEIO ANTI-NOTA ABSURDA: nunca abaixo de 9.6
-  return Math.max(9.6, note);
+  // Sem floor fixo — notas baixas são possíveis para quesitos sem profissional
+  return Math.max(NOTE_STEPS[0], note);
 }
 
 function scoreToQuesito(quality, profiles) {
   const profs = profiles || ['rigoroso','tecnico','generoso','critico'];
   const q = clamp(quality, 0, 100);
   const judges = profs.map(p => judgeNote(q, p));
-  const sorted = [...judges].sort((a,b)=>a-b);
-  const discarded = sorted[0];
-  const total = Math.round((sorted[1]+sorted[2]+sorted[3])*10)/10;
-  return { judges, discarded, total };
+  // Descarta o MENOR por ÍNDICE (não por valor) para evitar bug de descarte duplo
+  let discardIdx = 0;
+  for(let i=1;i<judges.length;i++) { if(judges[i]<judges[discardIdx]) discardIdx=i; }
+  // Soma dos 3 jurados válidos (excluindo o descartado pelo índice)
+  const sum = judges.reduce((s,v,i) => s + (i===discardIdx ? 0 : v), 0);
+  const total = Math.round(sum * 10) / 10;
+  return { judges, discardIdx, discarded: judges[discardIdx], total };
 }
 
 // Legacy stubs (compatibilidade)
@@ -8962,17 +10017,40 @@ function calculateFinalNotes() {
   const enredoData = gameState.enredo ? ENREDO_TYPES.find(e=>e.id===gameState.enredo) : null;
   const setorBonus = gameState.barracaoSetores ? gameState.barracaoSetores*1.5 : 0;
 
-  const raw = {
-    comissao:  clamp(s.comissao +(gameState.team.comissaoFrente?5:0), 55,100),
-    casal:     clamp(s.casal    +(gameState.team.casal?5:0), 55,100),
-    bateria:   clamp(s.bateria  +(gameState.team.mestre?5:0), 55,100),
-    harmonia:  clamp(s.harmonia +(gameState.team.harmonia?5:0)+gameState.rehearsals.tecnico*2, 55,100),
-    evolucao:  clamp(s.evolucao +(gameState.team.diretorCarnaval?5:0)+gameState.rehearsals.rua*2-(cc&&cc.cars.some(c=>c.largura>6)?5:0), 55,100),
-    enredo:    clamp(s.enredo   +(enredoData?.noteBonus?.enredo||0)*15+setorBonus, 55,100),
-    samba:     clamp(s.samba    +(gameState.team.interprete?5:0)+(gameState.chosenSamba?8:0), 55,100),
-    fantasias: clamp(s.fantasias+fantQual+alasBonus+barracBonus*8, 55,100),
-    alegorias: clamp(s.alegorias+(gameState.team.carnavalesco?8:0)+carrosBonus+alturaBonus+barracBonus*12, 55,100),
+  // Limite de qualidade para quesitos sem profissional contratado.
+  // Qualidade ≤ 62 → notas dos jurados ficam na faixa 9.3–9.5 (abaixo de 9.5)
+  const NO_PRO_MAX = 62;
+
+  // Verifica presença de profissional por quesito
+  const hasPro = {
+    comissao:  !!gameState.team.comissaoFrente,
+    casal:     !!gameState.team.casal,
+    bateria:   !!gameState.team.mestre,
+    harmonia:  !!gameState.team.harmonia,
+    evolucao:  !!gameState.team.diretorCarnaval,
+    enredo:    !!gameState.team.carnavalesco,   // carnavalesco define o enredo
+    samba:     !!gameState.team.interprete,
+    fantasias: !!gameState.team.carnavalesco,   // carnavalesco cuida das fantasias
+    alegorias: !!gameState.team.carnavalesco,
   };
+
+  const raw = {
+    comissao:  clamp(s.comissao +(hasPro.comissao?5:0), hasPro.comissao?55:40, hasPro.comissao?100:NO_PRO_MAX),
+    casal:     clamp(s.casal    +(hasPro.casal?5:0),    hasPro.casal?55:40,    hasPro.casal?100:NO_PRO_MAX),
+    bateria:   clamp(s.bateria  +(hasPro.bateria?5:0),  hasPro.bateria?55:40,  hasPro.bateria?100:NO_PRO_MAX),
+    harmonia:  clamp(s.harmonia +(hasPro.harmonia?5:0)+gameState.rehearsals.tecnico*2, hasPro.harmonia?55:40, hasPro.harmonia?100:NO_PRO_MAX),
+    evolucao:  clamp(s.evolucao +(hasPro.evolucao?5:0)+gameState.rehearsals.rua*2-(cc&&cc.cars.some(c=>c.largura>6)?5:0), hasPro.evolucao?55:40, hasPro.evolucao?100:NO_PRO_MAX),
+    enredo:    clamp(s.enredo   +(enredoData?.noteBonus?.enredo||0)*15+setorBonus, hasPro.enredo?55:40, hasPro.enredo?100:NO_PRO_MAX),
+    samba:     clamp(s.samba    +(hasPro.samba?5:0)+(gameState.chosenSamba?8:0), hasPro.samba?55:40, hasPro.samba?100:NO_PRO_MAX),
+    fantasias: clamp(s.fantasias+fantQual+alasBonus+barracBonus*8, hasPro.fantasias?55:40, hasPro.fantasias?100:NO_PRO_MAX),
+    alegorias: clamp(s.alegorias+(hasPro.alegorias?8:0)+carrosBonus+alturaBonus+barracBonus*12, hasPro.alegorias?55:40, hasPro.alegorias?100:NO_PRO_MAX),
+  };
+
+  // Rainha de bateria impacta qualidade da bateria
+  if(gameState.rainha) {
+    const rBonus = Math.round((gameState.rainha.samba * 0.5 + gameState.rainha.pop * 0.3) / 10);
+    raw.bateria = clamp(raw.bateria + rBonus, raw.bateria, 100);
+  }
 
   // Apply seasonal event score modifiers to raw quality
   const sm = gameState.seasonalMods || {};
@@ -8994,12 +10072,14 @@ function calculateFinalNotes() {
     // Pequena variação aleatória por quesito (±4 pontos de qualidade)
     const q = scoreToQuesito(sc + (Math.random()-.5)*4, profs);
     // Aplica penalidade de abertura diretamente na nota final do quesito
-    const noteWithPenalty = Math.max(29.1, Math.round((q.total + openerPenalty)*10)/10);
+    const noteWithPenalty = Math.max(27.3, Math.round((q.total + openerPenalty)*10)/10);
     gameState.finalNotes[k] = noteWithPenalty;
     gameState.finalNotesDetail[k] = q;
     total += noteWithPenalty;
   }
-  gameState.finalNotes._total = Math.round(total*10)/10;
+  gameState.finalNotes._total = Math.round(
+    Object.entries(gameState.finalNotes).filter(([k])=>k!=='_total').reduce((s,[,v])=>s+v, 0) * 10
+  ) / 10;
 }
 
 // Gera totais para rivais baseados na posição histórica esperada,
@@ -9009,9 +10089,15 @@ function simulateRivalScores() {
   const playerTotal = gameState.finalNotes._total || 268.5;
   const n = gameState.rivals.length;
 
-  // Gera spread realista: diferença total entre 1º e último ~3–4 pontos
-  // (9 quesitos × 0.4 max = 3.6 de spread máximo)
-  const spreadTotal = 2.5 + Math.random() * 1.5; // 2.5–4.0 pontos de spread
+  // Gera spread realista por divisão:
+  // Especial: 2.5–4.0 pontos de spread (competição acirrada)
+  // G1-G4: spread menor (0.8–2.0), poucas diferenças, todos perdem poucos décimos
+  const isEspecial = gameState.school.group === 'especial';
+  // Spread realista: Especial 1.0–2.5 pts total entre 1º e último (décimos pequenos)
+  // Grupos inferiores: 0.5–1.5 pts
+  const spreadTotal = isEspecial
+    ? 1.0 + Math.random() * 1.5      // Especial: 1.0–2.5 pts de diferença total
+    : 0.5 + Math.random() * 1.0;     // Outros: 0.5–1.5 pts
 
   gameState.rivals.forEach((r, i) => {
     // Use difficulty-adjusted base quality (set during initGameState)
@@ -9040,8 +10126,12 @@ function simulateRivalScores() {
   ];
   allEntries.sort((a,b) => b.total - a.total);
 
-  // Âncora: o melhor total fica entre 268.5 e 270
-  const topTotal = 268.5 + Math.random() * 1.4;
+  // Âncora: o melhor total varia por grupo
+  // Especial: 268.5–270. Outros grupos: 264–267 (notas levemente menores, menos décimos de diferença)
+  // Campeã perde 0 a 0.5 décimos do máximo (270). Outros seguem em cascata curta.
+  const topTotal = isEspecial
+    ? 269.5 + Math.random() * 0.5     // 269.5–270.0: campeã quase perfeita
+    : 265.0 + Math.random() * 2.0;    // Outros grupos: 265–267
   const step = spreadTotal / Math.max(allEntries.length - 1, 1);
 
   allEntries.forEach((e, idx) => {
@@ -9054,7 +10144,7 @@ function simulateRivalScores() {
       const diff = newTotal - gameState.finalNotes._total;
       const noteKeys = Object.keys(gameState.finalNotes).filter(k=>k!=='_total');
       for(const k of noteKeys) {
-        const adj = clamp(gameState.finalNotes[k] + diff/9, 29.1, 30.0);
+        const adj = clamp(gameState.finalNotes[k] + diff/9, 27.3, 30.0);
         gameState.finalNotes[k] = Math.round(adj*10)/10;
       }
       // Recalcula _total a partir das notas individuais já arredondadas
@@ -9065,7 +10155,7 @@ function simulateRivalScores() {
       const scale = newTotal / (e.rival._simulatedTotal || 268);
       let scaledTotal = 0;
       for(const k of Object.keys(e.rival._simulatedNotes)) {
-        const scaled = clamp(Math.round(e.rival._simulatedNotes[k] * scale * 10)/10, 29.1, 30.0);
+        const scaled = clamp(Math.round(e.rival._simulatedNotes[k] * scale * 10)/10, 27.3, 30.0);
         e.rival._simulatedNotes[k] = scaled;
         scaledTotal += scaled;
       }
@@ -9120,7 +10210,12 @@ function renderApuracaoQuesito() {
       ${allSchools.map(sch=>{
         const detail = sch.detail;
         const judges = detail?.judges||[9.8,9.9,9.8,9.9];
-        const discarded = detail?.discarded??Math.min(...judges);
+        // Descarte por ÍNDICE (evita bug de riscar notas com valor igual ao descartado)
+        let discardIdx = detail?.discardIdx ?? (() => {
+          let m=0; for(let i=1;i<judges.length;i++) if(judges[i]<judges[m]) m=i; return m;
+        })();
+        // Usa o total armazenado (já com penalidades) para exibição consistente com o ranking
+        const displayTotal = sch.qTotal;
         return `<div style="background:${sch.isPlayer?'rgba(212,175,55,.07)':'var(--bg2)'};
                             border:1px solid ${sch.isPlayer?'rgba(212,175,55,.4)':'var(--border)'};
                             border-radius:7px;padding:.45rem .7rem">
@@ -9128,17 +10223,17 @@ function renderApuracaoQuesito() {
             <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem;flex:1;
                          color:${sch.isPlayer?'var(--gold)':'var(--text)'}">${sch.name}${sch.isPlayer?' 🎭':''}</span>
             <span style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.15rem;
-                         color:${sch.isPlayer?'var(--gold-light)':'var(--text)'}">${sch.qTotal.toFixed(1)}</span>
+                         color:${sch.isPlayer?'var(--gold-light)':'var(--text)'}">${displayTotal.toFixed(1)}</span>
           </div>
           <div style="display:flex;gap:.25rem;align-items:center">
             <span style="font-size:.58rem;color:var(--text3);min-width:32px">Jurados:</span>
-            ${judges.map(j=>`<div style="flex:1;text-align:center;padding:.12rem .2rem;
-                border:1px solid ${j===discarded?'rgba(231,76,60,.3)':'rgba(46,204,113,.25)'};
-                background:${j===discarded?'rgba(231,76,60,.12)':'rgba(46,204,113,.08)'};
+            ${judges.map((j,idx)=>`<div style="flex:1;text-align:center;padding:.12rem .2rem;
+                border:1px solid ${idx===discardIdx?'rgba(231,76,60,.3)':'rgba(46,204,113,.25)'};
+                background:${idx===discardIdx?'rgba(231,76,60,.12)':'rgba(46,204,113,.08)'};
                 border-radius:3px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.75rem;
-                color:${j===discarded?'var(--danger)':'var(--success)'};
-                ${j===discarded?'text-decoration:line-through;opacity:.6':''}">${j.toFixed(1)}</div>`).join('')}
-            <span style="font-size:.58rem;color:var(--text3);margin-left:.2rem">=<strong style="color:var(--gold)"> ${sch.qTotal.toFixed(1)}</strong></span>
+                color:${idx===discardIdx?'var(--danger)':'var(--success)'};
+                ${idx===discardIdx?'text-decoration:line-through;opacity:.6':''}">${j.toFixed(1)}</div>`).join('')}
+            <span style="font-size:.58rem;color:var(--text3);margin-left:.2rem">=<strong style="color:var(--gold)"> ${displayTotal.toFixed(1)}</strong></span>
           </div>
         </div>`;
       }).join('')}
@@ -9238,7 +10333,7 @@ function showFinalResults() {
   let resultsTitle, resultsSubtitle;
   if(isChampion) {
     resultsTitle = '🏆 CAMPEÃO DO CARNAVAL! 🏆';
-    resultsSubtitle = `${gameState.school.name} é a grande campeã com ${(gameState.finalNotes?._total||0).toFixed(2)} pontos!`;
+    resultsSubtitle = `${gameState.school.name} é a grande campeã com ${(gameState.finalNotes?._total||0).toFixed(1)} pontos!`;
     launchFireworks();
   } else if(isTop3) {
     resultsTitle = `🥈 ${playerPos}° Lugar`;
@@ -9248,7 +10343,7 @@ function showFinalResults() {
     resultsSubtitle = `${gameState.school.name} será rebaixada para o próximo grupo.`;
   } else {
     resultsTitle = `📊 ${playerPos}° Lugar`;
-    resultsSubtitle = `${gameState.school.name} terminou em ${playerPos}° lugar com ${(gameState.finalNotes?._total||0).toFixed(2)} pontos.`;
+    resultsSubtitle = `${gameState.school.name} terminou em ${playerPos}° lugar com ${(gameState.finalNotes?._total||0).toFixed(1)} pontos.`;
   }
 
   document.getElementById('resultsTitle').textContent = resultsTitle;
@@ -9263,7 +10358,7 @@ function showFinalResults() {
       <div class="school-score-row" style="animation:revealRow ${0.3+i*0.1}s ease both">
         <div class="score-pos ${i===0?'first':i===1?'second':i===2?'third':''}">${i+1}°</div>
         <div class="score-school" style="${s.isPlayer?'color:var(--gold-light);font-size:1.05rem':''}">${s.name}${s.isPlayer?' 🎭':''}</div>
-        <div class="score-note">${s.note.toFixed(2)}</div>
+        <div class="score-note">${s.note.toFixed(1)}</div>
         ${i===0?'<span class="score-badge badge-champ">CAMPEÃO</span>':''}
         ${isReb?'<span class="score-badge badge-rebaixado">REBAIXADO</span>':''}
         ${isProm?'<span class="score-badge" style="background:var(--success);color:#fff">ACESSO</span>':''}
@@ -9279,18 +10374,25 @@ function showFinalResults() {
       ['harmonia','Harmonia','🎯'],['evolucao','Evolução','🚀'],['enredo','Enredo','📜'],
       ['samba','Samba-Enredo','🎵'],['fantasias','Fantasias','👗'],['alegorias','Alegorias','🎪'],
     ];
-    notesPanel.innerHTML = quesitos.map(([k,label,icon])=>`
+    notesPanel.innerHTML = quesitos.map(([k,label,icon])=>{
+      const detail = gameState.finalNotesDetail?.[k];
+      const judges = detail?.judges || [];
+      let discardIdx = detail?.discardIdx ?? (() => {
+        if(!judges.length) return -1;
+        let m=0; for(let i=1;i<judges.length;i++) if(judges[i]<judges[m]) m=i; return m;
+      })();
+      return `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid rgba(42,42,69,.4);font-size:.85rem">
         <span style="color:var(--text2)">${icon} ${label}</span>
         <div style="display:flex;align-items:center;gap:.5rem">
-          ${gameState.finalNotesDetail?.[k] ? `<span style="font-size:.7rem;color:var(--text3)">(${gameState.finalNotesDetail[k].judges.map(j=>j.toFixed(1)).join(' ')})</span>` : ''}
-          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;color:var(--gold)">${(gameState.finalNotes[k]||29.0).toFixed(1)}</span>
+          ${judges.length ? `<span style="font-size:.7rem;color:var(--text3)">(${judges.map((j,idx)=>`<span style="${idx===discardIdx?'text-decoration:line-through;opacity:.5;color:var(--danger)':''}">${j.toFixed(1)}</span>`).join(' ')})</span>` : ''}
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;color:var(--gold)">${(gameState.finalNotes[k]||0).toFixed(1)}</span>
         </div>
-      </div>
-    `).join('') + `
+      </div>`;
+    }).join('') + `
     <div style="display:flex;justify-content:space-between;padding:.6rem 0;margin-top:.3rem">
       <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--text)">TOTAL GERAL</span>
-      <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;font-weight:900;color:var(--gold-light)">${(gameState.finalNotes._total||0).toFixed(2)}</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;font-weight:900;color:var(--gold-light)">${(gameState.finalNotes._total||0).toFixed(1)}</span>
     </div>`;
   }
 
@@ -9516,7 +10618,11 @@ function startNextSeason() {
   const oldTeam = {...gameState.team};
   const oldCarnavPersonality = gameState.carnavalescoPersonality;
   const oldCarnavSatisfaction = gameState.carnavalescoSatisfaction;
+  const _prevRainha = gameState ? gameState.rainha : null;
+  const _prevRainhaType = gameState ? gameState.rainhaType : null;
   gameState = initGameState({...baseSchool, group: school.group}, difficulty);
+  // Rainha contratada por contrato plurianual se mantém
+  if(_prevRainha && _prevRainha.salario > 0) { gameState.rainha = _prevRainha; gameState.rainhaType = _prevRainhaType; }
   // Preserve sorting-lock data for next carnival
   const prevSeason10th   = oldHistory.length ? null : null; // set by showFinalResults before this call
   gameState.prevSeason10th  = typeof window._carry_10th  !== 'undefined' ? window._carry_10th  : null;
@@ -9654,7 +10760,7 @@ function renderHistorico() {
                   ${h.position}º
                   ${h.position===1?' 🏆':h.position<=3?' 🥉':h.relegated?' 💔':''}
                 </td>
-                <td style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;color:var(--info);font-weight:700">${(h.note||0).toFixed(2)}</td>
+                <td style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;color:var(--info);font-weight:700">${(h.note||0).toFixed(1)}</td>
                 <td style="color:var(--text2);font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.enredo||'—'}</td>
                 <td style="font-size:.8rem;color:var(--text3)">${h.highlight||'—'}</td>
                 <td>${hasRanking?`<span style="font-size:.7rem;color:var(--text3);background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:.15rem .4rem;white-space:nowrap">Ver classificação →</span>`:'<span style="font-size:.65rem;color:var(--text3)">—</span>'}</td>
@@ -9690,7 +10796,7 @@ function showHistoricoClassificacao(histIdx) {
       </span>
       <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;
                    color:${r.isPlayer?'var(--gold-light)':'var(--text)'}">
-        ${(r.note||0).toFixed(2)}
+        ${(r.note||0).toFixed(1)}
       </span>
     </div>
   `).join('');
@@ -9708,7 +10814,7 @@ function showHistoricoClassificacao(histIdx) {
       </div>
       <div style="flex:1;text-align:center">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:${posColor(h.position)}">${posResult}</div>
-        <div style="font-size:.72rem;color:var(--text3)">Nota: ${(h.note||0).toFixed(2)}</div>
+        <div style="font-size:.72rem;color:var(--text3)">Nota: ${(h.note||0).toFixed(1)}</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:1.2rem">${ecoIcon}</div>
