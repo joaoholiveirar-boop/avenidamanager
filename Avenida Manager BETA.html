@@ -1122,6 +1122,9 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
         <span class="nav-icon">🤝</span> Patrocinadores
         <span class="nav-badge green hidden" id="badge-patrocinadores">$</span>
       </div>
+      <div class="nav-item" onclick="showTab('departamento')">
+        <span class="nav-icon">🏗️</span> Departamento
+      </div>
       <div class="nav-item" onclick="showTab('talentos')">
         <span class="nav-icon">🌟</span> Talentos
       </div>
@@ -1182,6 +1185,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
     <div class="content-body hidden" id="tabCommunity"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabEventos"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabPatrocinadores"><!-- rendered by JS --></div>
+    <div class="content-body hidden" id="tabDepartamento"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabTalentos"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabPolitics"><!-- rendered by JS --></div>
     <div class="content-body hidden" id="tabPress"><!-- rendered by JS --></div>
@@ -1326,15 +1330,6 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
         <div class="panel-body" id="repercussionPanel"></div>
       </div>
     </div>
-
-    ${gameState.awardsHistory?.length ? `
-    <div class="panel" style="margin-bottom:1.5rem;max-width:900px;width:100%">
-      <div class="panel-header">
-        <span class="panel-title">🏅 Histórico de Premiações</span>
-        <span style="font-size:.72rem;color:var(--text3)">Estandarte de Ouro & S@mba-Net</span>
-      </div>
-      <div class="panel-body" id="awardsHistoryPanel"></div>
-    </div>` : ''}
 
     <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
       ${isTop6 && gameState.school.group==='especial' ? `<button class="btn btn-gold" onclick="showDesfCampeãs()">🎊 Desfile das Campeãs</button>` : ''}
@@ -3736,7 +3731,8 @@ let selectedSchool = null;
 let currentSaveSlot = 0;
 let currentTab = 'dashboard';
 let paradeInterval = null;
-let apuracaoQuesIdx_legacy = 0; // replaced by apuracaoQuesIndex
+let paradeEndTimeout = null;   // ← store the end-of-parade timeout so it can be cleared
+let apuracaoQuesIdx_legacy = 0;
 let finalScores = [];
 
 // ============================================================
@@ -3750,7 +3746,844 @@ function _getSubvencaoByGroup(group) {
   return SUBVENCAO_BY_GROUP[group] || 100000;
 }
 
-// Generate the income payment schedule for the year
+// ============================================================
+// ==================== SISTEMA DE ASCENSÃO/REBAIXAMENTO ======
+// ============================================================
+
+// Official group sizes
+const GROUP_SIZES = {
+  especial:  12,
+  ouro:      14,
+  prata:     16,
+  bronze:    16,
+  avaliacao: 0, // variable
+};
+
+// Number of relegations per group
+const RELEGATION_SPOTS = {
+  especial: 1,   // last place
+  ouro:     2,   // last 2
+  prata:    2,   // last 2
+  bronze:   1,   // last place
+  avaliacao:0,
+};
+
+// Number of promotions per group (bottom group promotes)
+const PROMOTION_SPOTS = {
+  ouro:     1,
+  prata:    1,
+  bronze:   1,
+  avaliacao:1,
+  especial: 0,
+};
+
+// Financial impact when relegated
+const RELEGATION_FINANCIAL = {
+  especial: {
+    subvencao: -0.60,
+    cotaTransmissao: -1.00,   // loses TV deal
+    patrocinio: -0.40,
+    community: -15,
+    reputation: -20,
+    prestPressBudget: 0,
+  },
+  ouro: { subvencao: -0.40, patrocinio: -0.25, community: -10, reputation: -12 },
+  prata:{ subvencao: -0.25, patrocinio: -0.15, community: -8,  reputation: -8  },
+  bronze:{ subvencao:-0.15, patrocinio: -0.10, community: -5,  reputation: -5  },
+};
+
+// Financial impact when promoted
+const PROMOTION_FINANCIAL = {
+  especial: { subvencao:0, community:+20, reputation:+25 }, // arriving in especial - huge
+  ouro:     { subvencao:0, community:+15, reputation:+20 },
+  prata:    { subvencao:0, community:+10, reputation:+12 },
+  bronze:   { subvencao:0, community:+8,  reputation:+8  },
+};
+
+// Headline templates for press
+const RELEGATION_HEADLINES = [
+  s=>`"${s} amarga queda histórica para o grupo inferior."`,
+  s=>`"Tradição não basta: ${s} cai na apuração mais dolorosa dos últimos anos."`,
+  s=>`"${s} desce de grupo após temporada decepcionante."`,
+  s=>`"A queda de ${s}: como uma escola se perdeu e saiu do grupo."`,
+];
+const PROMOTION_HEADLINES = [
+  s=>`"${s} conquista o acesso em temporada histórica!"`,
+  s=>`"${s} sobe de grupo com campanha impecável."`,
+  s=>`"A ascensão de ${s}: escola chega ao grupo superior com merecimento."`,
+];
+
+// ── Structural events (rare) ──────────────────────────────────
+function rollStructuralEvent(year) {
+  const r = Math.random();
+  if(r < 0.01) return {type:'fusao_liga',       label:'Fusão de Ligas',        desc:'Reestruturação liga: grupos reorganizados.', effect:'restructure'};
+  if(r < 0.03) return {type:'cancelamento',     label:'Descenso Cancelado',   desc:'A liga cancelou o rebaixamento desta temporada.', effect:'no_relegation'};
+  if(r < 0.08) return {type:'aumento_escolas',  label:'Expansão do Grupo',    desc:'O Grupo Especial passa a ter mais uma escola.', effect:'expand_especial'};
+  return null;
+}
+
+// ── Core: apply relegation consequences to player ─────────────
+function applyRelegationConsequences(fromGroup) {
+  const fx = RELEGATION_FINANCIAL[fromGroup] || RELEGATION_FINANCIAL.bronze;
+  // Financial impact
+  if(fx.subvencao)     gameState.income.subvencao     = Math.floor((gameState.income.subvencao||0)     * (1 + fx.subvencao));
+  if(fx.cotaTransmissao) gameState.income.cotaTransmissao = 0; // loses TV deal on relegation from especial
+  if(fx.patrocinio)    gameState.income.patrocinioPrivado = Math.floor((gameState.income.patrocinioPrivado||0) * (1 + fx.patrocinio));
+  if(fx.community)     gameState.community = clamp(gameState.community + fx.community, 0, 100);
+  if(fx.reputation)    gameState.reputation = clamp(gameState.reputation + fx.reputation, 0, 100);
+
+  // Staff departures
+  const carnav = gameState.team?.carnavalesco;
+  if(carnav && Math.random() < 0.5) {
+    addEvent(`💔 ${carnav.name} deixa a escola após o rebaixamento.`, 'bad');
+    gameState.team.carnavalesco = null;
+    gameState.carnavalescoPersonality = null;
+    applyDeptRegressionOnCrisis('carnavalesco_saiu');
+  }
+  const interprete = gameState.team?.interprete;
+  if(interprete && Math.random() < 0.35) {
+    addEvent(`💔 ${interprete.name} negocia saída com clube. Rebaixamento afeta elenco.`, 'bad');
+    gameState.team.interprete = null;
+  }
+  // Sponsor pullout
+  if(fromGroup==='especial' && gameState.activeSponsors?.length > 0) {
+    const lost = gameState.activeSponsors.splice(0, Math.ceil(gameState.activeSponsors.length*0.5));
+    if(lost.length>0) addEvent(`📉 ${lost.length} patrocinador${lost.length>1?'es':''} retirou${lost.length>1?'ram':''} apoio após rebaixamento.`, 'bad');
+  }
+}
+
+// ── Core: apply promotion consequences to player ──────────────
+function applyPromotionConsequences(toGroup) {
+  const fx = PROMOTION_FINANCIAL[toGroup] || PROMOTION_FINANCIAL.ouro;
+  if(fx.community)    gameState.community  = clamp(gameState.community  + fx.community,  0, 100);
+  if(fx.reputation)   gameState.reputation = clamp(gameState.reputation + fx.reputation, 0, 100);
+  // Update income to new group level
+  gameState.income.subvencao = _getSubvencaoByGroup(toGroup);
+  if(toGroup==='especial') {
+    gameState.income.cotaTransmissao = 1000000;
+    gameState.income.apoioEstado     = 2000000;
+    gameState.income.rendaIngresso   = 1200000;
+    gameState.income.patrocinioLiga  = 3000000;
+    addEvent(`🎉 Receitas atualizadas para o Grupo Especial! Cota de TV e apoio do estado incluídos.`, 'gold');
+  } else if(toGroup==='ouro') {
+    gameState.income.cotaTransmissao = 0;
+    addEvent(`🎉 Receitas atualizadas para a Série Ouro!`, 'gold');
+  }
+}
+
+// ── Rivals: deep relegation/promotion for rival pool ──────────
+function processRivalPromoRelegate(allSchools, group, groups, currentGroupIdx, structuralEvent) {
+  const rivalStrMult = {facil:0.80,normal:0.92,dificil:1.02,lendario:1.08}[gameState.difficulty]||0.92;
+  const relegSpots = RELEGATION_SPOTS[group] || 1;
+  const sorted = [...allSchools].sort((a,b)=>b.note-a.note);
+  const n = sorted.length;
+
+  // Structural event: no relegation this year
+  if(structuralEvent?.effect === 'no_relegation') {
+    addEvent(`🏛️ Liga cancela o rebaixamento desta temporada por decisão administrativa.`, 'info');
+    return;
+  }
+
+  // Find bottom rivals (non-player) to relegate
+  const bottomRivals = sorted.slice(Math.max(0, n - relegSpots)).filter(s=>!s.isPlayer);
+  const topNonPlayer = sorted.find(s=>!s.isPlayer);
+
+  // RELEGATE bottom rivals
+  bottomRivals.forEach(entry => {
+    const rival = gameState.rivals.find(r=>r.name===entry.name);
+    if(!rival) return;
+    const rGroupIdx = groups.indexOf(rival.group||group);
+    if(rGroupIdx <= 0) return;
+
+    const newGroup = groups[rGroupIdx-1];
+    // Replace relegated rival with a promoted school from below
+    const promotedPool = (SCHOOLS_DATA[newGroup]||[]).filter(s =>
+      !gameState.rivals.some(r=>r.id===s.id) && s.id!==gameState.school.id
+    );
+    if(promotedPool.length) {
+      const promoted = promotedPool[Math.floor(Math.random()*promotedPool.length)];
+      // Promoted school quality scales up slightly (they earned their spot)
+      const promotedQuality = clamp(Math.floor((promoted.tradition+promoted.community+(promoted.barracão||60)+promoted.creativity+promoted.org)/5 * rivalStrMult * 1.05), 50, 97);
+      const newRival = {
+        id: promoted.id, name: promoted.name, group: group,
+        tradition:  Math.floor(promoted.tradition  * rivalStrMult),
+        community:  Math.floor(promoted.community  * rivalStrMult),
+        barracão:   Math.floor((promoted.barracão||60) * rivalStrMult),
+        creativity: Math.floor(promoted.creativity * rivalStrMult),
+        org:        Math.floor(promoted.org        * rivalStrMult),
+        budget: promoted.budget,
+        _baseQuality: promotedQuality,
+        _cyclePhase: 'peak',  // promoted schools start in peak phase
+      };
+      const idx = gameState.rivals.findIndex(r=>r.id===rival.id);
+      if(idx>=0) gameState.rivals.splice(idx,1,newRival);
+
+      // Press headline
+      const hl = RELEGATION_HEADLINES[Math.floor(Math.random()*RELEGATION_HEADLINES.length)](rival.name);
+      addEvent(`📰 ${hl}`, 'warn');
+      addEvent(`📈 ${promoted.name} sobe para ${LEAGUE_NAMES[group]}!`, 'success');
+      toast(`${rival.name} rebaixada! ${promoted.name} sobe!`, 'warn');
+
+      // Update AI cycle for promoted school
+      if(!AI_SCHOOL_CYCLES[newRival.id]) AI_SCHOOL_CYCLES[newRival.id] = {phase:'peak',yearsInPhase:0,maxYearsInPhase:4+Math.floor(Math.random()*4)};
+      AI_SCHOOL_CYCLES[newRival.id].phase = 'peak';
+    }
+  });
+
+  // PROMOTE top non-player rival (group champion) if not already in highest group
+  if(topNonPlayer && group !== 'especial') {
+    const champRival = gameState.rivals.find(r=>r.name===topNonPlayer.name);
+    if(champRival && currentGroupIdx < groups.length-1) {
+      champRival.group = groups[currentGroupIdx+1];
+      // Update their quality — promotion gives a boost
+      champRival._baseQuality = clamp((champRival._baseQuality||70)+5, 50, 100);
+      const hl = PROMOTION_HEADLINES[Math.floor(Math.random()*PROMOTION_HEADLINES.length)](champRival.name);
+      addEvent(`📰 ${hl}`, 'success');
+    }
+  }
+}
+
+// ── Validation: ensure no impossible group states ─────────────
+function validateGroupIntegrity() {
+  // Make sure player's new group is valid
+  const groups = ['avaliacao','bronze','prata','ouro','especial'];
+  if(!groups.includes(gameState.school.group)) {
+    gameState.school.group = 'bronze';
+    gameState.school.displayGroup = LEAGUE_NAMES['bronze'];
+    addEvent('⚠️ Correção automática de grupo: integridade do sistema restaurada.', 'warn');
+  }
+  gameState.school.displayGroup = LEAGUE_NAMES[gameState.school.group] || gameState.school.displayGroup;
+}
+
+// ── Statistical control: if no mobility for 3+ seasons, adjust rival strength ─
+function checkMobilityStat() {
+  const history = gameState.seasonHistory || [];
+  if(history.length < 3) return;
+  const last3 = history.slice(-3);
+  const sameGroup = last3.every(h=>h.group===last3[0].group);
+  const allMidTable = last3.every(h=>h.position>=3 && h.position<=9);
+  if(sameGroup && allMidTable) {
+    const diff = gameState.difficulty;
+    if(diff==='facil' || diff==='normal') {
+      gameState.rivals.forEach(r=>{ r._baseQuality = clamp((r._baseQuality||70)-2, 40, 100); });
+      addEvent('📊 Liga: reequilíbrio estatístico — competição ajustada.', 'info');
+    }
+  }
+}
+
+// ============================================================
+// ==================== DEPARTAMENTO DE QUESITOS ==============
+// ============================================================
+
+const DEPT_LEVELS = [
+  {id:'amador',        label:'Amador',        icon:'⚪', color:'var(--text3)', bonus:0,  desc:'Improvisado, sem estrutura formal.'},
+  {id:'intermediario', label:'Intermediário',  icon:'🔵', color:'var(--info)',  bonus:3,  desc:'Organizado, equipe básica presente.'},
+  {id:'profissional',  label:'Profissional',   icon:'🟡', color:'var(--gold)',  bonus:7,  desc:'Equipe técnica especializada.'},
+  {id:'elite',         label:'Elite',          icon:'🔴', color:'var(--accent)',bonus:14, desc:'Referência no carnaval brasileiro.'},
+];
+
+const DEPT_LEVEL_IDS = DEPT_LEVELS.map(l=>l.id);
+
+const QUESITO_DEPT_DEFS = {
+  bateria: {
+    label:'Bateria', icon:'🥁',
+    upgrades:[
+      {id:'oficina_ritmistas',  label:'Oficina de Ritmistas',     cost:80000,  effect:{qualidade:+8}, desc:'Técnica e sincronia melhoradas.'},
+      {id:'instrumentos_novos', label:'Novos Instrumentos',        cost:150000, effect:{estrutura:+10},desc:'Som mais uniforme e potente.'},
+      {id:'arranjador_prof',    label:'Arranjador Profissional',   cost:220000, effect:{qualidade:+12,profissionalizacao:+8}, desc:'Arranjos originais, impacto na apuração.'},
+      {id:'academia_bateria',   label:'Academia de Bateria',       cost:400000, effect:{qualidade:+15,estrutura:+10,profissionalizacao:+10}, desc:'Centro de formação permanente.'},
+    ],
+  },
+  samba: {
+    label:'Samba-Enredo', icon:'🎵',
+    upgrades:[
+      {id:'workshops_comp',     label:'Workshops de Composição',  cost:60000,  effect:{qualidade:+6}, desc:'Compositores mais preparados.'},
+      {id:'diretor_musical',    label:'Diretor Musical',           cost:180000, effect:{qualidade:+10,profissionalizacao:+8}, desc:'Visão musical coesa.'},
+      {id:'ensaios_canto',      label:'Ensaios de Canto Coletivo', cost:90000,  effect:{estrutura:+8}, desc:'Coro mais forte na avenida.'},
+      {id:'studio_gravacao',    label:'Estúdio de Gravação Próprio',cost:350000,effect:{qualidade:+12,estrutura:+12,profissionalizacao:+10}, desc:'Produção musical interna.'},
+    ],
+  },
+  harmonia: {
+    label:'Harmonia', icon:'🎯',
+    upgrades:[
+      {id:'treino_diretores',   label:'Treinamento de Diretores de Ala', cost:70000,  effect:{qualidade:+7}, desc:'Diretores mais eficientes.'},
+      {id:'ensaios_rua',        label:'Ensaios de Rua Adicionais', cost:50000,  effect:{qualidade:+5,estrutura:+5}, desc:'Mais horas de prática coletiva.'},
+      {id:'sistema_comunicacao',label:'Sistema de Comunicação',    cost:120000, effect:{estrutura:+10,profissionalizacao:+6},desc:'Rádios e coordenação em tempo real.'},
+      {id:'coord_geral',        label:'Coordenador Geral de Harmonia',cost:280000,effect:{qualidade:+12,estrutura:+8,profissionalizacao:+10}, desc:'Profissional dedicado.'},
+    ],
+  },
+  evolucao: {
+    label:'Evolução', icon:'🚶',
+    upgrades:[
+      {id:'planejamento_desfile',label:'Planejamento de Desfile',  cost:80000,  effect:{qualidade:+7}, desc:'Coreografia de movimentação definida.'},
+      {id:'treino_alas',         label:'Treinamento das Alas',     cost:60000,  effect:{estrutura:+6}, desc:'Alas mais disciplinadas.'},
+      {id:'dir_evolucao',        label:'Diretores de Evolução',    cost:200000, effect:{qualidade:+10,profissionalizacao:+10},desc:'Especialistas no espaço da avenida.'},
+      {id:'simulacao_sapucai',   label:'Simulação da Sapucaí',     cost:320000, effect:{qualidade:+14,estrutura:+8,profissionalizacao:+8}, desc:'Ensaio no Sambódromo.'},
+    ],
+  },
+  comissao: {
+    label:'Comissão de Frente', icon:'💃',
+    upgrades:[
+      {id:'coreografo_prof',    label:'Coreógrafo Profissional',   cost:120000, effect:{qualidade:+10,profissionalizacao:+8}, desc:'Coreografia impactante.'},
+      {id:'bailarinos_exp',     label:'Bailarinos Experientes',    cost:180000, effect:{qualidade:+12,estrutura:+6}, desc:'Elenco de alto nível.'},
+      {id:'tecnologia_cenica',  label:'Tecnologia Cênica',         cost:250000, effect:{estrutura:+10,qualidade:+8}, desc:'Efeitos visuais especiais.'},
+      {id:'diretoria_cena',     label:'Diretoria de Cena',         cost:380000, effect:{qualidade:+15,estrutura:+10,profissionalizacao:+10},desc:'Produção teatral completa.'},
+    ],
+  },
+  casal: {
+    label:'Mestre-Sala e Porta-Bandeira', icon:'👑',
+    upgrades:[
+      {id:'aulas_coreograficas', label:'Aulas Coreográficas',      cost:50000,  effect:{qualidade:+6}, desc:'Técnica e elegância aprimoradas.'},
+      {id:'prep_fisica',         label:'Preparação Física',        cost:60000,  effect:{qualidade:+5,estrutura:+5}, desc:'Resistência para toda a avenida.'},
+      {id:'figurino_prof',       label:'Figurino Profissional',     cost:200000, effect:{qualidade:+8,estrutura:+8}, desc:'Traje de alto impacto visual.'},
+      {id:'coach_especializado', label:'Coach Especializado',       cost:300000, effect:{qualidade:+12,profissionalizacao:+12},desc:'Preparação técnica e emocional completa.'},
+    ],
+  },
+  fantasias: {
+    label:'Fantasias', icon:'👗',
+    upgrades:[
+      {id:'novos_figurinistas',  label:'Novos Figurinistas',       cost:100000, effect:{qualidade:+8}, desc:'Design mais criativo.'},
+      {id:'atelie_profissional', label:'Ateliê Profissional',       cost:200000, effect:{estrutura:+10,qualidade:+6}, desc:'Estrutura de produção própria.'},
+      {id:'materiais_premium',   label:'Materiais Premium',        cost:180000, effect:{qualidade:+10,estrutura:+5}, desc:'Plumas, tecidos e adornos de luxo.'},
+      {id:'dept_modas',          label:'Departamento de Moda',      cost:400000, effect:{qualidade:+15,estrutura:+10,profissionalizacao:+10},desc:'Núcleo criativo permanente.'},
+    ],
+  },
+  alegorias: {
+    label:'Alegorias', icon:'🎪',
+    upgrades:[
+      {id:'escultores_especializados',label:'Escultores Especializados',cost:150000,effect:{qualidade:+10}, desc:'Peças com mais detalhamento.'},
+      {id:'ferragem_profissional',     label:'Ferragem Profissional',   cost:200000,effect:{estrutura:+10,qualidade:+5},desc:'Estruturas mais seguras e ousadas.'},
+      {id:'cenotecnica',               label:'Cenotécnica',             cost:280000,effect:{qualidade:+10,profissionalizacao:+8},desc:'Efeitos cenográficos avançados.'},
+      {id:'dept_producao_arte',        label:'Departamento de Arte',    cost:500000,effect:{qualidade:+15,estrutura:+10,profissionalizacao:+10},desc:'Centro de artes plásticas da escola.'},
+    ],
+  },
+  enredo: {
+    label:'Enredo', icon:'📜',
+    upgrades:[
+      {id:'pesquisadores',      label:'Pesquisadores',              cost:70000,  effect:{qualidade:+7}, desc:'Profundidade histórica e cultural.'},
+      {id:'historiadores',      label:'Historiadores e Consultores',cost:120000, effect:{qualidade:+8,profissionalizacao:+6},desc:'Rigor documental no enredo.'},
+      {id:'consultores_cult',   label:'Consultores Culturais',      cost:150000, effect:{qualidade:+8,estrutura:+5}, desc:'Perspectiva criativa e comunitária.'},
+      {id:'instituto_cultural', label:'Instituto Cultural',         cost:600000, effect:{qualidade:+16,estrutura:+10,profissionalizacao:+12},desc:'Centro de pesquisa e memória permanente.'},
+    ],
+  },
+};
+
+// Departamento geral da escola
+const DEPT_GERAL_LEVELS = [
+  {id:'informal',    label:'Informal',     icon:'📋', desc:'Sem estrutura formal.', qBonus:0},
+  {id:'estruturado', label:'Estruturado',  icon:'🏢', desc:'Equipe básica contratada.', qBonus:2},
+  {id:'profissional',label:'Profissional', icon:'🏛️', desc:'Especialistas em cada área.', qBonus:5},
+  {id:'instituto',   label:'Instituto Cultural', icon:'🎓', desc:'Referência no carnaval.', qBonus:10},
+];
+
+function initQuesitoDept() {
+  if(!gameState.quesitoDept) {
+    gameState.quesitoDept = {};
+    Object.keys(QUESITO_DEPT_DEFS).forEach(k => {
+      gameState.quesitoDept[k] = {
+        level: 'amador',      // amador/intermediario/profissional/elite
+        qualidade: 0,         // 0–100 accumulated
+        estrutura: 0,
+        profissionalizacao: 0,
+        upgrades: [],         // purchased upgrade IDs
+      };
+    });
+  }
+  if(!gameState.deptGeral) gameState.deptGeral = 'informal';
+  if(!gameState.deptEspecialidade) gameState.deptEspecialidade = null; // quesito where school is specialist
+}
+
+function calcDeptLevel(dept) {
+  const score = dept.qualidade + dept.estrutura + dept.profissionalizacao;
+  if(score >= 90) return 'elite';
+  if(score >= 55) return 'profissional';
+  if(score >= 25) return 'intermediario';
+  return 'amador';
+}
+
+function getDeptQualityBonus(quesito) {
+  initQuesitoDept();
+  const dept = gameState.quesitoDept?.[quesito];
+  if(!dept) return 0;
+  const levelData = DEPT_LEVELS.find(l=>l.id===dept.level);
+  const geralData = DEPT_GERAL_LEVELS.find(l=>l.id===(gameState.deptGeral||'informal'));
+  const specialBonus = gameState.deptEspecialidade === quesito ? 8 : 0;
+  return (levelData?.bonus||0) + (geralData?.qBonus||0) + specialBonus;
+}
+
+function buyDeptUpgrade(quesito, upgradeId) {
+  initQuesitoDept();
+  const def = QUESITO_DEPT_DEFS[quesito];
+  if(!def) return;
+  const upg = def.upgrades.find(u=>u.id===upgradeId);
+  if(!upg) return;
+  const dept = gameState.quesitoDept[quesito];
+  if(dept.upgrades.includes(upgradeId)) { toast('Já adquirido!','warn'); return; }
+  if(gameState.budget < upg.cost) { toast(`Orçamento insuficiente! Precisa de R$ ${fmt(upg.cost)}`,'error'); return; }
+
+  gameState.budget -= upg.cost;
+  gameState.expenses.barracão = (gameState.expenses.barracão||0) + upg.cost;
+  dept.upgrades.push(upgradeId);
+  if(upg.effect.qualidade)        dept.qualidade        = Math.min(100, dept.qualidade        + upg.effect.qualidade);
+  if(upg.effect.estrutura)        dept.estrutura        = Math.min(100, dept.estrutura        + upg.effect.estrutura);
+  if(upg.effect.profissionalizacao) dept.profissionalizacao = Math.min(100, dept.profissionalizacao + upg.effect.profissionalizacao);
+
+  const prevLevel = dept.level;
+  dept.level = calcDeptLevel(dept);
+
+  // Check if escola became specialist
+  const totalScore = dept.qualidade + dept.estrutura + dept.profissionalizacao;
+  if(totalScore >= 100 && !gameState.deptEspecialidade) {
+    gameState.deptEspecialidade = quesito;
+    const def2 = QUESITO_DEPT_DEFS[quesito];
+    addEvent(`⭐ ${gameState.school.name} torna-se referência em ${def2.label} no carnaval!`, 'gold');
+    toast(`⭐ Especialização em ${def2.label}!`, 'gold');
+    gameState.reputation = clamp(gameState.reputation + 10, 0, 100);
+  }
+
+  if(dept.level !== prevLevel) {
+    const newLvl = DEPT_LEVELS.find(l=>l.id===dept.level);
+    addEvent(`📈 ${def.icon} ${def.label}: nível ${newLvl.icon} ${newLvl.label}!`, 'success');
+    toast(`${def.icon} ${def.label} → ${newLvl.label}!`, 'gold');
+  } else {
+    toast(`✅ ${upg.label} adquirido!`, 'success');
+  }
+  addEvent(`💰 Investimento em ${def.label}: ${upg.label} — R$ ${fmt(upg.cost)}.`, 'info');
+  renderDept();
+}
+
+function upgradeDeptGeral() {
+  const levels = DEPT_GERAL_LEVELS.map(l=>l.id);
+  const cur = levels.indexOf(gameState.deptGeral||'informal');
+  if(cur >= levels.length-1) { toast('Nível máximo atingido!','warn'); return; }
+  const costs = {informal:0, estruturado:300000, profissional:800000, instituto:2000000};
+  const next = levels[cur+1];
+  const cost = costs[next] || 0;
+  if(gameState.budget < cost) { toast(`Precisa de R$ ${fmt(cost)}`,'error'); return; }
+  gameState.budget -= cost;
+  gameState.expenses.barracão = (gameState.expenses.barracão||0) + cost;
+  gameState.deptGeral = next;
+  const lvl = DEPT_GERAL_LEVELS.find(l=>l.id===next);
+  addEvent(`🏛️ Departamento de Carnaval evoluiu para ${lvl.icon} ${lvl.label}!`, 'gold');
+  toast(`🏛️ Departamento: ${lvl.label}!`, 'gold');
+  renderDept();
+}
+
+function applyDeptRegressionOnCrisis(reason) {
+  // Called when carnavalesco/mestre leaves or budget crisis
+  initQuesitoDept();
+  const affected = reason === 'mestre_saiu' ? ['bateria'] :
+                   reason === 'carnavalesco_saiu' ? ['alegorias','fantasias','enredo'] :
+                   reason === 'crise_financeira' ? Object.keys(QUESITO_DEPT_DEFS) : [];
+  affected.forEach(q => {
+    const dept = gameState.quesitoDept?.[q];
+    if(!dept) return;
+    const penalty = reason === 'crise_financeira' ? 5 : 8;
+    dept.qualidade        = Math.max(0, dept.qualidade        - penalty);
+    dept.estrutura        = Math.max(0, dept.estrutura        - Math.round(penalty*0.5));
+    dept.profissionalizacao = Math.max(0, dept.profissionalizacao - Math.round(penalty*0.5));
+    const newLevel = calcDeptLevel(dept);
+    if(newLevel !== dept.level) {
+      dept.level = newLevel;
+      const def = QUESITO_DEPT_DEFS[q];
+      const lvl = DEPT_LEVELS.find(l=>l.id===newLevel);
+      addEvent(`📉 ${def?.icon||''} ${def?.label||q} regrediu para ${lvl.icon} ${lvl.label} devido à crise.`, 'bad');
+    }
+  });
+  if(gameState.deptEspecialidade && affected.includes(gameState.deptEspecialidade)) {
+    const dept = gameState.quesitoDept[gameState.deptEspecialidade];
+    if((dept.qualidade+dept.estrutura+dept.profissionalizacao) < 80) {
+      gameState.deptEspecialidade = null;
+      addEvent('⚠️ A escola perdeu o status de referência em seu quesito especializado.', 'warn');
+    }
+  }
+}
+
+function renderDept() {
+  const el = document.getElementById('tabDepartamento');
+  if(!el) return;
+  initQuesitoDept();
+
+  const geralData = DEPT_GERAL_LEVELS.find(l=>l.id===(gameState.deptGeral||'informal'));
+  const geralIdx  = DEPT_GERAL_LEVELS.findIndex(l=>l.id===(gameState.deptGeral||'informal'));
+  const geralNext = DEPT_GERAL_LEVELS[geralIdx+1];
+  const geralCosts = {informal:0, estruturado:300000, profissional:800000, instituto:2000000};
+
+  const quesitos = Object.keys(QUESITO_DEPT_DEFS);
+
+  el.innerHTML = `
+  <!-- Departamento Geral -->
+  <div class="panel" style="margin-bottom:1rem;border-color:rgba(212,175,55,.3)">
+    <div class="panel-header">
+      <span class="panel-title">🏛️ Departamento de Carnaval</span>
+      <span style="font-size:.75rem;color:${geralData.id==='instituto'?'var(--accent)':geralData.id==='profissional'?'var(--gold)':'var(--text3)'}">${geralData.icon} ${geralData.label}</span>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem">
+        ${DEPT_GERAL_LEVELS.map((l,i)=>`
+          <div style="flex:1;min-width:100px;padding:.5rem .65rem;background:${gameState.deptGeral===l.id?'rgba(212,175,55,.12)':'var(--panel2)'};border:1px solid ${gameState.deptGeral===l.id?'var(--gold)':'var(--border)'};border-radius:6px;text-align:center">
+            <div style="font-size:1.1rem">${l.icon}</div>
+            <div style="font-size:.72rem;font-weight:700;color:${gameState.deptGeral===l.id?'var(--gold)':'var(--text2)'}">${l.label}</div>
+            <div style="font-size:.62rem;color:var(--text3)">+${l.qBonus} em tudo</div>
+            ${gameState.deptGeral===l.id?`<div style="font-size:.6rem;color:var(--success);margin-top:.2rem">✓ ATUAL</div>`:''}
+          </div>`).join('')}
+      </div>
+      <div style="font-size:.8rem;color:var(--text2);margin-bottom:.5rem">${geralData.desc}</div>
+      ${geralNext ? `
+      <button class="btn btn-gold btn-sm" style="width:100%" onclick="upgradeDeptGeral()">
+        🏛️ Evoluir para ${geralNext.icon} ${geralNext.label} — R$ ${fmt(geralCosts[geralNext.id]||0)}
+      </button>` : `<div style="font-size:.75rem;color:var(--accent);text-align:center;padding:.4rem">🎓 Departamento no nível máximo!</div>`}
+      ${gameState.deptEspecialidade ? `
+      <div style="margin-top:.6rem;padding:.5rem .75rem;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);border-radius:5px;font-size:.78rem;color:var(--gold)">
+        ⭐ Especialização: <strong>${QUESITO_DEPT_DEFS[gameState.deptEspecialidade]?.label}</strong> — bônus +8 neste quesito
+      </div>` : ''}
+    </div>
+  </div>
+
+  <!-- Per-quesito cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem">
+    ${quesitos.map(k=>{
+      const def  = QUESITO_DEPT_DEFS[k];
+      const dept = gameState.quesitoDept[k];
+      const lvl  = DEPT_LEVELS.find(l=>l.id===dept.level);
+      const totalScore = dept.qualidade + dept.estrutura + dept.profissionalizacao;
+      const pct  = Math.min(100, Math.round(totalScore / 1.5));
+      const isSpec = gameState.deptEspecialidade === k;
+      const bonusTotal = getDeptQualityBonus(k);
+
+      return `
+      <div style="background:var(--panel2);border:1px solid ${isSpec?'rgba(212,175,55,.5)':'var(--border)'};border-radius:8px;padding:.8rem;position:relative">
+        ${isSpec?`<div style="position:absolute;top:.4rem;right:.6rem;font-size:.62rem;background:rgba(212,175,55,.2);border-radius:10px;padding:.1rem .4rem;color:var(--gold)">⭐ Referência</div>`:''}
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+          <span style="font-size:1.4rem">${def.icon}</span>
+          <div style="flex:1">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.92rem">${def.label}</div>
+            <div style="font-size:.7rem;color:${lvl.color}">${lvl.icon} ${lvl.label} · Bônus: +${bonusTotal} qualidade</div>
+          </div>
+        </div>
+
+        <!-- Indicadores -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.5rem;font-size:.62rem">
+          ${[['Técnica',dept.qualidade],['Estrutura',dept.estrutura],['Profis.',dept.profissionalizacao]].map(([lbl,val])=>`
+          <div style="text-align:center;padding:.25rem;background:var(--bg2);border-radius:4px">
+            <div style="font-weight:700;color:var(--text);font-size:.78rem">${val}</div>
+            <div style="color:var(--text3)">${lbl}</div>
+          </div>`).join('')}
+        </div>
+
+        <!-- Progress bar -->
+        <div class="prog-track" style="height:5px;margin-bottom:.6rem">
+          <div class="prog-fill ${lvl.id==='elite'?'accent':lvl.id==='profissional'?'gold':lvl.id==='intermediario'?'blue':'gray'}" style="width:${pct}%"></div>
+        </div>
+
+        <!-- Upgrades -->
+        <div style="display:flex;flex-direction:column;gap:.3rem">
+          ${def.upgrades.map(upg=>{
+            const owned = dept.upgrades.includes(upg.id);
+            const canAfford = gameState.budget >= upg.cost;
+            return `
+            <div style="display:flex;align-items:center;gap:.4rem;padding:.35rem .5rem;background:${owned?'rgba(46,204,113,.08)':'var(--bg2)'};border:1px solid ${owned?'rgba(46,204,113,.3)':'var(--border)'};border-radius:5px;opacity:${owned||canAfford?1:.6}">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.75rem;font-weight:600;color:${owned?'var(--success)':'var(--text)'}">${owned?'✓ ':''} ${upg.label}</div>
+                <div style="font-size:.62rem;color:var(--text3)">${upg.desc}</div>
+              </div>
+              ${owned
+                ? `<span style="font-size:.62rem;color:var(--success);white-space:nowrap">Adquirido</span>`
+                : `<button class="btn btn-sm ${canAfford?'btn-blue':'btn-gray'}" style="font-size:.65rem;padding:.2rem .5rem;white-space:nowrap" onclick="buyDeptUpgrade('${k}','${upg.id}')">R$ ${fmt(upg.cost)}</button>`}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ============================================================
+// ==================== SISTEMA DE ENREDISTAS =================
+// ============================================================
+
+const ENREDISTA_LEVELS = {
+  iniciante:     {label:'Iniciante',     icon:'📗', color:'var(--text3)',   salario:20000,  qualBonus:3,  narrativaBonus:2},
+  intermediario: {label:'Intermediário', icon:'📘', color:'var(--info)',    salario:50000,  qualBonus:7,  narrativaBonus:5},
+  profissional:  {label:'Profissional',  icon:'📙', color:'var(--gold)',    salario:100000, qualBonus:12, narrativaBonus:9},
+  elite:         {label:'Elite',         icon:'📕', color:'var(--accent)',  salario:250000, qualBonus:18, narrativaBonus:14},
+};
+
+const ENREDISTA_ESPECIALIDADES = {
+  historico:       {label:'História',          icon:'🏛️', enredoIds:['historico','biografico','ferroviario','migratorio','indigena']},
+  afro:            {label:'Cultura Afro',       icon:'🌍', enredoIds:['afro','religioso','folclorico']},
+  religiao:        {label:'Religião e Mística', icon:'✨', enredoIds:['religioso','mistico','mitologico']},
+  mitologia:       {label:'Mitologia',          icon:'⚡', enredoIds:['mitologico','fantasia','heroi']},
+  cultura_popular: {label:'Cultura Popular',    icon:'🎭', enredoIds:['folclorico','festivo','gastronomico','musical','imigrante']},
+  ciencia:         {label:'Ciência e Tecnologia',icon:'🔬',enredoIds:['aeroespacial','cientifico','futurista','experimental']},
+  social:          {label:'Questões Sociais',   icon:'✊', enredoIds:['social','ecologico','imigrante']},
+  arte:            {label:'Arte e Cultura',      icon:'🎨', enredoIds:['literario','abstrato','contemp','filosofico','musical']},
+};
+
+const DB_ENREDISTAS_ELITE = [
+  {id:'bia_chaves',         name:'Bia Chaves',              nivel:'elite', especialidade:'afro',          salario:320000, reputacao:95},
+  {id:'joao_gustavo',       name:'João Gustavo Melo',       nivel:'elite', especialidade:'historico',     salario:300000, reputacao:93},
+  {id:'mauro_cordeiro',     name:'Mauro Cordeiro',          nivel:'elite', especialidade:'cultura_popular',salario:280000, reputacao:91},
+  {id:'felipe_tinoco',      name:'Felipe Tinoco',           nivel:'elite', especialidade:'arte',          salario:270000, reputacao:90},
+  {id:'sthefanye_paz',      name:'Sthefanye Paz',           nivel:'elite', especialidade:'social',        salario:260000, reputacao:89},
+  {id:'thaina_santos',      name:'Thainá Santos',           nivel:'elite', especialidade:'religiao',      salario:250000, reputacao:88},
+  {id:'matheus_pranto',     name:'Matheus Pranto',          nivel:'elite', especialidade:'mitologia',     salario:245000, reputacao:87},
+  {id:'rodrigo_hilario',    name:'Rodrigo Hilário',         nivel:'elite', especialidade:'historico',     salario:240000, reputacao:86},
+  {id:'bianca_behrenda',    name:'Bianca Behrenda',         nivel:'elite', especialidade:'afro',          salario:235000, reputacao:85},
+  {id:'vivian_pereira',     name:'Vivian Caroline Pereira', nivel:'elite', especialidade:'cultura_popular',salario:230000, reputacao:84},
+  {id:'guilherme_niegro',   name:'Guilherme Niegro',        nivel:'elite', especialidade:'arte',          salario:225000, reputacao:83},
+  {id:'vinicius_natal',     name:'Vinícius Natal',          nivel:'elite', especialidade:'ciencia',       salario:220000, reputacao:82},
+  {id:'rafa_bqueer',        name:'Rafa Bqueer',             nivel:'elite', especialidade:'social',        salario:215000, reputacao:81},
+  {id:'thayssa_menezes',    name:'Thayssa Menezes',         nivel:'elite', especialidade:'mitologia',     salario:210000, reputacao:80},
+];
+
+const ENREDISTA_NAMES_PROF = [
+  'Carlos Andrade','Fernanda Melo','Lucas Ribeiro','Juliana Costa','Paulo Neves',
+  'Renata Silva','Márcio Ferreira','Adriana Lima','Roberto Santos','Camila Souza',
+  'Eduardo Pires','Patrícia Rocha','Alexandre Moura','Beatriz Gonçalves','Fábio Cardoso',
+];
+
+const ENREDISTA_NAMES_INT = [
+  'Anderson Dias','Cíntia Barros','Felipe Nascimento','Gabriela Teixeira','Henrique Lopes',
+  'Isabela Faria','João Mendes','Karoline Batista','Leonardo Cruz','Mariana Martins',
+];
+
+function generateEnredista(nivel) {
+  const lvl = ENREDISTA_LEVELS[nivel];
+  const esp = Object.keys(ENREDISTA_ESPECIALIDADES)[Math.floor(Math.random()*8)];
+  const names = nivel==='profissional' ? ENREDISTA_NAMES_PROF : ENREDISTA_NAMES_INT;
+  // Filter out already hired
+  const hired = (gameState.enredistas||[]).map(e=>e.name);
+  const available = names.filter(n=>!hired.includes(n));
+  const name = available.length ? available[Math.floor(Math.random()*available.length)] : names[Math.floor(Math.random()*names.length)];
+  // Salary varies ±20%
+  const sal = Math.round(lvl.salario * (0.85 + Math.random()*0.3));
+  return {
+    id: 'enr_' + Date.now() + '_' + Math.floor(Math.random()*999),
+    name, nivel, especialidade: esp,
+    salario: sal,
+    qualBonus: lvl.qualBonus + Math.floor(Math.random()*4),
+    narrativaBonus: lvl.narrativaBonus + Math.floor(Math.random()*3),
+    conflito: false,
+    anosNaEscola: 0,
+  };
+}
+
+function getEnredistasBonus() {
+  if(!gameState.enredistas || !gameState.enredistas.length) return {enredo:0, narrativa:0, samba:0, press:0};
+  const enredoId = gameState.enredo || '';
+  let totalQual = 0, totalNarr = 0;
+  let especialistaBonus = 0;
+  gameState.enredistas.forEach(e => {
+    if(e.conflito) return;  // conflito anula contribuição
+    const lvl = ENREDISTA_LEVELS[e.nivel] || ENREDISTA_LEVELS.iniciante;
+    totalQual += e.qualBonus || lvl.qualBonus;
+    totalNarr += e.narrativaBonus || lvl.narrativaBonus;
+    // Especialidade match bonus
+    const esp = ENREDISTA_ESPECIALIDADES[e.especialidade];
+    if(esp && esp.enredoIds.some(id => enredoId.includes(id))) {
+      especialistaBonus += 5;
+    }
+  });
+  // Team size bonus
+  const n = gameState.enredistas.filter(e=>!e.conflito).length;
+  const teamBonus = n >= 5 ? 8 : n >= 3 ? 5 : n >= 2 ? 2 : 0;
+  return {
+    enredo:   Math.min(25, totalQual + especialistaBonus + teamBonus),
+    narrativa:Math.min(20, totalNarr + Math.round(teamBonus*0.5)),
+    samba:    Math.min(8,  Math.round(n * 1.5)),  // sinopse more clara → easier samba
+    press:    Math.min(10, Math.round(totalQual * 0.15) + (especialistaBonus > 0 ? 3 : 0)),
+  };
+}
+
+function getTeamSizeLabel(n) {
+  if(n===0) return 'Enredo pelo carnavalesco';
+  if(n<=2)  return 'Equipe pequena';
+  if(n<=4)  return 'Núcleo de pesquisa';
+  return 'Departamento completo';
+}
+
+function hireEnredista(enredistaId) {
+  if(!gameState.enredistas) gameState.enredistas = [];
+  if(gameState.enredistas.length >= 5) { toast('Máximo de 5 enredistas atingido!','warn'); return; }
+
+  let candidate;
+  // Check elite pool
+  candidate = DB_ENREDISTAS_ELITE.find(e=>e.id===enredistaId);
+  if(!candidate) {
+    // Generated candidate stored temporarily
+    candidate = gameState._enredistasCandidates?.find(e=>e.id===enredistaId);
+  }
+  if(!candidate) { toast('Candidato não encontrado.','error'); return; }
+
+  if(gameState.budget < candidate.salario) {
+    toast(`Precisa de R$ ${fmt(candidate.salario)} para contratar!`, 'error'); return;
+  }
+  // Check if already hired
+  if(gameState.enredistas.some(e=>e.id===candidate.id)) { toast('Já contratado!','warn'); return; }
+  // Check if hired by a rival (simulate competition: 25% chance for elite)
+  if(candidate.nivel==='elite' && Math.random()<0.25 && gameState.school.group!=='especial') {
+    toast(`${candidate.name} preferiu outra escola!`,'warn');
+    addEvent(`⚔️ ${candidate.name} foi disputado por outra escola e preferiu ir para o rival.`, 'warn');
+    renderEnredo(); return;
+  }
+
+  gameState.budget -= candidate.salario;
+  gameState.expenses.equipe = (gameState.expenses.equipe||0) + candidate.salario;
+  const hired = {...candidate, anosNaEscola:0, conflito:false};
+  gameState.enredistas.push(hired);
+
+  const lvl = ENREDISTA_LEVELS[candidate.nivel];
+  addEvent(`📚 ${candidate.name} (${lvl.icon} ${lvl.label}) contratado como enredista. R$ ${fmt(candidate.salario)}/ano.`, 'success');
+  toast(`📚 ${candidate.name} contratado!`, 'gold');
+  renderEnredo();
+}
+
+function fireEnredista(enredistaId) {
+  if(!gameState.enredistas) return;
+  const idx = gameState.enredistas.findIndex(e=>e.id===enredistaId);
+  if(idx<0) return;
+  const e = gameState.enredistas[idx];
+  gameState.enredistas.splice(idx, 1);
+  addEvent(`📚 ${e.name} deixou a equipe de enredistas.`, 'info');
+  toast(`${e.name} dispensado.`, 'warn');
+  renderEnredo();
+}
+
+function rollEnredistaEvents() {
+  if(!gameState.enredistas || !gameState.enredistas.length) return;
+  const carnav = gameState.team?.carnavalesco;
+  gameState.enredistas.forEach(e => {
+    e.anosNaEscola = (e.anosNaEscola||0) + 1;
+    // Conflict with carnavalesco (5% chance per year)
+    if(carnav && !e.conflito && Math.random()<0.05) {
+      e.conflito = true;
+      addEvent(`⚠️ Conflito entre ${e.name} e ${carnav.name}! Narrativa do enredo prejudicada este ano.`, 'warn');
+    }
+    // Resolve old conflicts (70% chance)
+    if(e.conflito && Math.random()<0.70) {
+      e.conflito = false;
+      addEvent(`✅ Conflito entre enredistas e carnavalesco resolvido.`, 'info');
+    }
+    // Elite enredistas may be poached after 3+ years
+    if(e.nivel==='elite' && e.anosNaEscola>=3 && Math.random()<0.12 && gameState.school.group!=='especial') {
+      addEvent(`📰 ${e.name} recebe proposta de outro clube...`, 'warn');
+    }
+  });
+}
+
+function renderEnredistasSection() {
+  if(!gameState.enredistas) gameState.enredistas = [];
+  const hired = gameState.enredistas;
+  const n = hired.length;
+  const bonus = getEnredistasBonus();
+  const teamLabel = getTeamSizeLabel(n);
+
+  // Generate fresh candidates
+  if(!gameState._enredistasCandidates || gameState._enredistasCandidates.length<4) {
+    gameState._enredistasCandidates = [
+      generateEnredista('intermediario'),
+      generateEnredista('profissional'),
+      generateEnredista('profissional'),
+      generateEnredista('iniciante'),
+    ];
+  }
+
+  // Elite pool (only uncontracted)
+  const eliteAvail = DB_ENREDISTAS_ELITE.filter(e=>!hired.some(h=>h.id===e.id));
+
+  return `
+  <div class="panel" style="margin-top:1rem">
+    <div class="panel-header">
+      <span class="panel-title">📚 Equipe de Enredistas</span>
+      <span style="font-size:.75rem;color:${n>=3?'var(--success)':n>=1?'var(--gold)':'var(--text3)'}">${n}/5 • ${teamLabel}</span>
+    </div>
+    <div class="panel-body">
+
+      <!-- Bonus summary -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.85rem">
+        ${[['📜','Enredo',bonus.enredo],['🌀','Narrativa',bonus.narrativa],['🎵','Samba',bonus.samba],['📰','Imprensa',bonus.press]].map(([ic,lb,v])=>`
+        <div style="text-align:center;padding:.4rem;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:1rem">${ic}</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1rem;color:${v>0?'var(--gold)':'var(--text3)'}">${v>0?'+'+v:'—'}</div>
+          <div style="font-size:.6rem;color:var(--text3)">${lb}</div>
+        </div>`).join('')}
+      </div>
+
+      <!-- Hired team -->
+      ${hired.length ? `
+      <div style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.75rem">
+        ${hired.map(e=>{
+          const lvl = ENREDISTA_LEVELS[e.nivel];
+          const esp = ENREDISTA_ESPECIALIDADES[e.especialidade];
+          return `
+          <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;background:${e.conflito?'rgba(231,76,60,.07)':'var(--panel2)'};border:1px solid ${e.conflito?'rgba(231,76,60,.35)':'var(--border)'};border-radius:6px">
+            <span style="font-size:1.2rem">${lvl.icon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.85rem;font-weight:700;color:${lvl.color}">${e.name}${e.conflito?' ⚠️':''}</div>
+              <div style="font-size:.68rem;color:var(--text3)">${lvl.label} · ${esp?.icon||''} ${esp?.label||''} · R$ ${fmt(e.salario)}/ano · ${e.anosNaEscola||0} ano${(e.anosNaEscola||0)!==1?'s':''} na escola</div>
+              ${e.conflito?`<div style="font-size:.65rem;color:var(--danger)">Em conflito com o carnavalesco — contribuição suspensa</div>`:''}
+            </div>
+            <button class="btn btn-gray btn-sm" style="font-size:.65rem;padding:.2rem .5rem" onclick="fireEnredista('${e.id}')">Dispensar</button>
+          </div>`;
+        }).join('')}
+      </div>` : `<div style="font-size:.8rem;color:var(--text3);margin-bottom:.75rem;padding:.5rem;background:var(--bg2);border-radius:5px">Nenhum enredista contratado. O enredo será desenvolvido apenas pelo carnavalesco.</div>`}
+
+      <!-- Hire section -->
+      ${n < 5 ? `
+      <details style="margin-top:.3rem">
+        <summary style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;color:var(--gold);cursor:pointer;padding:.3rem 0">➕ Contratar Enredista (${5-n} vaga${5-n!==1?'s':''})</summary>
+
+        <!-- Elite pool -->
+        ${eliteAvail.length ? `
+        <div style="margin-top:.6rem">
+          <div style="font-size:.65rem;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.35rem">📕 Enredistas de Elite — disputados</div>
+          <div style="display:flex;flex-direction:column;gap:.3rem;max-height:220px;overflow-y:auto">
+            ${eliteAvail.slice(0,8).map(e=>{
+              const esp = ENREDISTA_ESPECIALIDADES[e.especialidade];
+              const canAfford = gameState.budget >= e.salario;
+              return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:5px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:.8rem;font-weight:700;color:var(--accent)">${e.name}</div>
+                  <div style="font-size:.62rem;color:var(--text3)">${esp?.icon||''} ${esp?.label||''} · Reputação ${e.reputacao}</div>
+                </div>
+                <div style="text-align:right;min-width:80px">
+                  <div style="font-size:.7rem;color:var(--gold)">R$ ${fmt(e.salario)}/ano</div>
+                  <button class="btn ${canAfford?'btn-gold':'btn-gray'} btn-sm" style="font-size:.62rem;padding:.15rem .4rem;margin-top:.15rem" onclick="hireEnredista('${e.id}')">Contratar</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- Generated candidates -->
+        <div style="margin-top:.6rem">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.35rem">📗📘📙 Outros Disponíveis</div>
+          <div style="display:flex;flex-direction:column;gap:.3rem">
+            ${(gameState._enredistasCandidates||[]).map(e=>{
+              const lvl = ENREDISTA_LEVELS[e.nivel];
+              const esp = ENREDISTA_ESPECIALIDADES[e.especialidade];
+              const canAfford = gameState.budget >= e.salario;
+              return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:var(--panel2);border:1px solid var(--border);border-radius:5px">
+                <span style="font-size:1.1rem">${lvl.icon}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:.8rem;font-weight:700;color:${lvl.color}">${e.name}</div>
+                  <div style="font-size:.62rem;color:var(--text3)">${lvl.label} · ${esp?.icon||''} ${esp?.label||''}</div>
+                </div>
+                <div style="text-align:right;min-width:80px">
+                  <div style="font-size:.7rem;color:var(--text2)">R$ ${fmt(e.salario)}/ano</div>
+                  <button class="btn ${canAfford?'btn-blue':'btn-gray'} btn-sm" style="font-size:.62rem;padding:.15rem .4rem;margin-top:.15rem" onclick="hireEnredista('${e.id}')">Contratar</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+          <button class="btn btn-gray btn-sm" style="width:100%;margin-top:.4rem;font-size:.72rem" onclick="gameState._enredistasCandidates=null;renderEnredo()">🔄 Atualizar candidatos</button>
+        </div>
+      </details>` : `<div style="font-size:.75rem;color:var(--success);text-align:center;padding:.3rem">✅ Departamento completo — 5 enredistas contratados!</div>`}
+
+    </div>
+  </div>`;
+}
 // Returns array of payment objects with due months
 function buildIncomeSchedule(state) {
   const group  = state.school.group;
@@ -3889,7 +4722,7 @@ function initGameState(school, difficulty) {
   };
   const group = school.group;
 
-  const teamSlots = {carnavalesco:null,interprete:null,mestre:null,diretorCarnaval:null,harmonia:null,comissaoFrente:null,casal:null};
+  const teamSlots = {carnavalesco:null,interprete:null,mestre:null,diretorCarnaval:null,harmonia:null,comissaoFrente:null,casal:null,diretorBarracao:null};
 
   // Generate rival schools in same group — strength scales with difficulty
   // diffMult: facil=1.3, normal=1.0, dificil=0.75, lendario=0.5
@@ -3970,7 +4803,7 @@ function initGameState(school, difficulty) {
     barracaoSetoresNomes: [],
     barracaoSetoresTipos: [],
     barracaoClarezaNarrativa: undefined,
-    barracaoCarrosConfig: null,  // {count, cars:[{...}]}
+    barracaoCarrosConfig: null,  // {count, cars:[{...}], extras:[{tipo,nome,setorIdx}]}
     barracaoAlasConfig: null,    // {count, compPerAla, investment}
     barracaoEquipeParintins: false,
     barracaoUnlocked: false,
@@ -4272,6 +5105,7 @@ function showTab(tab) {
     alas:'👥 Alas e Componentes',team:'🎭 Equipe Artística',rainha:'👸 Rainha de Bateria',
     ensaios:'🎺 Ensaios',community:'❤️ Comunidade',
     eventos:'🎉 Eventos de Quadra',patrocinadores:'🤝 Patrocinadores',talentos:'🌟 Talentos da Comunidade',
+    departamento:'🏗️ Departamento de Quesitos',
     politics:'🏛️ Sistema Político',press:'📰 Imprensa',negociacoes:'🤝 Negociações — Mercado de Profissionais',
   };
   document.getElementById('contentTitle').textContent = titles[tab]||tab;
@@ -4289,6 +5123,7 @@ function renderTab(tab) {
     samba:renderSamba, barracão:renderBarracão, alas:renderAlas,
     team:renderTeam, rainha:renderRainha, ensaios:renderEnsaios, community:renderCommunity,
     eventos:renderEventos, patrocinadores:renderPatrocinadores, talentos:renderTalentos,
+    departamento:renderDept,
     politics:renderPolitics, press:renderPress, negociacoes:renderNegociacoes,
   };
   if(fns[tab]) fns[tab]();
@@ -4808,6 +5643,8 @@ function confirmStartGame() {
   const slot = 0;
   currentSaveSlot = slot;
   gameState = initGameState(selectedSchool, difficulty);
+  initAICycles(gameState.rivals);
+  initQuesitoDept();
 
   // Apply selected year
   const startYear = selectedYear || 2025;
@@ -4944,8 +5781,11 @@ function advanceMonth() {
   }
 
   gameState.month++;
-  checkSambaEncomendaReady(); // activate encomenda samba if ready this month
+  checkSambaEncomendaReady();
   const m = MONTHS_DATA[gameState.month];
+
+  // Enredista events — check once per year in April (month 1)
+  if(gameState.month === 1) rollEnredistaEvents();
 
   // Random event
   if(Math.random() < 0.65) {
@@ -5683,6 +6523,7 @@ function renderEnredo() {
       </div>
     </div>
     ${renderSponsoredProposalsSection()}
+    ${renderEnredistasSection()}
     `;
     return;
   }
@@ -5730,6 +6571,7 @@ function renderEnredo() {
   el.innerHTML = `
   ${proposalsHTML}
   ${renderSponsoredProposalsSection()}
+  ${renderEnredistasSection()}
 
   <!-- Free banner -->
   <div style="background:linear-gradient(135deg,rgba(46,204,113,.08),transparent);border:1px solid rgba(46,204,113,.25);border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem">
@@ -6899,7 +7741,6 @@ function renderBarracão() {
       if(!form) return;
       form.innerHTML = `
         <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem">📋 Configure cada setor:</div>
-        <div style="padding:.3rem .6rem;background:rgba(212,175,55,.1);border-left:3px solid var(--gold);border-radius:4px;font-size:.8rem">🌟 Abre-Alas <em style="color:var(--text3)">(fixo)</em></div>
         ${Array.from({length:n},(_,i)=>{
           const defaultTipo = i===0?'abertura':i===n-1?'encerramento':i===Math.floor(n/2)?'climax':'historico';
           return `
@@ -6915,8 +7756,7 @@ function renderBarracão() {
               </select>
             </div>
           </div>`;
-        }).join('')}
-        <div style="padding:.3rem .6rem;background:rgba(212,175,55,.1);border-left:3px solid var(--gold);border-radius:4px;font-size:.8rem">🎆 Carro Final — Apoteose <em style="color:var(--text3)">(fixo)</em></div>`;
+        }).join('')}`;
       updateClarezaPreview(n);
     }
 
@@ -6955,144 +7795,130 @@ function renderBarracão() {
 
   // STEP 3: Carros not planned
   if(!gameState.barracaoCarrosConfig) {
+    const dirBarracao = gameState.team?.diretorBarracao;
+    const dirCarnaval = gameState.team?.diretorCarnaval;
+    const hasAuto = !!(dirBarracao || dirCarnaval);
+    const autoName = dirBarracao?.name || dirCarnaval?.name || '';
+    const autoLabel = dirBarracao ? 'Diretor de Barracão' : 'Diretor de Carnaval';
+    const autoBanner = hasAuto
+      ? `<div style="background:rgba(46,204,113,.08);border:1px solid rgba(46,204,113,.25);border-radius:8px;padding:.65rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem"><span style="font-size:1.4rem">🤖</span><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--success);font-size:.9rem">Confecção Automática Ativa</div><div style="font-size:.72rem;color:var(--text2)">${autoName} (${autoLabel}) conduz o passo a passo automaticamente a cada mês.</div></div></div>`
+      : `<div style="background:rgba(243,156,18,.07);border:1px solid rgba(243,156,18,.25);border-radius:8px;padding:.65rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem"><span style="font-size:1.4rem">👷</span><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--warn);font-size:.9rem">Modo Manual</div><div style="font-size:.72rem;color:var(--text2)">Sem Diretor de Barracão — controle cada etapa na aba Confecção ou contrate um diretor na aba Equipe.</div></div></div>`;
+
     el.innerHTML = `
-    <div style="max-width:680px;margin:0 auto">
-      <div style="text-align:center;margin-bottom:1.5rem">
+    <div style="max-width:600px;margin:0 auto">
+      <div style="text-align:center;margin-bottom:1rem">
         <div style="font-size:3rem">🎪</div>
-        <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;margin:.5rem 0">Planejamento de Carros Alegóricos</h3>
-        <p style="color:var(--text2);font-size:.85rem">Defina quantos carros terá o desfile e configure cada um individualmente.</p>
+        <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;margin:.5rem 0">Planejamento de Alegorias e Elementos</h3>
+        <p style="color:var(--text2);font-size:.82rem">Nomeie os carros e defina os elementos do desfile.</p>
       </div>
-
-      <div class="panel" style="margin-bottom:1rem">
-        <div class="panel-body">
-          <div class="form-group">
-            <label class="form-label">Número de Carros</label>
-            <input type="number" class="form-input" id="carrosCountInput" min="3" max="8" value="6" style="font-size:1.3rem;text-align:center;max-width:100px">
-            <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">Sugerido: 3 a 8 carros</div>
-          </div>
-
-          <div style="margin-top:.75rem">
-            <label class="form-label">Contratar Equipe de Parintins?</label>
-            <div style="display:flex;gap:.75rem;margin-top:.3rem">
-              <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
-                <input type="radio" name="parintins" value="sim" id="parintinsSim"> <span>✅ Sim — R$ 800k (esculturas gigantes, acabamento artístico)</span>
-              </label>
+      ${autoBanner}
+      <div style="display:flex;align-items:center;gap:.75rem;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem">
+        <span style="font-size:1.3rem">🎪</span>
+        <div style="flex:1">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem">Carros Alegóricos</div>
+          <div style="font-size:.7rem;color:var(--text3)">Sugerido: 4 a 8 carros</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <button class="btn btn-gray btn-sm" style="padding:.3rem .6rem;font-size:1rem;line-height:1" onclick="_barrBtnCarMinus()">−</button>
+          <span id="carCountDisplay" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.4rem;color:var(--gold);min-width:28px;text-align:center">6</span>
+          <button class="btn btn-gray btn-sm" style="padding:.3rem .6rem;font-size:1rem;line-height:1" onclick="_barrBtnCarPlus()">+</button>
+        </div>
+      </div>
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:.4rem">➕ Elementos Extras do Desfile</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-bottom:.6rem">Tripés e Pés de Passagem são independentes dos carros — não têm produção no barracão.</div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:150px;background:var(--bg2);border:1px solid rgba(52,152,219,.3);border-radius:6px;padding:.55rem .7rem;display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:1.2rem">🗼</span>
+            <div style="flex:1"><div style="font-size:.82rem;font-weight:700">Tripé</div><div style="font-size:.62rem;color:var(--text3)">1 slot · Impacto visual +3</div></div>
+            <div style="display:flex;align-items:center;gap:.3rem">
+              <button class="btn btn-gray btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnTripeMinus()">−</button>
+              <span id="tripeCountDisplay" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:var(--info);min-width:20px;text-align:center">0</span>
+              <button class="btn btn-blue btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnTripePlus()">+</button>
             </div>
-            <div style="display:flex;gap:.75rem;margin-top:.3rem">
-              <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
-                <input type="radio" name="parintins" value="nao" id="parintinsNao" checked> <span>❌ Não — equipe local</span>
-              </label>
+          </div>
+          <div style="flex:1;min-width:150px;background:var(--bg2);border:1px solid rgba(243,156,18,.3);border-radius:6px;padding:.55rem .7rem;display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:1.2rem">📣</span>
+            <div style="flex:1"><div style="font-size:.82rem;font-weight:700">Pé de Passagem</div><div style="font-size:.62rem;color:var(--text3)">Sem slot · Harmonia +2</div></div>
+            <div style="display:flex;align-items:center;gap:.3rem">
+              <button class="btn btn-gray btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnPedeMinus()">−</button>
+              <span id="pedeCountDisplay" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:var(--warn);min-width:20px;text-align:center">0</span>
+              <button class="btn btn-gray btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnPedePlus()">+</button>
             </div>
           </div>
         </div>
       </div>
-
-      <div id="carrosConfigList" style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem"></div>
-      <div id="barracaoAlerta" style="display:none;padding:.6rem .75rem;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:6px;color:var(--danger);font-size:.8rem;margin-bottom:.75rem"></div>
-      <button class="btn btn-gold" style="width:100%;font-size:1rem" onclick="confirmarCarros()">✅ Confirmar Planejamento de Carros</button>
+      <div id="carrosConfigList" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem"></div>
+      <div id="extrasConfigList" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem"></div>
+      <button class="btn btn-gold" style="width:100%;font-size:1rem" onclick="confirmarCarros()">✅ Confirmar Estrutura do Desfile</button>
     </div>`;
 
-    function buildCarrosUI() {
-      const n = parseInt(el.querySelector('#carrosCountInput').value)||6;
-      const list = el.querySelector('#carrosConfigList');
-      const alertEl = el.querySelector('#barracaoAlerta');
-      const defaultNames = ['Abre-Alas','Carro 2','Carro 3','Carro 4','Carro 5','Carro 6','Carro 7','Carro Final (Apoteose)'];
-      const carColors = ['#D4AF37','#C0392B','#1A7A3C','#9B59B6','#3498DB','#E67E22','#1ABC9C','#E91E63'];
-      list.innerHTML = Array.from({length:n},(_,i)=>`
-        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.4rem">
-          <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;color:var(--gold)">
-              🎪 ${i===0?'Abre-Alas':i===n-1?'Carro Final (Apoteose)':'Carro '+(i+1)}
-            </div>
-            <input type="text" class="form-input car-nome" data-idx="${i}"
-              placeholder="Nome do carro (opcional)"
-              value="${i===0?'Abre-Alas':i===n-1?'Carro Final (Apoteose)':'Carro '+(i+1)}"
-              style="flex:1;padding:.25rem .5rem;font-size:.75rem;color:var(--gold)">
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.4rem;font-size:.75rem;margin-bottom:.4rem">
-            <div>
-              <div style="color:var(--text3);margin-bottom:.2rem">Investimento</div>
-              <select class="form-input car-investimento" data-idx="${i}" style="padding:.3rem;font-size:.75rem">
-                <option value="100000">Econômico (R$ 100k)</option>
-                <option value="200000">Básico (R$ 200k)</option>
-                <option value="450000" selected>Médio (R$ 450k)</option>
-                <option value="800000">Alto (R$ 800k)</option>
-                <option value="1500000">Luxo (R$ 1,5M)</option>
-                <option value="3000000">Grandioso (R$ 3M)</option>
-              </select>
-            </div>
-            <div>
-              <div style="color:var(--text3);margin-bottom:.2rem">Altura (m)</div>
-              <input type="number" class="form-input car-altura" data-idx="${i}" min="4" max="14" value="${8+i}" style="padding:.3rem;font-size:.75rem">
-            </div>
-            <div>
-              <div style="color:var(--text3);margin-bottom:.2rem">Chassis</div>
-              <input type="number" class="form-input car-chassis" data-idx="${i}" min="1" max="4" value="1" style="padding:.3rem;font-size:.75rem">
-            </div>
-            <div>
-              <div style="color:var(--text3);margin-bottom:.2rem">Esculturas</div>
-              <input type="number" class="form-input car-esculturas" data-idx="${i}" min="1" max="25" value="${3+i*2}" style="padding:.3rem;font-size:.75rem">
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.75rem;margin-bottom:.4rem">
-            <div>
-              <div style="color:var(--text3);margin-bottom:.2rem">Cor Principal</div>
-              <div style="display:flex;gap:.3rem;align-items:center">
-                <input type="color" class="car-cor" data-idx="${i}" value="${carColors[i%carColors.length]}" style="width:36px;height:28px;border:none;background:none;cursor:pointer;border-radius:4px">
-                <input type="color" class="car-cor2" data-idx="${i}" value="${carColors[(i+3)%carColors.length]}" style="width:36px;height:28px;border:none;background:none;cursor:pointer;border-radius:4px">
-                <span style="color:var(--text3);font-size:.65rem">2 cores</span>
-              </div>
-            </div>
-            <div>
-              <div style="color:var(--text3);margin-bottom:.2rem">Passageiros</div>
-              <select class="form-input car-passageiros" data-idx="${i}" style="padding:.3rem;font-size:.75rem">
-                <option value="nenhum">Nenhum especial</option>
-                <option value="velha_guarda" ${i===0?'selected':''}>👴 Velha Guarda</option>
-                <option value="compositores">🎵 Compositores</option>
-                <option value="criancas">👧 Crianças</option>
-                <option value="convidados">⭐ Convidados Especiais</option>
-                <option value="rainha">👸 Rainha de Bateria</option>
-                <option value="destaque">💃 Destaque de Luxo</option>
-              </select>
-            </div>
-          </div>
-          <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.75rem">
-            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;color:var(--text2)">
-              <input type="checkbox" class="car-tripe" data-idx="${i}" ${i===n-1?'checked':''}> 🗼 Tripé
-            </label>
-            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;color:var(--text2)">
-              <input type="checkbox" class="car-pede-passagem" data-idx="${i}"> 📣 Pede Passagem
-            </label>
-            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;color:var(--text2)">
-              <input type="checkbox" class="car-cenografico" data-idx="${i}" ${i===n-1?'checked':''}> 🏛️ Elemento Cenográfico
-            </label>
-            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;color:var(--text2)">
-              <input type="checkbox" class="car-parintins" data-idx="${i}" ${i===n-1?'checked':''}> 🌴 Mov. Parintins
-            </label>
-          </div>
-        </div>
-      `).join('');
+    let _barrCarCount = 6, _barrTripeCount = 0, _barrPedeCount = 0;
 
-      // Validate and show alert
-      const totalCost = Array.from(list.querySelectorAll('.car-investimento')).reduce((s,el)=>s+parseInt(el.value),0);
-      const parintins = document.getElementById('parintinsSim')?.checked ? 800000 : 0;
-      const total = totalCost + parintins;
-      if(total > gameState.budget * 0.6) {
-        alertEl.style.display='block';
-        alertEl.textContent = `⚠️ Projeto pode ser grande demais! Custo estimado: R$ ${fmt(total)} (${Math.round(total/gameState.budget*100)}% do orçamento). Recomendado: máx. 60%.`;
-      } else {
-        alertEl.style.display='none';
-      }
-      // Live cost update on any change
-      list.querySelectorAll('.car-investimento').forEach(sel=>sel.addEventListener('change',buildCarrosUI));
-    }
-    el.querySelector('#carrosCountInput').addEventListener('input', buildCarrosUI);
-    el.querySelector('#parintinsSim').addEventListener('change', buildCarrosUI);
-    el.querySelector('#parintinsNao').addEventListener('change', buildCarrosUI);
-    buildCarrosUI();
+    window._barrBtnCarMinus  = ()=>{ _barrCarCount  = clamp(_barrCarCount -1, 2, 10); const d=document.getElementById('carCountDisplay');  if(d) d.textContent=_barrCarCount;  _barrBuildCars(); };
+    window._barrBtnCarPlus   = ()=>{ _barrCarCount  = clamp(_barrCarCount +1, 2, 10); const d=document.getElementById('carCountDisplay');  if(d) d.textContent=_barrCarCount;  _barrBuildCars(); };
+    window._barrBtnTripeMinus= ()=>{ _barrTripeCount= clamp(_barrTripeCount-1, 0, 6); const d=document.getElementById('tripeCountDisplay'); if(d) d.textContent=_barrTripeCount; _barrBuildExtras(); };
+    window._barrBtnTripePlus = ()=>{ _barrTripeCount= clamp(_barrTripeCount+1, 0, 6); const d=document.getElementById('tripeCountDisplay'); if(d) d.textContent=_barrTripeCount; _barrBuildExtras(); };
+    window._barrBtnPedeMinus = ()=>{ _barrPedeCount = clamp(_barrPedeCount -1, 0, 4); const d=document.getElementById('pedeCountDisplay');  if(d) d.textContent=_barrPedeCount;  _barrBuildExtras(); };
+    window._barrBtnPedePlus  = ()=>{ _barrPedeCount = clamp(_barrPedeCount +1, 0, 4); const d=document.getElementById('pedeCountDisplay');  if(d) d.textContent=_barrPedeCount;  _barrBuildExtras(); };
+
+    window._barrGetCarCount   = ()=> _barrCarCount;
+    window._barrGetTripeCount = ()=> _barrTripeCount;
+    window._barrGetPedeCount  = ()=> _barrPedeCount;
+
+    window._barrBuildCars = function() {
+      const list = document.getElementById('carrosConfigList');
+      if(!list) return;
+      const setorOpts = (gameState.barracaoSetoresNomes||[]).map((s,si)=>`<option value="${si+1}">${s}</option>`).join('');
+      list.innerHTML = Array.from({length:_barrCarCount},(_,i)=>`
+        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.75rem .9rem">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.45rem">🎪 CARRO ${i+1}</div>
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:end">
+            <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Nome</div><input type="text" class="form-input car-nome" data-idx="${i}" placeholder="Ex: O Nascimento da Floresta" style="font-size:.85rem;padding:.35rem .5rem"></div>
+            <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Chassis</div><input type="number" class="form-input car-chassis" data-idx="${i}" min="1" max="4" value="1" style="padding:.35rem .5rem;font-size:.85rem;width:62px;text-align:center"></div>
+            <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Setor</div><select class="form-select car-setor" data-idx="${i}" style="font-size:.75rem;padding:.35rem .4rem;min-width:90px"><option value="">— livre —</option>${setorOpts}</select></div>
+          </div>
+          <div style="margin-top:.5rem">
+            <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Quem vem neste carro</div>
+            <select class="form-select car-passageiros" data-idx="${i}" style="font-size:.8rem;padding:.35rem .5rem;width:100%">
+              <option value="nenhum">Sem destaque especial</option>
+              <option value="velha_guarda">👴 Velha Guarda</option>
+              <option value="compositores">🎵 Compositores</option>
+              <option value="criancas">👧 Crianças</option>
+              <option value="convidados">⭐ Convidados Especiais</option>
+              <option value="rainha">👸 Rainha de Bateria</option>
+              <option value="destaque">💃 Destaque de Luxo</option>
+              <option value="interprete">🎤 Intérprete</option>
+            </select>
+          </div>
+        </div>`).join('');
+    };
+
+    window._barrBuildExtras = function() {
+      const extList = document.getElementById('extrasConfigList');
+      if(!extList) return;
+      const setorOpts = (gameState.barracaoSetoresNomes||[]).map((s,si)=>`<option value="${si+1}">${s}</option>`).join('');
+      const all = [
+        ...Array.from({length:_barrTripeCount},(_,i)=>({tipo:'tripe',idx:i})),
+        ...Array.from({length:_barrPedeCount}, (_,i)=>({tipo:'pede', idx:i})),
+      ];
+      if(!all.length) { extList.innerHTML=''; return; }
+      extList.innerHTML = `<div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:.2rem 0;margin-bottom:.3rem">Elementos Extras</div>`
+        + all.map(({tipo,idx})=>`
+        <div style="background:var(--panel2);border:1px solid ${tipo==='tripe'?'rgba(52,152,219,.3)':'rgba(243,156,18,.3)'};border-radius:8px;padding:.65rem .9rem;display:flex;align-items:center;gap:.75rem">
+          <span style="font-size:1.3rem">${tipo==='tripe'?'🗼':'📣'}</span>
+          <div style="flex:1">
+            <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">${tipo==='tripe'?'TRIPÉ':'PÉ DE PASSAGEM'} ${idx+1}</div>
+            <input type="text" class="form-input extra-nome" data-tipo="${tipo}" data-idx="${idx}" placeholder="${tipo==='tripe'?'Nome do tripé':'Nome'}" style="font-size:.82rem;padding:.3rem .5rem">
+          </div>
+          <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.3rem">Setor</div><select class="form-select extra-setor" data-tipo="${tipo}" data-idx="${idx}" style="font-size:.72rem;padding:.3rem .4rem;min-width:90px"><option value="">— livre —</option>${setorOpts}</select></div>
+        </div>`).join('');
+    };
+
+    _barrBuildCars();
+    _barrBuildExtras();
     return;
   }
-
   // STEP 4: Alas not planned
   if(!gameState.barracaoAlasConfig) {
     el.innerHTML = `
@@ -7242,87 +8068,84 @@ function confirmarSetores() {
 }
 
 function confirmarCarros() {
-  const countInput = document.getElementById('carrosCountInput');
-  const n = clamp(parseInt(countInput?.value||6), 3, 10);
-  const parintins = document.getElementById('parintinsSim')?.checked || false;
-  const parintinsCost = parintins ? 800000 : 0;
+  // Read counts from window globals set by the planning UI buttons
+  const n = clamp(window._barrGetCarCount ? window._barrGetCarCount() : parseInt(document.getElementById('carCountDisplay')?.textContent||6), 2, 10);
 
   const cars = Array.from({length:n},(_,i)=>{
     const nomeEl    = document.querySelector(`.car-nome[data-idx="${i}"]`);
-    const investEl  = document.querySelector(`.car-investimento[data-idx="${i}"]`);
-    const altEl     = document.querySelector(`.car-altura[data-idx="${i}"]`);
-    const largEl    = document.querySelector(`.car-largura[data-idx="${i}"]`);
     const chassisEl = document.querySelector(`.car-chassis[data-idx="${i}"]`);
-    const sculEl    = document.querySelector(`.car-esculturas[data-idx="${i}"]`);
-    const corEl     = document.querySelector(`.car-cor[data-idx="${i}"]`);
-    const cor2El    = document.querySelector(`.car-cor2[data-idx="${i}"]`);
     const passEl    = document.querySelector(`.car-passageiros[data-idx="${i}"]`);
-    const tripeEl   = document.querySelector(`.car-tripe[data-idx="${i}"]`);
-    const pedeEl    = document.querySelector(`.car-pede-passagem[data-idx="${i}"]`);
-    const cenEl     = document.querySelector(`.car-cenografico[data-idx="${i}"]`);
-    const parEl     = document.querySelector(`.car-parintins[data-idx="${i}"]`);
+    const setorEl   = document.querySelector(`.car-setor[data-idx="${i}"]`);
 
-    const defaultName = i===0?'Abre-Alas':i===n-1?'Carro Final (Apoteose)':('Carro '+(i+1));
-    const invest    = parseInt(investEl?.value||450000);
-    const altura    = clamp(parseInt(altEl?.value||8), 4, 14);
-    const largura   = clamp(parseInt(largEl?.value||5), 4, 8);
-    const chassis   = clamp(parseInt(chassisEl?.value||1), 1, 4);
-    const esculturas= clamp(parseInt(sculEl?.value||5), 1, 25);
-    const nome      = (nomeEl?.value||'').trim() || defaultName;
-    const cor       = corEl?.value || '#D4AF37';
-    const cor2      = cor2El?.value || '#C0392B';
+    const defaultName = 'Carro '+(i+1);
+    const nome        = (nomeEl?.value||'').trim() || defaultName;
+    const chassis     = clamp(parseInt(chassisEl?.value||1), 1, 4);
     const passageiros = passEl?.value || 'nenhum';
-    const temTripe  = tripeEl?.checked || false;
-    const pedePas   = pedeEl?.checked || false;
-    const cenografico = cenEl?.checked || false;
-    const movParintins = parEl?.checked || false;
-
-    // Quality based on investment
-    const qualidade = invest>=3000000?'Grandioso':invest>=1500000?'Luxo':invest>=800000?'Alto':invest>=450000?'Médio':invest>=200000?'Básico':'Econômico';
+    const setorIdx    = parseInt(setorEl?.value||0) || 0;
 
     return {
-      idx:i, nome, invest, qualidade, altura, largura, chassis, esculturas,
-      cor, cor2, passageiros, temTripe, pedePas, cenografico, movParintins,
-      progress:0
+      id: 'car_'+(i+1),
+      idx: i,
+      nome,
+      chassis,
+      passageiros,
+      setorIdx,
+      invest: 0,
+      altura: 8,
+      largura: 5,
+      esculturas: 5,
+      cor: '#D4AF37',
+      cor2: '#C0392B',
+      qualidade: 'Médio',
+      progress: 0,
     };
   });
 
-  const totalCost = cars.reduce((s,c)=>s+c.invest,0) + parintinsCost;
-  if(gameState.budget < totalCost) {
-    toast(`Sem orçamento! Faltam R$ ${fmt(totalCost - gameState.budget)}`, 'error'); return;
+  // Read extras (tripés and pés de passagem)
+  const extras = [];
+  document.querySelectorAll('.extra-nome').forEach(el=>{
+    const tipo = el.dataset.tipo;
+    const idx  = parseInt(el.dataset.idx||0);
+    const nome = (el.value||'').trim() || (tipo==='tripe' ? `Tripé ${idx+1}` : `Pé de Passagem ${idx+1}`);
+    const setorEl = document.querySelector(`.extra-setor[data-tipo="${tipo}"][data-idx="${idx}"]`);
+    const setorIdx = parseInt(setorEl?.value||0) || 0;
+    extras.push({ id:`extra_${tipo}_${idx}`, tipo, nome, setorIdx });
+  });
+
+  // Count tripés for slot calculation
+  const tripeCount = extras.filter(e=>e.tipo==='tripe').length;
+  const pedeCount  = extras.filter(e=>e.tipo==='pede').length;
+
+  // No upfront cost
+  gameState.barracaoCarrosConfig = {count:n, cars, extras, parintins:false, totalCost:0};
+  gameState.barracaoEquipeParintins = false;
+  gameState.barracaoProgress = clamp(gameState.barracaoProgress + 10, 0, 100);
+
+  // Apply extras bonuses
+  if(tripeCount > 0) {
+    gameState.scores.alegorias = clamp(gameState.scores.alegorias + tripeCount * 3, 0, 100);
+    addEvent(`🗼 ${tripeCount} tripé${tripeCount>1?'s':''} adicionado${tripeCount>1?'s':''} ao desfile! Impacto visual +${tripeCount*3}.`, 'success');
   }
-
-  gameState.budget -= totalCost;
-  gameState.expenses.barracão += totalCost;
-  gameState.barracaoCarrosConfig = {count:n, cars, parintins, totalCost};
-  gameState.barracaoEquipeParintins = parintins;
-
-  // Apply score impacts from car configuration
-  const avgHeight = cars.reduce((s,c)=>s+c.altura,0)/n;
-  const totalSculp = cars.reduce((s,c)=>s+c.esculturas,0);
-  const parintinsCount = cars.filter(c=>c.movParintins).length;
-  const cenCount = cars.filter(c=>c.cenografico).length;
-  const visualImpact = Math.min(100, 50 + avgHeight*2 + totalSculp*0.5 + (parintins?15:0) + parintinsCount*3 + cenCount*2);
-  gameState.scores.alegorias = clamp(gameState.scores.alegorias + visualImpact*0.3, 0, 100);
-  gameState.barracaoProgress = clamp(gameState.barracaoProgress + 20, 0, 100);
+  if(pedeCount > 0) {
+    gameState.scores.harmonia = clamp(gameState.scores.harmonia + pedeCount * 2, 0, 100);
+    addEvent(`📣 ${pedeCount} pé${pedeCount>1?'s':''} de passagem no desfile! Harmonia +${pedeCount*2}.`, 'success');
+  }
 
   // Carnavalesco reaction
   const carnav = gameState.team?.carnavalesco;
   if(carnav) {
-    const isGrandiose = totalCost > 4000000 || n >= 7;
     const personality = gameState.carnavalescoPersonality;
-    let reaction;
-    if(personality==='visionário' && isGrandiose) reaction='😍 Impressionante! É exatamente o projeto que eu sonhava!';
-    else if(personality==='artista' && !isGrandiose) reaction='🎨 Gosto da contenção. Vamos focar na qualidade artística de cada peça.';
-    else if(personality==='teimoso' && isGrandiose) reaction='😤 Muitos carros. Vou precisar de mais tempo e mais verba.';
-    else if(personality==='comercial') reaction='💼 Bom projeto! Visibilidade garantida na mídia.';
-    else if(isGrandiose) reaction='😮 Projeto ambicioso! Espero que o orçamento aguente.';
-    else reaction='👍 Projeto equilibrado. Dá pra trabalhar bem com isso.';
-    addEvent(`${carnav.name} sobre o barracão: "${reaction.replace(/^[^\s]+ /,'')}"`, 'gold');
-    toast(reaction, 'gold');
+    const hasAuto = !!(gameState.team?.diretorBarracao || gameState.team?.diretorCarnaval);
+    const reaction = n>=7 ? '😮 Projeto ambicioso! Muitos carros para planejar.' :
+      personality==='artista' ? '🎨 Bom começo. Agora é focar na qualidade de cada peça.' :
+      hasAuto ? '👍 Ótimo — com o diretor de barracão, a produção vai fluir!' :
+      '👍 Estrutura definida. Vamos ao barracão!';
+    addEvent(`${carnav.name}: "${reaction.replace(/^[^\s]+ /,'')}"`, 'gold');
   }
 
-  addEvent(`Barracão planejado: ${n} carros (${cars.map(c=>c.nome).join(', ')}), R$ ${fmt(totalCost)} investidos.`,'success');
+  const extrasDesc = extras.length > 0 ? ` + ${extras.length} elemento${extras.length>1?'s':''} extra${extras.length>1?'s':''}` : '';
+  addEvent(`${n} carros definidos${extrasDesc}. Configure investimentos no Barracão.`, 'success');
+  toast(`${n} carros${extrasDesc} confirmados!`, 'gold');
   renderBarracão();
 }
 
@@ -7411,33 +8234,48 @@ function renderBarracaoFull(el) {
   <div class="grid-2">
     <!-- CARROS -->
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">🎪 Carros Alegóricos</span><span style="font-size:.75rem;color:var(--text3)">${cc?.count||0} carros${gameState.barracaoEquipeParintins?' • 🌴 Equipe Parintins':''}</span></div>
+      <div class="panel-header"><span class="panel-title">🎪 Carros Alegóricos</span><span style="font-size:.75rem;color:var(--text3)">${cc?.count||0} carros</span></div>
       <div class="panel-body">
-        ${cc ? cc.cars.map((c,i)=>`
-          <div style="padding:.4rem .6rem;background:var(--panel2);border:1px solid var(--border);border-radius:5px;margin-bottom:.35rem;border-left:3px solid ${c.cor||'var(--gold)'}">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem">🎪 ${c.nome}</span>
-              <div style="display:flex;gap:.25rem;align-items:center">
-                <span style="font-size:.65rem;padding:.1rem .3rem;background:rgba(212,175,55,.15);border-radius:3px;color:var(--gold)">${c.qualidade||''}</span>
-                <span style="font-size:.7rem;color:var(--gold)">R$ ${fmt(c.invest)}</span>
+        ${cc ? cc.cars.map((c,i)=>{
+          const carId = c.id || c.nome;
+          const totalCarCost = calcCarTotalCost(carId);
+          const effects = (gameState.barracaoEfeitosEspeciais?.[carId]||[]);
+          const setorNome = c.setorIdx ? (gameState.barracaoSetoresNomes?.[c.setorIdx-1] || '') : '';
+          const passLabel = {velha_guarda:'👴 Velha Guarda',compositores:'🎵 Compositores',criancas:'👧 Crianças',convidados:'⭐ Convidados',rainha:'👸 Rainha',destaque:'💃 Destaque',interprete:'🎤 Intérprete'}[c.passageiros]||'';
+          const stages = gameState.barracaoCarStages?.[carId] || {};
+          const stageAvg = stages.estrutura!==undefined ? Math.round((stages.estrutura+stages.escultura+stages.pintura+stages.iluminacao)/4) : 0;
+          return `
+          <div style="padding:.55rem .7rem;background:var(--panel2);border:1px solid var(--border);border-radius:6px;margin-bottom:.4rem">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.3rem">
+              <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem">🎪 ${c.nome}</span>
+              <div style="text-align:right">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem;color:var(--gold)">${totalCarCost>0?'R$ '+fmt(totalCarCost):'—'}</div>
+                <div style="font-size:.6rem;color:var(--text3)">custo total</div>
               </div>
             </div>
-            <div style="font-size:.7rem;color:var(--text3);margin-top:.2rem;display:flex;flex-wrap:wrap;gap:.3rem">
-              <span>🏗️ ${c.altura}m alt · ${c.chassis} chassis · ${c.esculturas} escult.</span>
-              ${c.temTripe?'<span style="color:var(--info)">🗼 Tripé</span>':''}
-              ${c.pedePas?'<span style="color:var(--warn)">📣 Pede Passagem</span>':''}
-              ${c.cenografico?'<span style="color:var(--accent)">🏛️ Cenográfico</span>':''}
-              ${c.movParintins?'<span style="color:var(--success)">🌴 Parintins</span>':''}
-              ${c.passageiros&&c.passageiros!=='nenhum'?`<span style="color:var(--gold-light)">⭐ ${{velha_guarda:'Velha Guarda',compositores:'Compositores',criancas:'Crianças',convidados:'Convidados',rainha:'Rainha',destaque:'Destaque'}[c.passageiros]||c.passageiros}</span>`:''}
+            <div style="display:flex;flex-wrap:wrap;gap:.3rem;font-size:.7rem;color:var(--text3)">
+              <span>🔧 ${c.chassis} chassis${c.chassis>1?' (multi)':''}</span>
+              ${passLabel?`<span style="color:var(--gold-light)">${passLabel}</span>`:''}
+              ${setorNome?`<span style="color:var(--info)">📍 ${setorNome}</span>`:''}
+              ${effects.length>0?`<span style="color:var(--accent)">✨ ${effects.length} efeito${effects.length>1?'s':''}</span>`:''}
             </div>
-            <div style="margin-top:.3rem;display:flex;gap:.25rem;align-items:center">
-              <div style="width:12px;height:12px;border-radius:50%;background:${c.cor||'#D4AF37'};border:1px solid rgba(255,255,255,.2)"></div>
-              <div style="width:12px;height:12px;border-radius:50%;background:${c.cor2||'#C0392B'};border:1px solid rgba(255,255,255,.2)"></div>
-              <div class="prog-track" style="flex:1;height:4px"><div class="prog-fill gold" style="width:${Math.min(100,carrosProgress)}%"></div></div>
-            </div>
-          </div>
-        `).join('') : '<p style="color:var(--text3);font-size:.8rem">Não planejado ainda.</p>'}
+            ${stageAvg>0?`<div class="prog-track" style="height:4px;margin-top:.4rem"><div class="prog-fill gold" style="width:${stageAvg}%"></div></div>`:''}
+          </div>`;
+        }).join('') : '<p style="color:var(--text3);font-size:.8rem">Não planejado ainda.</p>'}
         <button class="btn btn-green btn-sm" style="width:100%;margin-top:.5rem" onclick="investirBarracao()">💰 Investir R$ 200k no Barracão</button>
+        ${(()=>{
+          const extras = gameState.barracaoCarrosConfig?.extras||[];
+          if(!extras.length) return '';
+          return `<div style="margin-top:.6rem;padding:.5rem .6rem;background:var(--bg2);border-radius:5px">
+            <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Elementos Extras</div>
+            <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+              ${extras.map(ex=>`
+                <span style="font-size:.72rem;padding:.15rem .45rem;background:${ex.tipo==='tripe'?'rgba(52,152,219,.15)':'rgba(243,156,18,.15)'};border:1px solid ${ex.tipo==='tripe'?'rgba(52,152,219,.3)':'rgba(243,156,18,.3)'};border-radius:4px;color:${ex.tipo==='tripe'?'var(--info)':'var(--warn)'}">
+                  ${ex.tipo==='tripe'?'🗼':'📣'} ${ex.nome}
+                </span>`).join('')}
+            </div>
+          </div>`;
+        })()}
       </div>
     </div>
 
@@ -7473,7 +8311,6 @@ function renderBarracaoFull(el) {
     </div>
     <div class="panel-body">
       <div style="display:flex;gap:.3rem;flex-wrap:wrap">
-        <span style="padding:.25rem .6rem;background:rgba(212,175,55,.15);border:1px solid rgba(212,175,55,.3);border-radius:4px;font-size:.75rem">🌟 Abre-Alas</span>
         ${gameState.barracaoSetoresNomes.map((s,i)=>{
           const tipo = (gameState.barracaoSetoresTipos||[])[i];
           const tipoData = tipo ? SETOR_TIPOS.find(t=>t.id===tipo) : null;
@@ -7481,7 +8318,6 @@ function renderBarracaoFull(el) {
             ${tipoData?tipoData.icon+' ':''} ${s}
           </span>`;
         }).join('')}
-        <span style="padding:.25rem .6rem;background:rgba(212,175,55,.15);border:1px solid rgba(212,175,55,.3);border-radius:4px;font-size:.75rem">🎆 Apoteose</span>
       </div>
       ${gameState.barracaoClarezaNarrativa!==undefined?`
       <div class="prog-wrap" style="margin-top:.75rem;margin-bottom:0">
@@ -7493,6 +8329,40 @@ function renderBarracaoFull(el) {
   ${renderBarracaoAdvancedSection()}`;
 }
 
+// Calcula custo total de um carro (invest + efeitos especiais + materiais pró-rata + escultores)
+function calcCarTotalCost(carId) {
+  const cc = gameState.barracaoCarrosConfig;
+  if(!cc) return 0;
+  const car = cc.cars.find(c=>(c.id||c.nome)===carId || c.nome===carId);
+  if(!car) return 0;
+
+  // Base invest
+  let total = car.invest || 0;
+
+  // Special effects for this car
+  const effects = (gameState.barracaoEfeitosEspeciais?.[carId] || []);
+  effects.forEach(ef => { total += ef.custo || 0; });
+
+  // Material costs pro-rated per car (divide by number of cars)
+  const n = cc.cars.length || 1;
+  const matCosts = {
+    estrutural: {madeira:0, aluminio:200000, ferro:350000},
+    artistico:  {isopor:0,  fibra:180000, resina:300000, espuma:150000},
+    luxo:       {nenhum:0,  plumas:800000, cristais:1200000, tecidos:600000},
+  };
+  const mat = gameState.barracaoMateriais || {};
+  const matTotal = (matCosts.estrutural[mat.estrutural||'madeira']||0) +
+                   (matCosts.artistico[mat.artistico||'isopor']||0) +
+                   (matCosts.luxo[mat.luxo||'nenhum']||0);
+  total += Math.round(matTotal / n);
+
+  // Sculptor costs pro-rated
+  const sculptorTotal = (gameState.barracaoEscultores||[]).reduce((s,e)=>s+(e.salario||0), 0);
+  total += Math.round(sculptorTotal / n);
+
+  return total;
+}
+
 function investirBarracao() {
   const desconto = gameState._desmontagemDesconto||0;
   const cost = Math.round(200000 * (1-desconto));
@@ -7502,7 +8372,12 @@ function investirBarracao() {
   gameState.barracaoProgress = clamp(gameState.barracaoProgress + 8 + Math.floor(Math.random()*7), 0, 100);
   gameState.scores.alegorias = clamp(gameState.scores.alegorias + 3, 0, 100);
   if(gameState.barracaoCarrosConfig) {
-    gameState.barracaoCarrosConfig.cars = gameState.barracaoCarrosConfig.cars.map(c=>({...c, progress:Math.min(100,(c.progress||0)+15)}));
+    const perCar = Math.round(cost / gameState.barracaoCarrosConfig.cars.length);
+    gameState.barracaoCarrosConfig.cars = gameState.barracaoCarrosConfig.cars.map(c=>({
+      ...c,
+      invest: (c.invest||0) + perCar,
+      progress:Math.min(100,(c.progress||0)+15),
+    }));
   }
   addEvent(`Investimento no barracão: R$ ${fmt(cost)}. Produção avança!`,'success');
   toast(`R$ ${fmt(cost)} investidos! Barracão progride.`,'gold');
@@ -7722,6 +8597,28 @@ function renderBTabProducao() {
     acelerado: {label:'Acelerado', icon:'🚀', desc:'Velocidade +30%, qualidade -10',    qMod:-10, vMod:+30, color:'var(--danger)'},
   }[ritmo];
 
+  const dirBarracao = gameState.team?.diretorBarracao;
+  const dirCarnaval = gameState.team?.diretorCarnaval;
+  const hasAuto = !!(dirBarracao || dirCarnaval);
+  const autoDirector = dirBarracao || dirCarnaval;
+  const autoLabel = dirBarracao ? 'Dir. de Barracão' : 'Dir. de Carnaval';
+
+  const autoStatusBanner = hasAuto ? `
+  <div style="background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.2);border-radius:7px;padding:.6rem .85rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
+    <span style="font-size:1.2rem">🤖</span>
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--success);font-size:.85rem">Confecção Automática — ${autoDirector.name} (${autoLabel})</div>
+      <div style="font-size:.7rem;color:var(--text2)">Etapas são iniciadas e avançadas automaticamente a cada mês. Monitore problemas na aba Confecção.</div>
+    </div>
+  </div>` : `
+  <div style="background:rgba(243,156,18,.06);border:1px solid rgba(243,156,18,.2);border-radius:7px;padding:.6rem .85rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
+    <span style="font-size:1.2rem">👷</span>
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--warn);font-size:.85rem">Modo Manual</div>
+      <div style="font-size:.7rem;color:var(--text2)">Inicie e avance cada etapa manualmente na aba <strong>Confecção</strong>. Contrate um Diretor de Barracão para automação.</div>
+    </div>
+  </div>`;
+
   const cc = gameState.barracaoCarrosConfig;
   const month = gameState.month; // 0=March
   const MONTHS = ['Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro','Janeiro','Fevereiro'];
@@ -7741,6 +8638,7 @@ function renderBTabProducao() {
   const stageColors = {estrutura:'gold',escultura:'blue',pintura:'purple',iluminacao:'green'};
 
   return `
+  ${autoStatusBanner}
   <div class="grid-2" style="margin-bottom:1rem">
     <div class="panel" style="margin-bottom:0">
       <div class="panel-header"><span class="panel-title">📅 Fase de Produção</span></div>
@@ -7803,7 +8701,7 @@ function renderBTabProducao() {
               </div>
             `).join('')}
           </div>
-          <button class="btn btn-gray btn-sm" style="width:100%;margin-top:.5rem;font-size:.72rem" onclick="investirCarEspecifico('${c.id||c.nome}')">💰 Investir neste carro — R$ 150k</button>
+          <button class="btn btn-gray btn-sm" style="width:100%;margin-top:.5rem;font-size:.72rem" onclick="investirCarEspecifico('${c.id||c.nome}')">💰 Investir neste carro — R$ ${fmt(Math.round(150000*(1-(gameState._desmontagemDesconto||0))))}</button>
         </div>`;
       }).join('')}
     </div>
@@ -8561,6 +9459,10 @@ function renderBTabConfeccao() {
         </div>
         <div style="display:flex;align-items:center;gap:.75rem">
           <div style="text-align:right">
+            <div style="font-size:.65rem;color:var(--text3)">CUSTO TOTAL</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;color:var(--gold)">${calcCarTotalCost(id)>0?'R$ '+fmt(calcCarTotalCost(id)):'—'}</div>
+          </div>
+          <div style="text-align:right">
             <div style="font-size:.68rem;color:var(--text3)">PROGRESSO</div>
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:${pct<40?'var(--danger)':pct<75?'var(--warn)':'var(--success)'}">${pct}%</div>
           </div>
@@ -9094,6 +9996,12 @@ function investirCarEspecifico(carId) {
   const cost = Math.round(150000 * (1-desconto));
   if(gameState.budget < cost) { toast('Sem orçamento!','error'); return; }
   gameState.budget -= cost; gameState.expenses.barracão += cost;
+
+  // Track investment on the car object
+  if(gameState.barracaoCarrosConfig) {
+    const car = gameState.barracaoCarrosConfig.cars.find(c=>(c.id||c.nome)===carId||c.nome===carId);
+    if(car) car.invest = (car.invest||0) + cost;
+  }
   if(!gameState.barracaoCarStages) gameState.barracaoCarStages = {};
   if(!gameState.barracaoCarStages[carId]) gameState.barracaoCarStages[carId] = {estrutura:0,escultura:0,pintura:0,iluminacao:0};
   const st = gameState.barracaoCarStages[carId];
@@ -9116,20 +10024,62 @@ function advanceBarracaoProduction() {
   const workerBonus = 1 + (gameState.barracaoMaoObra||[]).length * 0.08;
   const base = Math.round(10 * ritmoMult * workerBonus);
 
-  // Advance confecção etapas automatically if in fazendo state
+  // ── Automated confecção by Diretor de Barracão / Diretor de Carnaval ──
+  const dirBarracao  = gameState.team?.diretorBarracao;
+  const dirCarnaval  = gameState.team?.diretorCarnaval;
+  const hasAutoDirector = !!(dirBarracao || dirCarnaval);
+  // Quality of automation: dirBarracao is best, dirCarnaval gives partial auto
+  const autoQuality = dirBarracao
+    ? clamp((dirBarracao.management||80)/100, 0.6, 1.0)
+    : dirCarnaval
+      ? clamp((dirCarnaval.management||75)/100 * 0.65, 0.4, 0.75)
+      : 0;
+  // Auto-risk: better director = less mistakes
+  const autoRisk = dirBarracao
+    ? Math.max(0.03, 0.15 - (dirBarracao.management||80)/1000)
+    : dirCarnaval
+      ? Math.max(0.05, 0.20 - (dirCarnaval.management||75)/1000)
+      : 0;
+
   if(gameState.barracaoConfeccao) {
     Object.keys(gameState.barracaoConfeccao).forEach(carId=>{
       const conf = gameState.barracaoConfeccao[carId];
-      conf.etapas.forEach((et,i)=>{
-        if(et.status==='fazendo') {
-          et.progresso = Math.min(100, (et.progresso||0) + base);
-          if(et.progresso>=100) {
-            const ritmoRisk = gameState.barracaoRitmo==='acelerado' ? 0.20 : 0.08;
-            if(Math.random()<ritmoRisk) {
-              et.status='problema';
-              const ps=['Escultura saiu torta','Material rachado','Pintura falhada'];
-              et.problema=ps[Math.floor(Math.random()*ps.length)];
-            } else { et.status='concluida'; }
+      conf.etapas.forEach((et, i) => {
+        // AUTO MODE: director automatically starts and advances etapas
+        if(hasAutoDirector) {
+          const prevDone = i===0 || ['concluida','problema'].includes(conf.etapas[i-1]?.status);
+          // Auto-start pending if prev is done
+          if(et.status==='pendente' && prevDone) {
+            et.status = 'fazendo';
+            et.progresso = 0;
+          }
+          // Auto-advance fazendo
+          if(et.status==='fazendo') {
+            const advance = Math.round(base * autoQuality * (1 + Math.random()*0.3));
+            et.progresso = Math.min(100, (et.progresso||0) + advance);
+            if(et.progresso >= 100) {
+              if(Math.random() < autoRisk) {
+                et.status = 'problema';
+                const ps = ['Escultura saiu torta','Material rachado','Pintura falhada','Acabamento irregular'];
+                et.problema = ps[Math.floor(Math.random()*ps.length)];
+                addEvent(`⚠️ ${dirBarracao?.name||dirCarnaval?.name} reportou problema em etapa de ${carId}: ${et.problema}`, 'warn');
+              } else {
+                et.status = 'concluida';
+              }
+            }
+          }
+        } else {
+          // MANUAL MODE: only advance etapas that are already in 'fazendo' state
+          if(et.status==='fazendo') {
+            et.progresso = Math.min(100, (et.progresso||0) + base);
+            if(et.progresso>=100) {
+              const ritmoRisk = gameState.barracaoRitmo==='acelerado' ? 0.20 : 0.08;
+              if(Math.random()<ritmoRisk) {
+                et.status='problema';
+                const ps=['Escultura saiu torta','Material rachado','Pintura falhada'];
+                et.problema=ps[Math.floor(Math.random()*ps.length)];
+              } else { et.status='concluida'; }
+            }
           }
         }
       });
@@ -10254,6 +11204,7 @@ function renderTeam() {
     {key:'interprete',label:'Intérprete Oficial',emoji:'🎤'},
     {key:'mestre',label:'Mestre de Bateria',emoji:'🥁'},
     {key:'diretorCarnaval',label:'Diretor de Carnaval',emoji:'📋'},
+    {key:'diretorBarracao',label:'Diretor de Barracão',emoji:'🏗️'},
     {key:'harmonia',label:'Diretor de Harmonia',emoji:'🎯'},
     {key:'comissaoFrente',label:'Comissão de Frente',emoji:'💃'},
     {key:'casal',label:'Casal M-S & P-B',emoji:'👑'},
@@ -10680,7 +11631,8 @@ function renderPolitics() {
       </div>
     </div>
   </div>
-  ${renderRivalidades()}`;
+  ${renderRivalidades()}
+  ${renderLigaPanel()}`;
 }
 
 function doPoliticalAction(id) {
@@ -11734,13 +12686,6 @@ function renderPress() {
         </div>
       </div>
 
-      <!-- Press awards (after apuração) -->
-      ${gameState.pressAwards?`
-      <div class="panel" style="border-color:rgba(212,175,55,.3)">
-        <div class="panel-header"><span class="panel-title">🏅 Premiações da Imprensa</span></div>
-        <div class="panel-body">${renderPressAwardsBlock(gameState.pressAwards)}</div>
-      </div>`:''}
-
     </div><!-- /col direita -->
   </div><!-- /grid -->
   `;
@@ -11866,11 +12811,21 @@ const DB_HARMONIA = [
 ];
 
 // Map slot → which DB to draw from
+const DB_DIRETORES_BARRACAO = [
+  {id:'db1',name:'Roberto Melo',       role:'diretorBarracao',emoji:'🏗️',management:92,creativity:85,experience:90,discipline:88,cost:350000},
+  {id:'db2',name:'Cláudio Figueiredo', role:'diretorBarracao',emoji:'🏗️',management:88,creativity:80,experience:85,discipline:90,cost:280000},
+  {id:'db3',name:'Vanessa Lima',        role:'diretorBarracao',emoji:'🏗️',management:85,creativity:88,experience:82,discipline:85,cost:240000},
+  {id:'db4',name:'Jorge Teixeira',      role:'diretorBarracao',emoji:'🏗️',management:82,creativity:75,experience:80,discipline:87,cost:180000},
+  {id:'db5',name:'Adriana Santos',      role:'diretorBarracao',emoji:'🏗️',management:78,creativity:82,experience:75,discipline:80,cost:130000},
+  {id:'db6',name:'Paulo Brito',         role:'diretorBarracao',emoji:'🏗️',management:72,creativity:70,experience:68,discipline:75,cost:80000},
+];
+
 const SLOT_NAME_DB = {
   carnavalesco:    () => DB_CARNAVALESCOS[Math.floor(Math.random()*DB_CARNAVALESCOS.length)],
   interprete:      () => DB_INTERPRETES[Math.floor(Math.random()*DB_INTERPRETES.length)],
   mestre:          () => DB_MESTRES[Math.floor(Math.random()*DB_MESTRES.length)],
   diretorCarnaval: () => DB_DIRETORES_CARNAVAL[Math.floor(Math.random()*DB_DIRETORES_CARNAVAL.length)],
+  diretorBarracao: () => DB_DIRETORES_BARRACAO[Math.floor(Math.random()*DB_DIRETORES_BARRACAO.length)],
   harmonia:        () => DB_HARMONIA[Math.floor(Math.random()*DB_HARMONIA.length)],
   comissaoFrente:  () => DB_COMISSAO_FRENTE[Math.floor(Math.random()*DB_COMISSAO_FRENTE.length)],
   casal:           () => DB_CASAIS[Math.floor(Math.random()*DB_CASAIS.length)],
@@ -11882,13 +12837,14 @@ const PROF_NAMES_F = ['Ana','Wanessa','Jéssica','Fernanda','Camila','Juliana','
 const PROF_SURNAMES = ['Silva','Santos','Oliveira','Souza','Andrade','Costa','Ferreira','Ribeiro','Melo','Lima'];
 
 const TEAM_SLOT_DEFS = [
-  {key:'carnavalesco',  label:'Carnavalesco',        emoji:'🎨', baseSalary:[800000,2000000], qRange:[75,98], affects:['enredo','alegorias','fantasias']},
-  {key:'interprete',   label:'Intérprete Oficial',   emoji:'🎤', baseSalary:[200000,800000],  qRange:[70,96], affects:['samba']},
-  {key:'mestre',       label:'Mestre de Bateria',     emoji:'🥁', baseSalary:[300000,900000],  qRange:[72,97], affects:['bateria']},
-  {key:'diretorCarnaval',label:'Diretor de Carnaval',emoji:'📋', baseSalary:[150000,500000],  qRange:[65,90], affects:['evolucao']},
-  {key:'harmonia',     label:'Diretor de Harmonia',   emoji:'🎯', baseSalary:[120000,400000],  qRange:[65,90], affects:['harmonia']},
-  {key:'comissaoFrente',label:'Coreógrafo C. Frente', emoji:'💃', baseSalary:[100000,350000],  qRange:[60,88], affects:['comissao']},
-  {key:'casal',        label:'Casal M-S & P-B',       emoji:'👑', baseSalary:[80000,280000],   qRange:[60,92], affects:['casal']},
+  {key:'carnavalesco',   label:'Carnavalesco',          emoji:'🎨', baseSalary:[800000,2000000], qRange:[75,98], affects:['enredo','alegorias','fantasias']},
+  {key:'interprete',     label:'Intérprete Oficial',    emoji:'🎤', baseSalary:[200000,800000],  qRange:[70,96], affects:['samba']},
+  {key:'mestre',         label:'Mestre de Bateria',     emoji:'🥁', baseSalary:[300000,900000],  qRange:[72,97], affects:['bateria']},
+  {key:'diretorCarnaval',label:'Diretor de Carnaval',   emoji:'📋', baseSalary:[150000,500000],  qRange:[65,90], affects:['evolucao']},
+  {key:'diretorBarracao',label:'Diretor de Barracão',   emoji:'🏗️', baseSalary:[120000,450000],  qRange:[65,92], affects:['alegorias','barracaoProgress']},
+  {key:'harmonia',       label:'Diretor de Harmonia',   emoji:'🎯', baseSalary:[120000,400000],  qRange:[65,90], affects:['harmonia']},
+  {key:'comissaoFrente', label:'Coreógrafo C. Frente',  emoji:'💃', baseSalary:[100000,350000],  qRange:[60,88], affects:['comissao']},
+  {key:'casal',          label:'Casal M-S & P-B',       emoji:'👑', baseSalary:[80000,280000],   qRange:[60,92], affects:['casal']},
 ];
 
 const QUALITY_LABEL = q => q>=96?'🌟 Lendário':q>=90?'⭐ Elite':q>=85?'👍 Ótimo':q>=80?'✅ Bom':q>=75?'🟡 Médio':q>=70?'🔸 Fraco':'🔴 Ruim';
@@ -12688,10 +13644,17 @@ function setParadeSpeed(s) {
 }
 
 function startParadeScreen() {
-  // Clear any leftover interval from previous parade
-  if(paradeInterval) { clearInterval(paradeInterval); paradeInterval = null; }
-  paradeTime = 0; paradePhase = 0; paradeSpeed = 1;
-  paradeHype = 20; paradePublicoVal = 0; paradeEnergyVal = 100; paradeTotalRevealed = 0;
+  // ── Clear ALL stale state from previous season ──────────────
+  if(paradeInterval)   { clearInterval(paradeInterval);   paradeInterval   = null; }
+  if(paradeEndTimeout) { clearTimeout(paradeEndTimeout);  paradeEndTimeout = null; }
+  // Reset all parade globals completely
+  paradeTime        = 0;
+  paradePhase       = 0;
+  paradeSpeed       = 1;
+  paradeHype        = 20;
+  paradePublicoVal  = 0;
+  paradeEnergyVal   = 100;
+  paradeTotalRevealed = 0;
 
   showScreen('screen-parade');
   document.getElementById('paradeSchoolName').textContent = `${gameState.school.name} — ${gameState.school.displayGroup} · Temporada ${gameState.season}`;
@@ -12732,18 +13695,35 @@ function startParadeScreen() {
 
   // Speed buttons reset
   [1,2,4,10].forEach(v=>{ const b=document.getElementById(`spd${v}`); if(b) b.classList.toggle('active',v===1); });
+  // Reset parade buttons for new season
+  const startBtn = document.getElementById('startParadeBtn');
+  const skipBtn  = document.getElementById('skipParadeBtn');
+  if(startBtn) startBtn.classList.remove('hidden');
+  if(skipBtn)  skipBtn.classList.add('hidden');
+  // Reset parade log
+  const logEl = document.getElementById('paradeLog');
+  if(logEl) logEl.innerHTML = `<div style="color:var(--text3);font-size:.78rem">🌙 A escola aguarda para entrar na avenida...</div>`;
+  // Reset phase display
+  const phEl = document.getElementById('paradeCurrentPhase');
+  if(phEl) phEl.textContent = 'Aguardando início...';
+  // Reset total score display
+  const totalEl = document.getElementById('paradeTotalScore');
+  if(totalEl) { totalEl.textContent = '—'; totalEl.style.color = 'var(--text3)'; }
+  const statusEl = document.getElementById('paradeScoreStatus');
+  if(statusEl) statusEl.textContent = '';
 }
 
 function startParade() {
-  // Always clear any existing interval first to prevent double-running
-  if(paradeInterval) { clearInterval(paradeInterval); paradeInterval = null; }
+  // Always clear any existing interval AND end timeout first
+  if(paradeInterval)   { clearInterval(paradeInterval);  paradeInterval   = null; }
+  if(paradeEndTimeout) { clearTimeout(paradeEndTimeout); paradeEndTimeout = null; }
   document.getElementById('startParadeBtn').classList.add('hidden');
   document.getElementById('skipParadeBtn').classList.remove('hidden');
-  paradeTime = 0;
-  paradePhase = 0;
-  paradeHype = 20;
-  paradePublicoVal = 0;
-  paradeEnergyVal = 100;
+  paradeTime          = 0;
+  paradePhase         = 0;
+  paradeHype          = 20;
+  paradePublicoVal    = 0;
+  paradeEnergyVal     = 100;
   paradeTotalRevealed = 0;
   // Always recalculate notes before starting
   calculateFinalNotes();
@@ -12863,7 +13843,8 @@ function _runParadeInterval() {
       updateParadeTotalScore();
       addParadeLog('🎊 <strong>DESFILE ENCERRADO!</strong> A escola sai pela rampa entre ovações! Aguardando apuração...', 'good');
       document.getElementById('paradeCurrentPhase').textContent = '🏁  DESFILE ENCERRADO — Aguardando Apuração...';
-      setTimeout(()=>{ goToApuracao(); }, paradeSpeed >= 4 ? 500 : 2500);
+      if(paradeEndTimeout) clearTimeout(paradeEndTimeout);
+      paradeEndTimeout = setTimeout(()=>{ paradeEndTimeout = null; goToApuracao(); }, paradeSpeed >= 4 ? 500 : 2500);
     }
   }, 200);
 }
@@ -13122,7 +14103,8 @@ function addParadeLog(text, cls='') {
 }
 
 function skipToResults() {
-  if(paradeInterval) { clearInterval(paradeInterval); paradeInterval=null; }
+  if(paradeInterval)   { clearInterval(paradeInterval);  paradeInterval   = null; }
+  if(paradeEndTimeout) { clearTimeout(paradeEndTimeout); paradeEndTimeout = null; }
   calculateFinalNotes();
   // Reveal all scores instantly
   ['comissao','casal','bateria','harmonia','evolucao','enredo','samba','fantasias','alegorias'].forEach(k=>{
@@ -13401,17 +14383,46 @@ const NOTE_STEPS = [9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0];
 // quality 0–100 → array de pesos para NOTE_STEPS
 // Nota: abaixo de 9.7 é quase impossível para escolas boas (quality ≥ 76)
 //       Escolas sem profissional (quality ≤ 62) recebem 9.5 pra baixo
-function getNoteDist(quality) {
+// Per-quesito realistic floor notes (what actually happens in real carnaval)
+const QUESITO_FLOOR = {
+  casal:     { good: 9.9, bad: 9.8 },   // MS/PB raramente perde
+  comissao:  { good: 9.9, bad: 9.8 },   // Comissão: impacto ou penalidade
+  bateria:   { good: 9.8, bad: 9.7 },   // Bateria: muito difícil tirar ponto
+  samba:     { good: 9.7, bad: 9.6 },
+  harmonia:  { good: 9.7, bad: 9.6 },
+  evolucao:  { good: 9.7, bad: 9.6 },
+  alegorias: { good: 9.6, bad: 9.5 },
+  fantasias: { good: 9.6, bad: 9.5 },
+  enredo:    { good: 9.6, bad: 9.5 },
+};
+
+// Maps a raw 0-100 quality + quesito type → realistic note distribution
+// Floor is applied after picking note based on distribution
+function getNoteDist(quality, quesito) {
   //                              9.1  9.2  9.3  9.4  9.5  9.6  9.7  9.8  9.9  10.0
-  if(quality >= 98) return [      0,   0,   0,   0,   0,   0,   0,   8,  32,   60]; // perfeito: 9.9/10
-  if(quality >= 94) return [      0,   0,   0,   0,   0,   0,   3,  18,  45,   34]; // elite: 9.9/10 dominam
-  if(quality >= 90) return [      0,   0,   0,   0,   0,   0,   8,  32,  42,   18]; // excelente
-  if(quality >= 86) return [      0,   0,   0,   0,   0,   2,  18,  48,  28,    4]; // muito bom
-  if(quality >= 82) return [      0,   0,   0,   0,   0,   5,  32,  48,  14,    1]; // bom
-  if(quality >= 76) return [      0,   0,   0,   0,   1,  12,  48,  34,   5,    0]; // médio (9.6 raríssimo)
-  if(quality >= 68) return [      0,   0,   0,   2,   8,  28,  45,  15,   2,    0]; // sem profissional: 9.5-9.6
-  if(quality >= 58) return [      0,   0,   2,   8,  28,  40,  20,   2,   0,    0]; // sem profissional: 9.4-9.5
-  return                   [      0,   2,   8,  22,  40,  22,   6,   0,   0,    0]; // sem profissional: 9.3-9.4
+  let dist;
+  if(quality >= 98) dist = [      0,   0,   0,   0,   0,   0,   0,   8,  32,   60];
+  else if(quality >= 94) dist = [ 0,   0,   0,   0,   0,   0,   3,  18,  45,   34];
+  else if(quality >= 90) dist = [ 0,   0,   0,   0,   0,   0,   8,  32,  42,   18];
+  else if(quality >= 86) dist = [ 0,   0,   0,   0,   0,   2,  18,  48,  28,    4];
+  else if(quality >= 82) dist = [ 0,   0,   0,   0,   0,   5,  32,  48,  14,    1];
+  else if(quality >= 76) dist = [ 0,   0,   0,   0,   1,  12,  48,  34,   5,    0];
+  else if(quality >= 68) dist = [ 0,   0,   0,   2,   8,  28,  45,  15,   2,    0];
+  else if(quality >= 58) dist = [ 0,   0,   2,   8,  28,  40,  20,   2,   0,    0];
+  else                   dist = [ 0,   2,   8,  22,  40,  22,   6,   0,   0,    0];
+
+  // Apply per-quesito floor: shift weight away from notes below the floor
+  if(quesito && QUESITO_FLOOR[quesito]) {
+    const floor = quality >= 70 ? QUESITO_FLOOR[quesito].good : QUESITO_FLOOR[quesito].bad;
+    const floorIdx = NOTE_STEPS.indexOf(floor);
+    if(floorIdx > 0) {
+      // Move weight from below floor into floor step
+      let moved = 0;
+      for(let i=0; i<floorIdx; i++) { moved += dist[i]; dist[i] = 0; }
+      dist[floorIdx] = (dist[floorIdx]||0) + moved;
+    }
+  }
+  return dist;
 }
 
 function pickNote(dist) {
@@ -13423,8 +14434,8 @@ function pickNote(dist) {
 
 // Um jurado individual: pega a distribuição do quality e opcionalmente
 // inclina ±1 step conforme perfil de julgamento
-function judgeNote(quality, profile) {
-  const dist = [...getNoteDist(quality)];
+function judgeNote(quality, profile, quesito) {
+  const dist = [...getNoteDist(quality, quesito)];
   // perfil rigoroso: desloca peso para baixo
   if(profile==='rigoroso') {
     for(let i=dist.length-1;i>0;i--) { dist[i-1]+=dist[i]*0.3; dist[i]*=0.7; }
@@ -13435,38 +14446,35 @@ function judgeNote(quality, profile) {
   }
   // critico: mais 9.8, menos 10.0
   else if(profile==='critico') {
-    dist[4]*=0.6; dist[2]+=dist[4]*0.4;
+    if(dist[9]>0) { dist[8]+=dist[9]*0.4; dist[9]*=0.6; }
   }
-  // tecnico: neutro, pequena preferência por notas exatas (9.9)
-  // sem ajuste
+  // tecnico: neutro
 
   const note = pickNote(dist);
-  // Sem floor fixo — notas baixas são possíveis para quesitos sem profissional
   return Math.max(NOTE_STEPS[0], note);
 }
 
-function scoreToQuesito(quality, profiles, group, schoolId, seasonHistory) {
+function scoreToQuesito(quality, profiles, group, schoolId, seasonHistory, quesito) {
   const g = group || gameState?.school?.group || 'especial';
   const rules = GROUP_JUDGING_RULES[g] || GROUP_JUDGING_RULES.especial;
   const count = rules.jurados;
-
-  // Apply peso de bandeira to quality (Especial only)
   const adjQuality = applyPesoBandeira(quality, schoolId || gameState?.school?.id || '', seasonHistory || gameState?.seasonHistory || [], g);
-
   const profs = profiles || (['rigoroso','tecnico','generoso','critico','neutro'].slice(0, count));
   const q = clamp(adjQuality, 0, 100);
-  const judges = profs.slice(0, count).map(p => judgeNote(q, p==='neutro'?'tecnico':p));
+  const judges = profs.slice(0, count).map(p => judgeNote(q, p==='neutro'?'tecnico':p, quesito));
+
+  // Detect discrepancy — polêmica
+  const maxJ = Math.max(...judges), minJ = Math.min(...judges);
+  const isPolemico = (maxJ - minJ) >= 0.2;
 
   if(rules.descarta && judges.length >= 3) {
-    // Descarta o MENOR
     let discardIdx = 0;
     for(let i=1;i<judges.length;i++) { if(judges[i]<judges[discardIdx]) discardIdx=i; }
     const sumInt = judges.reduce((s,v,i) => i===discardIdx?s:s+Math.round(v*10), 0);
-    return { judges, discardIdx, discarded: judges[discardIdx], total: sumInt/10 };
+    return { judges, discardIdx, discarded: judges[discardIdx], total: sumInt/10, isPolemico };
   } else {
-    // No discard — sum all
     const sumInt = judges.reduce((s,v)=>s+Math.round(v*10), 0);
-    return { judges, discardIdx: -1, discarded: null, total: sumInt/10 };
+    return { judges, discardIdx: -1, discarded: null, total: sumInt/10, isPolemico };
   }
 }
 
@@ -13513,17 +14521,30 @@ function calculateFinalNotes() {
     alegorias: !!gameState.team.carnavalesco,
   };
 
+  // Enredistas bonus (applied before quality-to-note conversion)
+  const enrBonus = getEnredistasBonus();
+
   const raw = {
-    comissao:  clamp(s.comissao +(hasPro.comissao?5:0), hasPro.comissao?55:40, hasPro.comissao?100:NO_PRO_MAX),
-    casal:     clamp(s.casal    +(hasPro.casal?5:0),    hasPro.casal?55:40,    hasPro.casal?100:NO_PRO_MAX),
-    bateria:   clamp(s.bateria  +(hasPro.bateria?5:0),  hasPro.bateria?55:40,  hasPro.bateria?100:NO_PRO_MAX),
-    harmonia:  clamp(s.harmonia +(hasPro.harmonia?5:0)+gameState.rehearsals.tecnico*2, hasPro.harmonia?55:40, hasPro.harmonia?100:NO_PRO_MAX),
-    evolucao:  clamp(s.evolucao +(hasPro.evolucao?5:0)+gameState.rehearsals.rua*2-(cc&&cc.cars.some(c=>c.largura>6)?5:0), hasPro.evolucao?55:40, hasPro.evolucao?100:NO_PRO_MAX),
-    enredo:    clamp(s.enredo   +(enredoData?.noteBonus?.enredo||0)*15+setorBonus+clarezaBonus, hasPro.enredo?55:40, hasPro.enredo?100:NO_PRO_MAX),
-    samba:     clamp(s.samba    +(hasPro.samba?5:0)+(gameState.chosenSamba?8:0), hasPro.samba?55:40, hasPro.samba?100:NO_PRO_MAX),
-    fantasias: clamp(s.fantasias+fantQual+alasBonus+barracBonus*8, hasPro.fantasias?55:40, hasPro.fantasias?100:NO_PRO_MAX),
-    alegorias: clamp(s.alegorias+(hasPro.alegorias?8:0)+carrosBonus+alturaBonus+barracBonus*12, hasPro.alegorias?55:40, hasPro.alegorias?100:NO_PRO_MAX),
+    comissao:  clamp(s.comissao +(hasPro.comissao?5:0)+getDeptQualityBonus('comissao'), hasPro.comissao?55:40, hasPro.comissao?100:NO_PRO_MAX),
+    casal:     clamp(s.casal    +(hasPro.casal?5:0)+getDeptQualityBonus('casal'),    hasPro.casal?55:40,    hasPro.casal?100:NO_PRO_MAX),
+    bateria:   clamp(s.bateria  +(hasPro.bateria?5:0)+getDeptQualityBonus('bateria'),  hasPro.bateria?55:40,  hasPro.bateria?100:NO_PRO_MAX),
+    harmonia:  clamp(s.harmonia +(hasPro.harmonia?5:0)+gameState.rehearsals.tecnico*2+getDeptQualityBonus('harmonia'), hasPro.harmonia?55:40, hasPro.harmonia?100:NO_PRO_MAX),
+    evolucao:  clamp(s.evolucao +(hasPro.evolucao?5:0)+gameState.rehearsals.rua*2-(cc&&cc.cars.some(c=>c.largura>6)?5:0)+getDeptQualityBonus('evolucao'), hasPro.evolucao?55:40, hasPro.evolucao?100:NO_PRO_MAX),
+    enredo:    clamp(s.enredo   +(enredoData?.noteBonus?.enredo||0)*15+setorBonus+clarezaBonus+getDeptQualityBonus('enredo')+enrBonus.enredo, hasPro.enredo?55:40, hasPro.enredo?100:NO_PRO_MAX),
+    samba:     clamp(s.samba    +(hasPro.samba?5:0)+(gameState.chosenSamba?8:0)+getDeptQualityBonus('samba')+enrBonus.samba, hasPro.samba?55:40, hasPro.samba?100:NO_PRO_MAX),
+    fantasias: clamp(s.fantasias+fantQual+alasBonus+barracBonus*8+getDeptQualityBonus('fantasias'), hasPro.fantasias?55:40, hasPro.fantasias?100:NO_PRO_MAX),
+    alegorias: clamp(s.alegorias+(hasPro.alegorias?8:0)+carrosBonus+alturaBonus+barracBonus*12+getDeptQualityBonus('alegorias'), hasPro.alegorias?55:40, hasPro.alegorias?100:NO_PRO_MAX),
   };
+
+  // Enredistas press reputation bonus
+  if(enrBonus.press > 0) {
+    gameState.pressReputation = clamp((gameState.pressReputation||50) + enrBonus.press * 0.1, 0, 100);
+  }
+
+  // Narrativa clarity bonus from enredistas
+  if(enrBonus.narrativa > 0 && gameState.barracaoClarezaNarrativa !== undefined) {
+    gameState.barracaoClarezaNarrativa = clamp(gameState.barracaoClarezaNarrativa + enrBonus.narrativa, 0, 100);
+  }
 
   // ── Advanced Barracão bonuses ──────────────────────────────────
   // Special effects risk: advanced effects may fail on avenida
@@ -13627,19 +14648,21 @@ function calculateFinalNotes() {
   gameState.finalNotes = {};
   gameState.finalNotesDetail = {};
   let total = 0;
-  // Penalidade de abertura: escola que abre o dia sofre -0.1 por quesito
   const openerPenalty = (gameState.isOpenerThisYear && gameState.school.group === 'especial') ? -0.1 : 0;
   for(const [k,sc] of Object.entries(raw)) {
     const profs = [...['rigoroso','tecnico','generoso','critico']].sort(()=>Math.random()-.5);
-    // Pequena variação aleatória por quesito (±4 pontos de qualidade)
-    const q = scoreToQuesito(sc + (Math.random()-.5)*4, profs);
-    // Aplica penalidade de abertura diretamente na nota final do quesito
+    // Pass quesito key so floor notes are respected
+    const q = scoreToQuesito(sc + (Math.random()-.5)*4, profs, null, null, null, k);
     const noteWithPenalty = Math.max(27.3, Math.round((q.total + openerPenalty)*10)/10);
     gameState.finalNotes[k] = noteWithPenalty;
     gameState.finalNotesDetail[k] = q;
     total += noteWithPenalty;
+    // Polêmica: discrepant judge triggers press event
+    if(q.isPolemico && Math.random()<0.4) {
+      const qLabel = {comissao:'Comissão de Frente',casal:'Mestre-Sala/Porta-Bandeira',bateria:'Bateria',harmonia:'Harmonia',evolucao:'Evolução',enredo:'Enredo',samba:'Samba-Enredo',fantasias:'Fantasias',alegorias:'Alegorias'}[k]||k;
+      addEvent(`📰 Nota polêmica em ${qLabel}! Jurado divergiu dos demais — imprensa questiona.`, 'warn');
+    }
   }
-  // Soma _total em inteiros para evitar float drift (ex: 28.9 + 29.0 + ... com precisão exata)
   const noteKeys9 = Object.keys(gameState.finalNotes).filter(k=>k!=='_total');
   const totalInt9 = noteKeys9.reduce((s,k)=>s+Math.round((gameState.finalNotes[k]||0)*10), 0);
   gameState.finalNotes._total = totalInt9 / 10;
@@ -13666,7 +14689,7 @@ function simulateRivalScores() {
       const sc = clamp(adjBase + (Math.random()-.5)*10, 45, 100);
       const profs = ['rigoroso','tecnico','generoso','critico','neutro'].slice(0, rules.jurados);
       const shuffled = [...profs].sort(()=>Math.random()-.5);
-      const res = scoreToQuesito(sc, shuffled, group, r.id, []);
+      const res = scoreToQuesito(sc, shuffled, group, r.id, [], k);
       notes[k]=res.total; detail[k]=res; total+=res.total;
     });
 
@@ -13838,12 +14861,21 @@ function renderApuracaoQuesito() {
           background:rgba(212,175,55,.1);border-radius:3px;border:1px solid rgba(212,175,55,.3)">
           ⚡ Nota virada! O jurado ${namedJurados[notaViradaIdx]?.name||'N/A'} corrigiu sua nota no envelope.
         </div>` : ''}
+        ${(()=>{
+          const d = gameState.finalNotesDetail?.[q.k];
+          if(d?.isPolemico) return `<div style="margin-top:.3rem;font-size:.68rem;color:var(--warn);padding:.15rem .4rem;background:rgba(243,156,18,.1);border-radius:3px;border:1px solid rgba(243,156,18,.3)">⚠️ POLÊMICA — Grande divergência entre jurados neste quesito.</div>`;
+          return '';
+        })()}
       </div>`;
     }).join('')}
   </div>
 
   <div style="margin-top:.5rem;padding:.4rem .6rem;background:var(--bg2);border-radius:5px;font-size:.68rem;color:var(--text3);text-align:center">
-    ⚖️ Regra: 4 jurados por quesito — <span style="color:var(--danger)">menor nota descartada</span> — soma das 3 restantes
+    ${(()=>{
+      const g = gameState?.school?.group||'especial';
+      const rules = GROUP_JUDGING_RULES[g]||GROUP_JUDGING_RULES.especial;
+      return `⚖️ ${rules.jurados} jurado${rules.jurados>1?'s':''} por quesito${rules.descarta?' — <span style="color:var(--danger)">menor nota descartada</span>':' — sem descarte'} — soma = quesito`;
+    })()}
   </div>`;
 
   renderApuracaoRanking();
@@ -14103,6 +15135,9 @@ function showFinalResults() {
       ${isPlayoffEligible && !playoffWon ? `<div style="color:var(--warn)">😤 Playoff de acesso disputado mas não conquistado.</div>` : ''}
       ${playoffWon ? `<div style="color:var(--success)">🎉 <strong>Acesso via Playoff!</strong> Lobby e política decidiram!</div>` : ''}
 
+      ${finalRelegatedFull && group==='especial'?`<div style="margin-top:.4rem;font-size:.75rem;color:var(--danger)">📉 Cota de TV perdida · subvenção menor · patrocinadores recuaram</div>`:''}
+      ${isPromoted && groups[currentGroupIdx+1]==='especial'?`<div style="margin-top:.4rem;font-size:.75rem;color:var(--success)">📈 Cota de TV incluída · subvenção máxima · novos patrocinadores</div>`:''}
+
       ${ligaEleicao?`
       <div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(155,89,182,.1);border:1px solid rgba(155,89,182,.3);border-radius:5px">
         <div style="font-size:.72rem;color:var(--accent);font-weight:700;margin-bottom:.2rem">🗳️ ELEIÇÃO DA LIGA ${gameState.year}</div>
@@ -14126,25 +15161,18 @@ function showFinalResults() {
     </div>`;
 
   // Update game state for next season
-  const finalRelegatedState = isRelegated || zonaRiscoRelegated;
   gameState.community = clamp(gameState.community + commGain, 0, 100);
   gameState.reputation = clamp(gameState.reputation + repGain, 0, 100);
   gameState.budget += budgetBonus;
 
-  // Calculate press awards
-  const pressAwards = calculatePressAwards();
-  const awardsBlock = renderPressAwardsBlock(pressAwards);
-  if(awardsBlock) {
-    setTimeout(() => {
-      const repPanel = document.getElementById('repercussionPanel');
-      if(repPanel) {
-        const awardsDiv = document.createElement('div');
-        awardsDiv.style.marginTop = '1rem';
-        awardsDiv.innerHTML = awardsBlock;
-        repPanel.parentNode.insertBefore(awardsDiv, repPanel.nextSibling);
-      }
-    }, 600);
+  // ── STRUCTURAL EVENT ──────────────────────────────────────────
+  const structuralEvent = rollStructuralEvent(gameState.year);
+  if(structuralEvent) {
+    addEvent(`🏛️ EVENTO ESTRUTURAL: ${structuralEvent.label} — ${structuralEvent.desc}`, 'gold');
+    toast(`🏛️ ${structuralEvent.label}`, 'gold');
   }
+
+  const finalRelegatedState = (isRelegated || zonaRiscoRelegated) && structuralEvent?.effect !== 'no_relegation';
 
   // Record history
   gameState.seasonHistory.push({
@@ -14163,70 +15191,42 @@ function showFinalResults() {
     tendenciaEpoca: getTendenciasDaEpoca(gameState.year||2010)?.label || null,
     ligaEleicao: ligaEleicao?.nome || null,
     mudancaReg: mudancaReg?.desc || null,
+    structuralEvent: structuralEvent?.label || null,
     ranking: allSchools.map((s,i) => ({pos:i+1,name:s.name,note:s.note,isPlayer:s.isPlayer})),
   });
 
-  // Handle promotion/relegation — PLAYER
-  if(isPromoted && currentGroupIdx < groups.length-1) {
-    gameState.school.group = groups[currentGroupIdx+1];
-    gameState.school.displayGroup = LEAGUE_NAMES[groups[currentGroupIdx+1]];
-    toast('🎉 ACESSO! Sua escola sobe de grupo para a próxima temporada!', 'gold');
+  // ── HANDLE PLAYER PROMOTION/RELEGATION ───────────────────────
+  const effectivelyPromoted = isPromoted;
+
+  if(effectivelyPromoted && currentGroupIdx < groups.length-1) {
+    const newGroup = groups[currentGroupIdx+1];
+    gameState.school.group = newGroup;
+    gameState.school.displayGroup = LEAGUE_NAMES[newGroup];
+    applyPromotionConsequences(newGroup);
+    toast('🎉 ACESSO! Sua escola sobe de grupo!', 'gold');
+    // Press headline
+    const hl = PROMOTION_HEADLINES[Math.floor(Math.random()*PROMOTION_HEADLINES.length)](gameState.school.name);
+    addEvent(`📰 ${hl}`, 'gold');
   } else if(finalRelegatedState && currentGroupIdx > 0) {
-    gameState.school.group = groups[currentGroupIdx-1];
-    gameState.school.displayGroup = LEAGUE_NAMES[groups[currentGroupIdx-1]];
+    const oldGroup = group;
+    const newGroup = groups[currentGroupIdx-1];
+    gameState.school.group = newGroup;
+    gameState.school.displayGroup = LEAGUE_NAMES[newGroup];
+    applyRelegationConsequences(oldGroup);
     toast('💔 Rebaixamento confirmado para a próxima temporada.', 'warn');
-    // Reduce peso de bandeira if relegated
-    addEvent(`⚠️ Rebaixamento reduz o Peso de Bandeira da escola.`, 'bad');
+    // Press headline
+    const hl = RELEGATION_HEADLINES[Math.floor(Math.random()*RELEGATION_HEADLINES.length)](gameState.school.name);
+    addEvent(`📰 ${hl}`, 'bad');
   }
 
-  // Handle promotion/relegation — RIVALS (active system)
-  // The LAST place rival (not player) gets relegated; a rival from the group below is promoted
-  const rivalsSorted = [...allSchools].sort((a,b)=>b.note-a.note);
-  const lastNonPlayer = [...rivalsSorted].reverse().find(s=>!s.isPlayer);
-  if(lastNonPlayer) {
-    const lastRival = gameState.rivals.find(r=>r.name===lastNonPlayer.name);
-    if(lastRival) {
-      const rivalGroupIdx = groups.indexOf(lastRival.group||gameState.school.group);
-      if(rivalGroupIdx > 0) {
-        const prevGroup = groups[rivalGroupIdx-1];
-        lastRival.group = prevGroup;
-        // Replace with a school from the lower group
-        const promotedPool = (SCHOOLS_DATA[prevGroup]||[]).filter(s=>!gameState.rivals.some(r=>r.id===s.id) && s.id!==gameState.school.id);
-        if(promotedPool.length) {
-          const promoted = promotedPool[Math.floor(Math.random()*promotedPool.length)];
-          const rivalStrMult = {facil:0.80,normal:0.92,dificil:1.02,lendario:1.08}[gameState.difficulty]||0.92;
-          const newRival = {
-            id:promoted.id, name:promoted.name,
-            tradition:  Math.floor(promoted.tradition  * rivalStrMult),
-            community:  Math.floor(promoted.community  * rivalStrMult),
-            barracão:   Math.floor(promoted.barracão   * rivalStrMult),
-            creativity: Math.floor(promoted.creativity * rivalStrMult),
-            org:        Math.floor(promoted.org        * rivalStrMult),
-            budget: promoted.budget,
-            group: gameState.school.group,
-            _baseQuality: clamp(Math.floor((promoted.tradition+promoted.community+promoted.barracão+promoted.creativity+promoted.org)/5*rivalStrMult),50,97),
-          };
-          // Swap: remove relegated rival, add promoted
-          const idxInRivals = gameState.rivals.findIndex(r=>r.id===lastRival.id);
-          if(idxInRivals>=0) gameState.rivals.splice(idxInRivals,1,newRival);
-          addEvent(`📉 ${lastRival.name} foi rebaixada e ${newRival.name} sobe para o ${LEAGUE_NAMES[gameState.school.group]}!`,'warn');
-          toast(`${lastRival.name} rebaixada! ${newRival.name} sobe!`,'warn');
-        } else {
-          addEvent(`📉 ${lastRival.name} foi rebaixada do grupo.`,'warn');
-        }
-      }
-    }
-  }
-  // Champion rival gets promoted (if not player's group champion)
-  const firstNonPlayer = rivalsSorted.find(s=>!s.isPlayer);
-  if(firstNonPlayer && gameState.school.group!=='especial') {
-    // promote the top non-player rival as well (simulated)
-    const champRival = gameState.rivals.find(r=>r.name===firstNonPlayer.name);
-    if(champRival && currentGroupIdx < groups.length-1) {
-      champRival.group = groups[currentGroupIdx+1];
-      addEvent(`📈 ${champRival.name} também sobe de grupo!`,'gold');
-    }
-  }
+  // ── VALIDATE GROUP INTEGRITY ──────────────────────────────────
+  validateGroupIntegrity();
+
+  // ── HANDLE RIVALS PROMOTION/RELEGATION ───────────────────────
+  processRivalPromoRelegate(allSchools, group, groups, currentGroupIdx, structuralEvent);
+
+  // ── MOBILITY STATISTICAL CONTROL ─────────────────────────────
+  checkMobilityStat();
 
   // Store top-6 for Desfile das Campeãs
   if(gameState.school.group === 'especial') {
@@ -14383,7 +15383,19 @@ function startNextSeason() {
   const oldCarnavSatisfaction = gameState.carnavalescoSatisfaction;
   const _prevRainha = gameState ? gameState.rainha : null;
   const _prevRainhaType = gameState ? gameState.rainhaType : null;
+  const _prevEnredistas = gameState?.enredistas ? [...gameState.enredistas] : [];
+  const _prevQuesitoDept = gameState?.quesitoDept ? JSON.parse(JSON.stringify(gameState.quesitoDept)) : null;
+  const _prevDeptGeral = gameState?.deptGeral || 'informal';
+  const _prevDeptEspec = gameState?.deptEspecialidade || null;
   gameState = initGameState({...baseSchool, group: school.group}, difficulty);
+  initAICycles(gameState.rivals);
+  initQuesitoDept();
+  // Carry forward enredistas and departamento between seasons
+  if(_prevEnredistas.length) gameState.enredistas = _prevEnredistas;
+  if(_prevQuesitoDept) gameState.quesitoDept = _prevQuesitoDept;
+  gameState.deptGeral = _prevDeptGeral;
+  gameState.deptEspecialidade = _prevDeptEspec;
+  gameState._enredistasCandidates = null;
   // Restore continuous cash — IMPORTANT: do not reset to base budget
   gameState.budget = oldBudget;
   // Rainha contratada por contrato plurianual se mantém
@@ -15900,6 +16912,108 @@ function negotiateOrder(rivalId, rivalName, offerType) {
 // ============================================================
 // ==================== RIVALIDADES ===========================
 // ============================================================
+
+// ============================================================
+// ==================== LIGA PANEL ============================
+// ============================================================
+
+function renderLigaPanel() {
+  const group = gameState.school.group;
+  const history = gameState.seasonHistory || [];
+  const pesoKey = getEscolaPesoBandeira(gameState.school.id, history);
+  const pesoData = PESO_BANDEIRA_NIVEIS[pesoKey];
+  const cycles = AI_SCHOOL_CYCLES;
+
+  // Get rival cycle info
+  const cycleInfo = (gameState.rivals||[]).slice(0,4).map(r=>{
+    const c = cycles[r.id];
+    const phase = c?.phase || 'rebuilding';
+    const phaseLabel = {peak:'⬆️ Ascensão', decline:'⬇️ Declínio', rebuilding:'🔄 Reconstrução'}[phase]||phase;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem .6rem;background:var(--panel2);border-radius:4px;font-size:.75rem">
+      <span>${r.name}</span>
+      <span style="color:${phase==='peak'?'var(--danger)':phase==='decline'?'var(--success)':'var(--text3)'}">${phaseLabel}</span>
+    </div>`;
+  }).join('');
+
+  // History of season positions with bandeira info
+  const posHistory = history.slice(-5).reverse().map(h=>`
+    <div style="display:flex;gap:.5rem;align-items:center;padding:.25rem .5rem;border-radius:3px;background:var(--panel2);font-size:.75rem">
+      <span style="color:var(--text3);min-width:42px">${h.season}</span>
+      <span style="color:${h.position===1?'var(--gold)':h.relegated?'var(--danger)':'var(--text2)'};font-weight:700">${h.position}°</span>
+      <span style="color:var(--text3)">${h.note?.toFixed(1)||'-'}</span>
+      <span style="color:var(--text3);flex:1;text-align:right">${h.highlight||''}</span>
+      ${h.pesoBandeira?`<span style="color:${PESO_BANDEIRA_NIVEIS[h.pesoBandeira]?.descColor||'var(--text3)'}">${PESO_BANDEIRA_NIVEIS[h.pesoBandeira]?.icon||''}</span>`:''}
+    </div>
+  `).join('');
+
+  // Liga regulamento atual
+  const regAtual = ligaRegulamentoCurrent.slice(-3).map(r=>`
+    <div style="font-size:.72rem;color:var(--text2);padding:.2rem .4rem;background:var(--bg2);border-radius:3px">
+      ${r.icon} ${r.desc}
+    </div>
+  `).join('');
+
+  return `
+  <div class="panel mt1">
+    <div class="panel-header"><span class="panel-title">🏆 Liga & Julgamento</span></div>
+    <div class="panel-body">
+      <div class="grid-2">
+        <!-- Peso de Bandeira -->
+        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.85rem">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">🏳️ Peso de Bandeira</div>
+          ${group==='especial'?`
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.2rem;color:${pesoData.descColor}">${pesoData.icon} ${pesoData.label}</div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:.2rem">${pesoData.desc}</div>
+            ${pesoData.minFloor>0?`<div style="font-size:.7rem;color:var(--success);margin-top:.3rem">Piso mínimo de notas: ${pesoData.minFloor}</div>`:''}
+          `:`<div style="font-size:.8rem;color:var(--text3)">Peso de Bandeira ativo somente no Grupo Especial.</div>`}
+        </div>
+
+        <!-- Regras do Grupo -->
+        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.85rem">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">⚖️ Regras de Julgamento</div>
+          ${(()=>{
+            const rules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
+            const range = `${rules.botTotal[0]}–${rules.topTotal[1]}`;
+            return `<div style="font-size:.8rem;color:var(--text2);line-height:1.8">
+              <div>👨‍⚖️ Jurados por quesito: <strong style="color:var(--gold)">${rules.jurados}</strong></div>
+              <div>✂️ Descarta menor: <strong style="color:${rules.descarta?'var(--success)':'var(--text3)'}">${rules.descarta?'Sim':'Não'}</strong></div>
+              <div>📊 Range de totais: <strong>${range}</strong></div>
+            </div>`;
+          })()}
+        </div>
+      </div>
+
+      ${history.length>0?`
+      <!-- Histórico recente -->
+      <div style="margin-top:.85rem">
+        <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">📅 Últimas ${Math.min(5,history.length)} temporadas</div>
+        <div style="display:flex;flex-direction:column;gap:.2rem">${posHistory}</div>
+      </div>`:''}
+
+      ${cycleInfo?`
+      <!-- Ciclos dos rivais -->
+      <div style="margin-top:.85rem">
+        <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">📈 Ciclos dos Rivais</div>
+        <div style="display:flex;flex-direction:column;gap:.2rem">${cycleInfo}</div>
+        <div style="font-size:.68rem;color:var(--text3);margin-top:.3rem">⬆️ Rivais em ascensão são mais perigosos. ⬇️ Em declínio são mais fracos.</div>
+      </div>`:''}
+
+      ${regAtual?`
+      <!-- Regulamento ativo -->
+      <div style="margin-top:.85rem">
+        <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem">📋 Regulamento Atual da Liga</div>
+        <div style="display:flex;flex-direction:column;gap:.2rem">${regAtual}</div>
+      </div>`:''}
+
+      ${ligaEleicaoThisYear?`
+      <div style="margin-top:.85rem;padding:.6rem .8rem;background:rgba(155,89,182,.1);border:1px solid rgba(155,89,182,.3);border-radius:6px">
+        <div style="font-size:.7rem;color:var(--accent);font-weight:700;margin-bottom:.2rem">🗳️ ELEIÇÃO DA LIGA (último carnaval)</div>
+        <div style="font-size:.8rem;color:var(--text2)">${ligaEleicaoThisYear.icon} <strong>${ligaEleicaoThisYear.nome}</strong></div>
+        <div style="font-size:.72rem;color:var(--text3)">${ligaEleicaoThisYear.desc}</div>
+      </div>`:''}
+    </div>
+  </div>`;
+}
 
 function renderRivalidades() {
   const allRivals = gameState.rivals || [];
