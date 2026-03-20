@@ -3703,24 +3703,441 @@ const INTERVIEW_QUESTIONS = [
   },
 ];
 
+// ============================================================
+// ==================== SISTEMA POLÍTICO PROFUNDO =============
+// ============================================================
+
 const POLITICAL_ENTITIES = [
-  {id:'liga',name:'Liga das Escolas (Nível)',emoji:'🏛️',role:'Controla o regulamento e a organização do carnaval',relation:50},
-  {id:'prefeitura',name:'Prefeitura do Rio',emoji:'🏙️',role:'Responsável pela subvenção e pela Sapucaí',relation:45},
-  {id:'imprensa',name:'Imprensa Carnavalesca',emoji:'📰',role:'Forma a opinião pública e dos jurados',relation:40},
-  {id:'rivais',name:'Escolas Rivais',emoji:'⚔️',role:'Concorrentes diretos na disputa',relation:30},
-  {id:'patrocinadores',name:'Patrocinadores',emoji:'💼',role:'Financiam o carnaval em troca de visibilidade',relation:50},
-  {id:'velha_guarda',name:'Velha Guarda',emoji:'👴',role:'Guardiões da tradição e identidade da escola',relation:60},
+  {id:'liga',        name:'Presidência da Liga', emoji:'🏛️', role:'Controla regulamento, organização e contratos'},
+  {id:'conselho',    name:'Conselho das Escolas', emoji:'🤝', role:'Órgão deliberativo — votações e alianças'},
+  {id:'comissao',    name:'Comissão de Carnaval', emoji:'📋', role:'Organização técnica e logística da avenida'},
+  {id:'julgamento',  name:'Comissão de Julgamento',emoji:'⚖️',role:'Seleciona jurados e define critérios'},
+  {id:'prefeitura',  name:'Prefeitura do Rio',   emoji:'🏙️', role:'Subvenção pública e cessão do Sambódromo'},
+  {id:'imprensa',    name:'Imprensa Carnavalesca',emoji:'📰', role:'Forma a opinião pública e influencia jurados'},
+  {id:'rivais',      name:'Escolas Rivais',       emoji:'⚔️', role:'Concorrentes — aliados ou adversários políticos'},
+  {id:'patrocinadores',name:'Patrocinadores',     emoji:'💼', role:'Financiam o carnaval em troca de visibilidade'},
+  {id:'velha_guarda',name:'Velha Guarda',         emoji:'👴', role:'Guardiões da tradição e identidade da escola'},
 ];
 
-const POLITICAL_ACTIONS = [
-  {id:'pa1',text:'Participar de reunião da liga',cost:0,budgetCost:0,effects:{politics:+8,reputation:+3},monthReq:0,desc:'Garante influência nas decisões regulamentares'},
-  {id:'pa2',text:'Organizar jantar com patrocinadores',cost:0,budgetCost:50000,effects:{politics:+5,budget:+300000},monthReq:0,desc:'Atrair novos recursos para a escola'},
-  {id:'pa3',text:'Visitar escola rival em gesto de paz',cost:0,budgetCost:0,effects:{politics:+10,reputation:+5,rivais:+15},monthReq:0,desc:'Relação diplomática com rivais'},
-  {id:'pa4',text:'Convocar assembleia da comunidade',cost:0,budgetCost:20000,effects:{community:+8,politics:+3},monthReq:0,desc:'Fortalecer o engajamento da base'},
-  {id:'pa5',text:'Contratar advogado para revisar regulamento',cost:0,budgetCost:30000,effects:{politics:+5},monthReq:0,desc:'Proteger os interesses da escola na liga'},
-  {id:'pa6',text:'Convidar vereadores para a quadra',cost:0,budgetCost:15000,effects:{politics:+6,budget:+100000,prefeitura:+10},monthReq:0,desc:'Criar laços com o poder municipal'},
-  {id:'pa7',text:'Lançar manifesto pela transparência do julgamento',cost:0,budgetCost:0,effects:{reputation:+10,politics:-5,imprensa:+12},monthReq:0,desc:'Pressão política pela imparcialidade'},
+// Blocos políticos — escolas se organizam naturalmente
+const BLOCOS_POLITICOS = {
+  tradicionalistas: { label:'Bloco Tradicionalista', icon:'🏛️', desc:'Escolas antigas. Defendem o regulamento histórico e peso de bandeira forte.', color:'var(--gold)', beneficios:'pesoBandeira+, regulamento favorável' },
+  reformistas:      { label:'Bloco Reformista',       icon:'🔄', desc:'Querem modernizar o carnaval — novos quesitos, novas regras, mais transparência.', color:'var(--info)', beneficios:'acesso fácil, mais subvenção' },
+  pragmaticos:      { label:'Bloco Pragmático',       icon:'💼', desc:'Negociam vantagens caso a caso. Sem ideologia — apenas resultados.', color:'var(--warn)', beneficios:'patrocínio extra, sorteio favorável' },
+  rebeldes:         { label:'Bloco Rebelde',           icon:'✊', desc:'Confrontam a liga. Alta visibilidade na imprensa mas relação tensa com a cúpula.', color:'var(--accent)', beneficios:'pressReputation+, comunidade+' },
+};
+
+// Órgãos internos da liga com diretores fictícios
+const LIGA_ORGAOS = [
+  { id:'presidencia', nome:'Presidência', icon:'👑', diretor:'Coronel Antônio Muniz', influencia:95 },
+  { id:'conselho',    nome:'Conselho',    icon:'🤝', diretor:'Marcos Vilaça',          influencia:80 },
+  { id:'financeiro',  nome:'Diretoria Financeira', icon:'💰', diretor:'Beatriz Corrêa', influencia:75 },
+  { id:'julgamento',  nome:'Comissão de Julgamento',icon:'⚖️',diretor:'Prof. Paulo Estrela', influencia:70 },
 ];
+
+// Presidentes da liga ao longo das eleições
+const LIGA_PRESIDENTES_POOL = [
+  { id:'muniz',    nome:'Coronel Antônio Muniz',  perfil:'conservador', icon:'👴', viesEscolas:['mangueira','portela','beijaflor'], desc:'Veterano. Prioriza tradição e escolas históricas.' },
+  { id:'vieira',   nome:'Dr. Carlos Vieira',       perfil:'reformista',  icon:'🕴️', viesEscolas:[], desc:'Advogado. Defende mais transparência e novas regras.' },
+  { id:'santos',   nome:'Roberta Santos',          perfil:'pragmatica',  icon:'👩‍💼', viesEscolas:[], desc:'Executiva. Foco em patrocinadores e visibilidade nacional.' },
+  { id:'ferreira', nome:'Jorge Ferreira',          perfil:'rebelde',     icon:'✊', viesEscolas:[], desc:'Ativista. Quer transferir poder para as comunidades.' },
+  { id:'barros',   nome:'Dra. Marta Barros',       perfil:'conservador', icon:'🏛️', viesEscolas:[], desc:'Jurista. Prioriza regulamento estável e peso histórico.' },
+];
+
+// Ações políticas mensais (3/mês)
+const POLITICAL_ACTIONS = [
+  // Articulação
+  {id:'pa_reuniao',    text:'Participar de reunião da liga',        budgetCost:0,      effects:{liga:+6,politics:+5},        desc:'Presença garantida nas decisões regulamentares. Aumenta influência.'},
+  {id:'pa_jantar',     text:'Jantar político com aliados',           budgetCost:60000,  effects:{conselho:+10,politics:+8},   desc:'Reforça alianças. Votos garantidos na próxima votação.'},
+  {id:'pa_paz',        text:'Visita diplomática a escola rival',     budgetCost:0,      effects:{rivais:+15,reputation:+5},   desc:'Reduz tensão com adversários políticos.'},
+  {id:'pa_assembleia', text:'Convocar assembleia da comunidade',     budgetCost:20000,  effects:{community:+10,politics:+4},  desc:'Mostra base forte — pesa nas negociações com a liga.'},
+  {id:'pa_manifesto',  text:'Lançar manifesto de transparência',     budgetCost:0,      effects:{imprensa:+15,liga:-5},       desc:'Visibilidade na imprensa, mas tensiona relação com a cúpula.'},
+  {id:'pa_vereador',   text:'Convidar vereadores para a quadra',     budgetCost:15000,  effects:{prefeitura:+12,politics:+5}, desc:'Laços com o poder municipal. Facilita subvenção.'},
+  {id:'pa_advogado',   text:'Revisar regulamento com advogado',      budgetCost:40000,  effects:{liga:+8,politics:+3},        desc:'Identifica brechas favoráveis no regulamento vigente.'},
+  // Lobby
+  {id:'pa_lobby_leve', text:'Articulação política (bastidores)',     budgetCost:80000,  effects:{liga:+12,politics:+8},       desc:'Conversa discreta com membros do conselho. Baixo risco.'},
+  {id:'pa_lobby_medio',text:'Lobby na liga (pressão direta)',        budgetCost:200000, effects:{liga:+18,politics:+12,imprensa:-5}, desc:'Pressão direta sobre dirigentes. Médio risco — pode vazar.'},
+  {id:'pa_cupula',     text:'Participar de cúpula secreta',          budgetCost:150000, effects:{liga:+20,conselho:+15,politics:+15}, desc:'Encontro informal com presidentes influentes. Alto impacto.'},
+  // Eleição
+  {id:'pa_campanha',   text:'Iniciar campanha interna',              budgetCost:300000, effects:{conselho:+20,politics:+15},  desc:'Amplia capital político para a eleição da liga.'},
+  // Conflito
+  {id:'pa_denuncia',   text:'Denunciar irregularidade ao conselho',  budgetCost:0,      effects:{imprensa:+18,liga:-10,reputation:+8}, desc:'Alto risco mas pode mudar o jogo político.'},
+];
+
+// Reuniões políticas anuais da liga
+const LIGA_MEETINGS = {
+  abril: {
+    mes: 1, title: '🏛️ Reunião Pós-Carnaval — Avaliação',
+    desc: 'A liga avalia o carnaval. Críticas ao julgamento são comuns. Primeira chance de marcar posição política.',
+    temas: ['Avaliação dos jurados','Reclamações das escolas','Início da temporada política'],
+    opcoes: [
+      { label:'Apoiar o julgamento oficial',      effects:{liga:+10,imprensa:-5,politics:+5},  desc:'Aproxima da cúpula. Imprensa reformista pode criticar.' },
+      { label:'Criticar abertamente o julgamento',effects:{liga:-8,imprensa:+12,politics:+8},  desc:'Pressão por mudança. Tensão com a liga mas visibilidade.' },
+      { label:'Pedir investigação formal',         effects:{liga:-3,imprensa:+8,conselho:+10},  desc:'Posição moderada. Abre processo que pode beneficiar ou prejudicar.' },
+      { label:'Manter neutralidade',               effects:{politics:+2},                       desc:'Sem ganhos nem perdas. Observar o campo antes de agir.' },
+    ],
+  },
+  junho: {
+    mes: 3, title: '⚖️ Reunião de Regulamento',
+    desc: 'Votação de regras para o próximo carnaval. Momento mais importante da política da liga.',
+    temas: ['Número de escolas','Tempo de desfile','Mudanças em quesitos','Novo regulamento'],
+    opcoes: [
+      { label:'Propor mudança de regulamento',     effects:{liga:-5,conselho:+15,politics:+12}, desc:'Liderança reformista. Alto risco, alto retorno.' },
+      { label:'Negociar apoio em troca de votos',  effects:{conselho:+20,politics:+10},          desc:'Pragmatismo. Constrói capital para votações futuras.' },
+      { label:'Bloquear proposta desfavorável',    effects:{liga:+5,conselho:+8,politics:+6},   desc:'Defesa dos interesses da escola. Sólido mas limitado.' },
+      { label:'Apoiar a proposta da presidência',  effects:{liga:+18,politics:+5},               desc:'Ganha favor da cúpula. Pode perder apoio do conselho reformista.' },
+    ],
+  },
+  setembro: {
+    mes: 6, title: '🗓️ Reunião de Organização',
+    desc: 'Definição da logística da avenida, venda de ingressos e ordem dos desfiles.',
+    temas: ['Logística da avenida','Venda de ingressos','Transmissão de TV','Patrocinadores'],
+    opcoes: [
+      { label:'Negociar posição de destaque',       effects:{liga:-5,politics:+10,budget:+200000}, desc:'Lobby pela ordem no desfile. Custo político mas ganho real.' },
+      { label:'Pressionar por mais subvenção',      effects:{prefeitura:+15,liga:+5,politics:+8},  desc:'Articulação com a prefeitura. Fortalece posição financeira.' },
+      { label:'Propor melhorias no sambódromo',     effects:{imprensa:+12,community:+8,politics:+5},desc:'Posição popular. Aumenta prestígio público.' },
+      { label:'Articular acordo de transmissão',    effects:{liga:+10,budget:+500000},              desc:'Negociar cota extra de TV. Risco de desequilíbrio com rivais.' },
+    ],
+  },
+  dezembro: {
+    mes: 9, title: '🎭 Reunião Final — Clima Político',
+    desc: 'O clima político define o ambiente do carnaval. Pressões de patrocinadores e tensões emergem.',
+    temas: ['Clima político','Patrocinadores estratégicos','Tensões entre escolas','Pré-carnaval'],
+    opcoes: [
+      { label:'Fazer discurso de unidade',          effects:{liga:+12,conselho:+8,reputation:+10}, desc:'Líder conciliador. Fortalece posição institucional.' },
+      { label:'Declarar oposição à gestão atual',   effects:{liga:-12,imprensa:+15,politics:+12},  desc:'Posição combativa. Divide o conselho mas mobiliza aliados.' },
+      { label:'Anunciar aliança estratégica',        effects:{conselho:+18,politics:+10,rivais:+10},desc:'Coalização com rivais. Muda o equilíbrio de forças.' },
+      { label:'Pressionar por eleições antecipadas',effects:{liga:-8,conselho:+12,politics:+15},   desc:'Radical. Pode acelerar a eleição da liga se apoio for suficiente.' },
+    ],
+  },
+};
+
+// Cúpulas secretas (eventos aleatórios raros)
+const CUPULAS_SECRETAS = [
+  { id:'cs1', title:'Jantar na Gávea', desc:'Presidentes das 3 maiores escolas se reúnem discretamente. O assunto: eleição da liga.', chance:0.08 },
+  { id:'cs2', title:'Encontro no Sambódromo', desc:'Reunião informal após ensaio técnico. Propostas circulam em off.', chance:0.10 },
+  { id:'cs3', title:'Almoço no clube', desc:'Cúpula com representantes da prefeitura e das grandes escolas.', chance:0.06 },
+  { id:'cs4', title:'Reunião de emergência', desc:'Crise institucional acelera reunião não prevista no calendário.', chance:0.05 },
+];
+
+// Escândalos políticos possíveis
+const ESCANDALOS_POLITICOS = [
+  { id:'esc1', icon:'📰', texto:'Vazamento: "{escola}" teria tentado influenciar jurado, segundo portal carnavalesco.', severity:'alta',    effects:{liga:-15,imprensa:+20,reputation:-12} },
+  { id:'esc2', icon:'📰', texto:'Presidentes debatem mudança polêmica na liga — "{escola}" é citada na discussão.', severity:'media',  effects:{liga:-5,imprensa:+10,politics:-5} },
+  { id:'esc3', icon:'🎙️', texto:'Carnavalesco de "{escola}" critica julgamento em entrevista. Liga reage.', severity:'baixa',  effects:{liga:-8,imprensa:+8} },
+  { id:'esc4', icon:'📱', texto:'Áudio vaza mostrando diretor de "{escola}" discutindo vantagem no sorteio.', severity:'alta',    effects:{liga:-20,reputation:-15,politics:-10} },
+  { id:'esc5', icon:'🏛️', texto:'"{escola}" é investigada por irregularidade no uso de subvenção pública.', severity:'critica', effects:{liga:-25,reputation:-20,budget:-300000} },
+  { id:'esc6', icon:'🤝', texto:'Aliança política entre "{escola}" e rival surpreende o carnaval.', severity:'baixa',  effects:{rivais:+20,imprensa:+8} },
+];
+
+// Capital político — métrica acumulada
+function getCapitalPolitico() {
+  const r = gameState.politicalRelations||{};
+  const hist = gameState.seasonHistory||[];
+  const titulos = hist.filter(h=>h.position===1).length;
+  const yearsEspec = hist.filter(h=>h.group==='especial').length;
+  return clamp(
+    Math.round((r.liga||50)*0.25 + (r.conselho||50)*0.20 + (gameState.politics||50)*0.25
+    + titulos*5 + yearsEspec*2 + (r.prefeitura||50)*0.10 + (r.velha_guarda||60)*0.10
+    + (r.patrocinadores||50)*0.10), 0, 100);
+}
+
+function getPesoVoto() {
+  const cp = getCapitalPolitico();
+  const group = gameState.school?.group||'especial';
+  const groupBonus = {especial:20,ouro:10,prata:5,bronze:2,avaliacao:0}[group]||0;
+  return clamp(cp + groupBonus, 0, 100);
+}
+
+function getBlocoAtual() {
+  return gameState.blocoPolitico || null;
+}
+
+function entrarBloco(blocoId) {
+  gameState.blocoPolitico = blocoId;
+  const bloco = BLOCOS_POLITICOS[blocoId];
+  const bonus = {
+    tradicionalistas: {liga:+10, velha_guarda:+15},
+    reformistas:      {conselho:+12, imprensa:+8},
+    pragmaticos:      {patrocinadores:+15, politics:+10},
+    rebeldes:         {imprensa:+20, community:+12, liga:-10},
+  }[blocoId]||{};
+  for(const [k,v] of Object.entries(bonus)) {
+    if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+    else if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+    else if(k==='community') gameState.community=clamp(gameState.community+v,0,100);
+  }
+  addEvent(`🤝 "${gameState.school.name}" entrou para o ${bloco.label}! ${bloco.desc}`,'gold');
+  toast(`Bloco: ${bloco.label}`,'gold');
+}
+
+// ── WhatsApp-style chat helper ──────────────────────────────
+function buildChatHTML(messages) {
+  return messages.map(m=>{
+    const isPlayer = m.from==='player';
+    return `<div style="display:flex;${isPlayer?'justify-content:flex-end':'justify-content:flex-start'};margin-bottom:.5rem;animation:fadeInUp .25s ease both">
+      ${!isPlayer?`<div style="width:30px;height:30px;border-radius:50%;background:rgba(212,175,55,.2);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;margin-right:.4rem;align-self:flex-end">${m.avatar||'👤'}</div>`:'' }
+      <div style="max-width:78%;padding:.55rem .8rem;border-radius:${isPlayer?'16px 4px 16px 16px':'4px 16px 16px 16px'};background:${isPlayer?'rgba(212,175,55,.18)':'var(--panel2)'};border:1px solid ${isPlayer?'rgba(212,175,55,.4)':'var(--border)'};font-size:.82rem;color:var(--text);line-height:1.45">
+        ${m.sender?`<div style="font-size:.65rem;color:${isPlayer?'var(--gold)':'var(--text3)'};margin-bottom:.15rem;font-weight:700">${m.sender}</div>`:''}
+        ${m.text}
+        ${m.time?`<div style="font-size:.58rem;color:var(--text3);text-align:right;margin-top:.2rem">${m.time}</div>`:''}
+      </div>
+      ${isPlayer?`<div style="width:30px;height:30px;border-radius:50%;background:rgba(52,152,219,.2);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;margin-left:.4rem;align-self:flex-end">🎭</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openChatModal(title, initialMessages, choices, onChoice, closable) {
+  const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  let msgs = [...initialMessages];
+
+  function renderModal() {
+    const chatHTML = buildChatHTML(msgs);
+    const choicesHTML = choices ? `
+      <div style="border-top:1px solid var(--border);padding:.6rem .75rem;background:var(--bg)">
+        <div style="font-size:.65rem;color:var(--text3);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.08em">Sua resposta:</div>
+        <div style="display:flex;flex-direction:column;gap:.3rem">
+          ${choices.map((ch,i)=>`<button id="chatbtn_${i}" onclick="_chatChoose(${i})" style="text-align:left;padding:.5rem .75rem;background:var(--panel2);border:1px solid var(--border);border-radius:10px;cursor:pointer;color:var(--text);font-family:inherit;font-size:.82rem;transition:all .2s" onmouseover="this.style.borderColor='var(--gold)';this.style.background='rgba(212,175,55,.1)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--panel2)'">${ch.label}</button>`).join('')}
+        </div>
+      </div>` : '';
+
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalBody').innerHTML = `
+      <div id="chatBox" style="height:280px;overflow-y:auto;padding:.75rem;display:flex;flex-direction:column;gap:0;background:rgba(0,0,0,.15);border-radius:8px;margin-bottom:.5rem">
+        ${chatHTML}
+      </div>
+      ${choicesHTML}`;
+    document.getElementById('modalFooter').innerHTML = '';
+    document.getElementById('modalOverlay').classList.add('open');
+    // Scroll to bottom
+    setTimeout(()=>{ const b=document.getElementById('chatBox'); if(b) b.scrollTop=b.scrollHeight; },60);
+  }
+
+  window._chatChoose = function(idx) {
+    const ch = choices[idx];
+    if(!ch) return;
+    // Disable buttons immediately
+    choices.forEach((_,i)=>{ const btn=document.getElementById(`chatbtn_${i}`); if(btn) btn.disabled=true; });
+    onChoice(idx, ch, msgs, renderModal);
+  };
+
+  renderModal();
+}
+
+// ── Diálogos por reunião (presidente fala, player responde, presidente reage) ──
+const LIGA_MEETING_DIALOGUES = {
+  abril: {
+    intro: [
+      'Bom dia a todos. O carnaval foi incrível, mas precisamos conversar sobre o julgamento.',
+      'Há reclamações de duas escolas sobre notas divergentes. Como a sua escola se posiciona?',
+    ],
+    reacoes: [
+      // apoiar jurados
+      ['Fico feliz com o apoio. Minha administração confia no trabalho dos jurados.','📰 "Escola apoia gestão após polêmica nas notas" — SRzd'],
+      // criticar
+      ['Entendo a preocupação. Vamos abrir um canal para revisão dos critérios.','📰 "Escola critica notas e pressiona liga por mudanças" — Carnavalesco.com'],
+      // pedir investigação
+      ['Investigação formal é algo sério. Vou levar ao conselho.','📰 "Escola pede investigação de jurados após carnaval" — Samba-Net'],
+      // neutralidade
+      ['Posição cautelosa. Mas o debate continuará nas próximas semanas.','📰 "Escola mantém neutralidade em polêmica pós-carnaval" — G1'],
+    ],
+  },
+  junho: {
+    intro: [
+      'Chegou o momento mais esperado do ano político: a revisão do regulamento.',
+      'Temos três propostas na mesa. Duas delas mudam os quesitos, uma mexe no número de escolas. Qual a posição da sua escola?',
+    ],
+    reacoes: [
+      ['Proposta corajosa. Vai gerar debate. Precisaremos de 7 votos no conselho.','📰 "Escola lidera movimento por reforma do regulamento" — SRzd'],
+      ['Negociação é o caminho. Cada escola tem interesses diferentes aqui.','📰 "Escola negocia apoios para regulamento híbrido" — Carnavalesco.com'],
+      ['Bloqueio registrado. Vai atrasar a votação em pelo menos 30 dias.','📰 "Escola bloqueia proposta de regulamento — impasse na liga" — Extra'],
+      ['Agradeço o apoio. Vou garantir que a gestão lembre disso.','📰 "Escola apoia presidência no regulamento" — Minha São Paulo'],
+    ],
+  },
+  setembro: {
+    intro: [
+      'Setembro. Hora de organizar a logística do carnaval.',
+      'Estamos discutindo ingressos, transmissão e ordem dos desfiles. O que a sua escola prioriza?',
+    ],
+    reacoes: [
+      ['Lobby pela ordem registrado. Vou avaliar com a comissão técnica.','📰 "Escola negocia posição privilegiada no desfile" — Samba-Net'],
+      ['Boa articulação. A prefeitura tem sido receptiva a aumentar repasses.','📰 "Escola pressiona por mais subvenção no encontro da liga" — O Globo'],
+      ['Proposta de melhorias anotada. Tem apoio de pelo menos 4 escolas.','📰 "Escola defende reformas no sambódromo em reunião" — SRzd'],
+      ['Cota de transmissão é estratégica. Negociaremos com a Globo em outubro.','📰 "Escola articula acordo de TV em reunião da liga" — Carnavalesco.com'],
+    ],
+  },
+  dezembro: {
+    intro: [
+      'Último encontro antes do carnaval. O clima está tenso.',
+      'Patrocinadores pressionando, escolas em conflito, e a eleição da liga no horizonte. Qual é a posição da sua escola?',
+    ],
+    reacoes: [
+      ['Discurso de unidade bem recebido. Vários presidentes te cumprimentaram.','📰 "Escola prega paz e sai fortalecida da reunião de dezembro" — SRzd'],
+      ['Declaração de oposição registrada. Vai dividir o conselho.','📰 "Escola declara oposição à gestão às vésperas do carnaval" — Carnavalesco.com'],
+      ['Aliança anunciada causou surpresa. O equilíbrio de forças mudou.','📰 "Aliança surpreendente entre escolas rivais agita bastidores" — Samba-Net'],
+      ['Pedido de eleições antecipadas vai ao conselho. Presidente reagiu mal.','📰 "Escola pede eleições antecipadas — crise institucional à vista" — Extra'],
+    ],
+  },
+};
+
+function triggerLigaMeeting(mKey) {
+  const meet = LIGA_MEETINGS[mKey];
+  if(!meet) return;
+  if(!gameState.ligaMeetingsDone) gameState.ligaMeetingsDone = {};
+  if(gameState.ligaMeetingsDone[mKey]) return;
+
+  const president = LIGA_PRESIDENTES_POOL.find(p=>p.id===gameState.ligaPresidenteId)||LIGA_PRESIDENTES_POOL[0];
+  const cp = getCapitalPolitico();
+  const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const dialogues = LIGA_MEETING_DIALOGUES[mKey];
+  const schoolName = gameState.school?.name||'Sua Escola';
+
+  // Build initial messages
+  const initMsgs = [
+    {from:'other', avatar:president.icon, sender:president.nome, text:`📅 <em>${meet.title}</em><br><span style="font-size:.75rem;color:var(--text3)">${meet.temas.map(t=>'📌 '+t).join(' · ')}</span>`, time:hora},
+    {from:'other', avatar:president.icon, sender:president.nome, text:dialogues.intro[0], time:hora},
+    {from:'other', avatar:president.icon, sender:president.nome, text:dialogues.intro[1], time:hora},
+  ];
+
+  const choices = meet.opcoes.map((op,i)=>({label:op.label, optIdx:i}));
+
+  openChatModal(meet.title, initMsgs, choices, (idx, ch, msgs, rerender)=>{
+    const op = meet.opcoes[idx];
+    const react = dialogues.reacoes[idx]||dialogues.reacoes[0];
+    const hora2 = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+
+    // Player message
+    msgs.push({from:'player', sender:schoolName, text:op.label, time:hora2});
+
+    // Short delay then president reacts
+    setTimeout(()=>{
+      msgs.push({from:'other', avatar:president.icon, sender:president.nome, text:react[0], time:hora2});
+      // Manchete
+      msgs.push({from:'other', avatar:'📰', sender:'Imprensa', text:`<span style="font-size:.75rem;font-style:italic;color:var(--warn)">${react[1]}</span>`, time:hora2});
+      // Result card
+      const fx = Object.entries(op.effects);
+      msgs.push({from:'other', avatar:'✅', sender:'Resultado', text:`
+        <div style="font-size:.72rem">
+          ${fx.map(([k,v])=>`<div style="color:${v>0?'var(--success)':'var(--danger)'}">${v>0?'▲':'▼'} ${k.replace(/_/g,' ')}: ${v>0?'+':''}${v}</div>`).join('')}
+          ${getBlocoAtual()?`<div style="color:var(--gold)">🤝 Bloco político: +3 política</div>`:''}
+        </div>`, time:hora2});
+
+      // Apply effects
+      for(const [k,v] of Object.entries(op.effects)) {
+        if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+        else if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+        else if(k==='reputation') gameState.reputation=clamp(gameState.reputation+v,0,100);
+        else if(k==='community') gameState.community=clamp(gameState.community+v,0,100);
+        else if(k==='budget') gameState.budget+=v;
+      }
+      if(getBlocoAtual()) gameState.politics=clamp(gameState.politics+3,0,100);
+
+      gameState.ligaMeetingsDone[mKey] = true;
+      if(!gameState.ligaMeetingsHistory) gameState.ligaMeetingsHistory=[];
+      gameState.ligaMeetingsHistory.push({mKey,opcao:op.label,ano:gameState.year});
+      addEvent(`🏛️ ${meet.title.replace(/^[^ ]+ /,'')}: "${op.label}". ${react[1]}`,'success');
+
+      // Rerender without choices, add close button
+      document.getElementById('modalBody').querySelector('div[style*="border-top"]')?.remove();
+      const chatBox = document.getElementById('chatBox');
+      if(chatBox) chatBox.innerHTML = buildChatHTML(msgs);
+      setTimeout(()=>{ if(chatBox) chatBox.scrollTop=chatBox.scrollHeight; },60);
+      document.getElementById('modalFooter').innerHTML = `<button class="btn btn-gold" onclick="closeModal();renderPolitics()">✅ Encerrar reunião</button>`;
+    }, 600);
+  });
+}
+
+
+function triggerEleicaoLiga() {
+  if(!gameState.ligaElectionPending) return;
+  const candidates = LIGA_PRESIDENTES_POOL.sort(()=>Math.random()-.5).slice(0,3);
+  const cp = getCapitalPolitico();
+  const pesoVoto = getPesoVoto();
+
+  openModal('🗳️ ELEIÇÃO DA LIGA', `
+    <div style="margin-bottom:.85rem;padding:.65rem .9rem;background:rgba(155,89,182,.1);border:1px solid rgba(155,89,182,.3);border-radius:8px">
+      <div style="font-size:.7rem;color:var(--accent);font-weight:700;margin-bottom:.2rem">⚠️ ELEIÇÃO PARA PRESIDÊNCIA DA LIGA</div>
+      <div style="font-size:.82rem;color:var(--text2)">Seu peso de voto: <strong style="color:var(--gold)">${pesoVoto}</strong>/100 — ${pesoVoto>=70?'sua escola tem influência decisiva':'sua influência é considerada'}</div>
+    </div>
+    <div style="font-size:.8rem;color:var(--text2);margin-bottom:.75rem">Vote no candidato que melhor representa os interesses da sua escola:</div>
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      ${candidates.map((c,i)=>`
+        <button onclick="votarEleicaoLiga('${c.id}')" style="text-align:left;padding:.75rem 1rem;background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer;color:var(--text);font-family:inherit;transition:all .2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem">
+            <span style="font-size:1.5rem">${c.icon}</span>
+            <div>
+              <div style="font-weight:700;font-size:.95rem">${c.nome}</div>
+              <div style="font-size:.7rem;color:var(--text3)">${{conservador:'Conservador 🏛️',reformista:'Reformista 🔄',pragmatica:'Pragmático 💼',rebelde:'Rebelde ✊'}[c.perfil]||c.perfil}</div>
+            </div>
+          </div>
+          <div style="font-size:.78rem;color:var(--text2)">${c.desc}</div>
+        </button>
+      `).join('')}
+    </div>
+    <div style="margin-top:.75rem;font-size:.72rem;color:var(--text3)">💡 O resultado depende do equilíbrio de forças entre todas as escolas.</div>
+  `, []);
+  gameState._electionCandidates = candidates;
+}
+
+function votarEleicaoLiga(candidatoId) {
+  const candidates = gameState._electionCandidates||LIGA_PRESIDENTES_POOL.slice(0,3);
+  const chosen = candidates.find(c=>c.id===candidatoId)||candidates[0];
+  const cp = getCapitalPolitico();
+
+  // Simular resultado: escola tem cp/100 * 20% de chance de fazer o candidato ganhar
+  const playerInfluence = cp/100;
+  const scores = candidates.map(c=>({
+    c,
+    score: (Math.random()*0.7) + (c.id===candidatoId ? playerInfluence*0.3 : 0)
+  })).sort((a,b)=>b.score-a.score);
+
+  const winner = scores[0].c;
+  const playerWon = winner.id===candidatoId;
+  gameState.ligaPresidenteId = winner.id;
+  gameState.ligaElectionPending = false;
+  gameState._electionCandidates = null;
+
+  const effects = playerWon
+    ? {liga:+15, politics:+12, reputation:+8}
+    : {liga:-5, politics:-3};
+  for(const [k,v] of Object.entries(effects)) {
+    if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+    else if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+    else if(k==='reputation') gameState.reputation=clamp(gameState.reputation+v,0,100);
+  }
+
+  addEvent(`🗳️ Eleição da liga: ${winner.nome} eleito presidente. ${playerWon?'Seu candidato venceu! Influência+.':'Seu candidato perdeu.'}`,'gold');
+  closeModal();
+  openModal('🗳️ Resultado da Eleição', `
+    <div style="text-align:center;padding:1rem 0">
+      <div style="font-size:3rem">${winner.icon}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:800;color:var(--gold);margin:.3rem 0">${winner.nome}</div>
+      <div style="font-size:.85rem;color:var(--text2);margin-bottom:1rem">NOVO PRESIDENTE DA LIGA</div>
+      <div style="font-size:.82rem;color:var(--text2);background:var(--panel2);border-radius:6px;padding:.65rem .9rem;margin-bottom:.75rem">${winner.desc}</div>
+      <div style="${playerWon?'color:var(--success)':'color:var(--warn)'}">
+        ${playerWon?'✅ Seu candidato venceu! Liga +15, Política +12.':'❌ Seu candidato perdeu. Relacionamento com a nova gestão começa frio.'}
+      </div>
+    </div>
+  `, [{text:'Entendido', cls:'btn-gold', action:()=>{ closeModal(); renderPolitics(); }}]);
+}
+
+function triggerEscandaloPolitico() {
+  if(Math.random()>0.06) return; // 6% chance por mês a partir de junho
+  const esc = ESCANDALOS_POLITICOS[Math.floor(Math.random()*ESCANDALOS_POLITICOS.length)];
+  const texto = esc.texto.replace('{escola}',gameState.school.name);
+  if(!gameState.escandalosLog) gameState.escandalosLog = [];
+  gameState.escandalosLog.unshift({...esc,texto,mes:MONTHS_DATA[gameState.month]?.name,ano:gameState.year});
+  for(const [k,v] of Object.entries(esc.effects)) {
+    if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+    else if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+    else if(k==='reputation') gameState.reputation=clamp(gameState.reputation+v,0,100);
+    else if(k==='budget') gameState.budget+=v;
+  }
+  addEvent(`${esc.icon} ESCÂNDALO POLÍTICO: ${texto}`,'bad');
+  toast(`${esc.icon} Escândalo: ${texto.substring(0,60)}...`,'warn');
+}
+
+
 
 // ============================================================
 // ==================== GAME STATE ============================
@@ -4852,9 +5269,15 @@ function initGameState(school, difficulty) {
       {text:`A escola ${s.name} inicia os preparativos para o carnaval.`, date:'Março', type:'info'},
     ],
 
-    // Political relations
-    politicalRelations: {liga:50, prefeitura:45, imprensa:40, rivais:30, patrocinadores:50, velha_guarda:60},
+    // Political relations — expanded for deep system
+    politicalRelations: {liga:50, conselho:45, prefeitura:45, imprensa:40, rivais:30, patrocinadores:50, velha_guarda:60, julgamento:50, comissao:45},
     politicalActionsThisMonth: 0,
+    blocoPolitico: null,
+    ligaPresidenteId: 'muniz',
+    ligaMeetingsDone: {},
+    ligaMeetingsHistory: [],
+    ligaElectionPending: false,
+    escandalosLog: [],
 
     // Press interviews done
     interviewsDone: 0,
@@ -5857,6 +6280,32 @@ function advanceMonth() {
   // Assessor de imprensa permanente: +2 prestígio por mês
   if(gameState.pressActionsLog && gameState.pressActionsLog['rp_assessor']) {
     gameState.pressReputation = clamp((gameState.pressReputation||50) + 2, 0, 100);
+  }
+
+  // Liga annual meetings
+  const ligaMeetingKeys = Object.keys(LIGA_MEETINGS);
+  const meetThisMonth = ligaMeetingKeys.find(k=>LIGA_MEETINGS[k].mes===gameState.month);
+  if(meetThisMonth && !(gameState.ligaMeetingsDone||{})[meetThisMonth]) {
+    setTimeout(()=>{
+      toast(`🏛️ Reunião da Liga! Veja a aba Política.`,'gold');
+      addEvent(`📅 Reunião política da liga em ${MONTHS_DATA[gameState.month]?.name}.`,'info');
+    }, 1800);
+  }
+  // Liga elections trigger every 4 years in Junho (month 3)
+  if(gameState.month===3 && gameState.year && gameState.year%4===0) {
+    gameState.ligaElectionPending = true;
+    addEvent('🗳️ Ano de eleição da liga! Vote na aba Política.','gold');
+    setTimeout(()=>{ triggerEleicaoLiga(); }, 2500);
+  }
+  // Political scandal (from Junho onward)
+  if(gameState.month>=3) triggerEscandaloPolitico();
+  const dir = gameState.team?.diretorBarracao;
+  if(dir && gameState.barracaoCarrosConfig) {
+    const meetingMonths = {0:'marco',5:'agosto',8:'novembro',10:'janeiro'};
+    const mKey = meetingMonths[gameState.month];
+    if(mKey && !(gameState.barracaoMeetingsDone||{})[mKey]) {
+      setTimeout(()=>{ triggerBarracaoMeeting(mKey); }, 2200);
+    }
   }
 }
 
@@ -7793,130 +8242,178 @@ function renderBarracão() {
     return;
   }
 
-  // STEP 3: Carros not planned
+  // STEP 3: Desfile not planned — Visual Parade Planner
   if(!gameState.barracaoCarrosConfig) {
     const dirBarracao = gameState.team?.diretorBarracao;
     const dirCarnaval = gameState.team?.diretorCarnaval;
-    const hasAuto = !!(dirBarracao || dirCarnaval);
-    const autoName = dirBarracao?.name || dirCarnaval?.name || '';
-    const autoLabel = dirBarracao ? 'Diretor de Barracão' : 'Diretor de Carnaval';
-    const autoBanner = hasAuto
-      ? `<div style="background:rgba(46,204,113,.08);border:1px solid rgba(46,204,113,.25);border-radius:8px;padding:.65rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem"><span style="font-size:1.4rem">🤖</span><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--success);font-size:.9rem">Confecção Automática Ativa</div><div style="font-size:.72rem;color:var(--text2)">${autoName} (${autoLabel}) conduz o passo a passo automaticamente a cada mês.</div></div></div>`
-      : `<div style="background:rgba(243,156,18,.07);border:1px solid rgba(243,156,18,.25);border-radius:8px;padding:.65rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem"><span style="font-size:1.4rem">👷</span><div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--warn);font-size:.9rem">Modo Manual</div><div style="font-size:.72rem;color:var(--text2)">Sem Diretor de Barracão — controle cada etapa na aba Confecção ou contrate um diretor na aba Equipe.</div></div></div>`;
+    const hasDir = !!(dirBarracao || dirCarnaval);
+    const dirName = dirBarracao?.name || dirCarnaval?.name || '';
+    const dirLabel = dirBarracao ? 'Diretor de Barracão' : 'Diretor de Carnaval';
+    const dirBanner = hasDir
+      ? `<div style="background:rgba(46,204,113,.08);border:1px solid rgba(46,204,113,.3);border-radius:8px;padding:.6rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
+           <span style="font-size:1.5rem">👷</span>
+           <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--success);font-size:.9rem">${dirName} — ${dirLabel}</div>
+           <div style="font-size:.72rem;color:var(--text2)">Confecção automática ativa. Ele avança as etapas mensalmente sem precisar de intervenção.</div></div>
+         </div>`
+      : `<div style="background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.25);border-radius:8px;padding:.6rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem">
+           <span style="font-size:1.5rem">⚠️</span>
+           <div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--warn);font-size:.9rem">Sem Diretor de Barracão</div>
+           <div style="font-size:.72rem;color:var(--text2)">Confecção manual — você avança cada etapa na aba Confecção. Contrate um diretor na aba Equipe.</div></div>
+         </div>`;
+
+    // Init parade ordem if empty
+    if(!gameState._desfileOrdem || !gameState._desfileOrdem.length) {
+      const group = gameState.school.group;
+      const nCarros = group==='especial'?6:group==='ouro'?5:4;
+      gameState._desfileOrdem = [
+        {id:'el_cf', tipo:'comissao', nome:'Comissão de Frente', fixo:true},
+        ...Array.from({length:nCarros},(_,i)=>({id:`el_car_${i}`,tipo:'carro',nome:`Carro ${i+1}`,chassis:1,passageiros:'nenhum',setor:''}))
+      ];
+    }
+
+    const ELEM_TIPOS = {
+      comissao:  {label:'Comissão de Frente', icon:'💃', cor:'rgba(155,89,182,.3)', fixo:true},
+      carro:     {label:'Carro Alegórico',    icon:'🎪', cor:'rgba(212,175,55,.3)'},
+      tripe:     {label:'Tripé',              icon:'🗼', cor:'rgba(52,152,219,.3)'},
+      pede_passagem:{label:'Pede Passagem',   icon:'📣', cor:'rgba(243,156,18,.3)'},
+      cenotecnico:  {label:'Elem. Cenográfico',icon:'🏛️',cor:'rgba(46,204,113,.3)'},
+    };
+
+    function renderOrdemList() {
+      const lista = document.getElementById('desfileOrdemLista');
+      if(!lista) return;
+      const ordem = gameState._desfileOrdem||[];
+      lista.innerHTML = ordem.map((el,idx)=>{
+        const t = ELEM_TIPOS[el.tipo]||ELEM_TIPOS.carro;
+        const isFirst = idx===0, isLast=idx===ordem.length-1;
+        const extras = el.tipo==='carro'?`
+          <div style="display:flex;gap:.4rem;margin-top:.35rem;flex-wrap:wrap">
+            <select class="form-select desfile-el-chassis" data-id="${el.id}" style="font-size:.72rem;padding:.2rem .4rem;width:90px">
+              ${[1,2,3,4].map(n=>`<option value="${n}" ${el.chassis===n?'selected':''}>${n} chassis</option>`).join('')}
+            </select>
+            <select class="form-select desfile-el-pass" data-id="${el.id}" style="font-size:.72rem;padding:.2rem .4rem;flex:1">
+              <option value="nenhum">Sem destaque</option>
+              <option value="velha_guarda" ${el.passageiros==='velha_guarda'?'selected':''}>👴 Velha Guarda</option>
+              <option value="compositores" ${el.passageiros==='compositores'?'selected':''}>🎵 Compositores</option>
+              <option value="criancas" ${el.passageiros==='criancas'?'selected':''}>👧 Crianças</option>
+              <option value="convidados" ${el.passageiros==='convidados'?'selected':''}>⭐ Convidados</option>
+              <option value="rainha" ${el.passageiros==='rainha'?'selected':''}>👸 Rainha</option>
+              <option value="destaque" ${el.passageiros==='destaque'?'selected':''}>💃 Destaque de Luxo</option>
+              <option value="interprete" ${el.passageiros==='interprete'?'selected':''}>🎤 Intérprete</option>
+            </select>
+          </div>`:
+          el.tipo==='pede_passagem'?`<div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">Elemento cenográfico móvel — empurrado por componentes</div>`
+          :``;
+        return `
+        <div class="desfile-elem" data-id="${el.id}" style="display:flex;gap:.5rem;align-items:flex-start;padding:.5rem .65rem;background:var(--panel2);border:1px solid ${t.cor};border-radius:7px;margin-bottom:.3rem">
+          <div style="display:flex;flex-direction:column;gap:.15rem;margin-top:.1rem">
+            <button ${isFirst?'disabled':''} onclick="_desfileMover('${el.id}',-1)" style="background:none;border:1px solid var(--border);border-radius:3px;padding:.1rem .35rem;cursor:pointer;color:var(--text3);font-size:.7rem;line-height:1">▲</button>
+            <button ${isLast?'disabled':''} onclick="_desfileMover('${el.id}',1)" style="background:none;border:1px solid var(--border);border-radius:3px;padding:.1rem .35rem;cursor:pointer;color:var(--text3);font-size:.7rem;line-height:1">▼</button>
+          </div>
+          <span style="font-size:1.2rem;margin-top:.1rem">${t.icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.2rem">
+              <span style="font-size:.6rem;padding:.08rem .35rem;border-radius:3px;background:${t.cor};color:var(--text2);white-space:nowrap">${idx+1}° · ${t.label}</span>
+            </div>
+            <input type="text" class="form-input desfile-el-nome" data-id="${el.id}" value="${el.nome||''}" placeholder="Nome do elemento..." style="font-size:.82rem;padding:.3rem .5rem;width:100%">
+            ${extras}
+          </div>
+          ${!el.fixo?`<button onclick="_desfileRemover('${el.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:1rem;padding:.1rem;margin-top:.15rem;flex-shrink:0">✕</button>`:''}
+        </div>`;
+      }).join('');
+
+      // Wire up input listeners after render
+      lista.querySelectorAll('.desfile-el-nome').forEach(inp=>{
+        inp.oninput = ()=>{ const el=gameState._desfileOrdem.find(e=>e.id===inp.dataset.id); if(el) el.nome=inp.value; };
+      });
+      lista.querySelectorAll('.desfile-el-chassis').forEach(sel=>{
+        sel.onchange = ()=>{ const el=gameState._desfileOrdem.find(e=>e.id===sel.dataset.id); if(el) el.chassis=parseInt(sel.value); };
+      });
+      lista.querySelectorAll('.desfile-el-pass').forEach(sel=>{
+        sel.onchange = ()=>{ const el=gameState._desfileOrdem.find(e=>e.id===sel.dataset.id); if(el) el.passageiros=sel.value; };
+      });
+
+      // Update counter badges
+      const nCarros = (gameState._desfileOrdem||[]).filter(e=>e.tipo==='carro').length;
+      const nTripe  = (gameState._desfileOrdem||[]).filter(e=>e.tipo==='tripe').length;
+      const nPede   = (gameState._desfileOrdem||[]).filter(e=>e.tipo==='pede_passagem').length;
+      const nCeno   = (gameState._desfileOrdem||[]).filter(e=>e.tipo==='cenotecnico').length;
+      ['carro','tripe','pede_passagem','cenotecnico'].forEach(t=>{
+        const el=document.getElementById(`badge_add_${t}`);
+        const count = (gameState._desfileOrdem||[]).filter(e=>e.tipo===t).length;
+        if(el) el.textContent=count;
+      });
+    }
+
+    window._desfileMover = function(id, dir) {
+      const ordem = gameState._desfileOrdem;
+      const idx = ordem.findIndex(e=>e.id===id);
+      if(idx<0) return;
+      const newIdx = idx+dir;
+      if(newIdx<0||newIdx>=ordem.length) return;
+      // Can't move before comissão
+      if(newIdx===0 && ordem[0].fixo) return;
+      [ordem[idx],ordem[newIdx]]=[ordem[newIdx],ordem[idx]];
+      renderOrdemList();
+    };
+    window._desfileRemover = function(id) {
+      gameState._desfileOrdem = (gameState._desfileOrdem||[]).filter(e=>e.id!==id);
+      renderOrdemList();
+    };
+    window._desfileAdicionar = function(tipo) {
+      const tipos = {carro:'Carro',tripe:'Tripé',pede_passagem:'Pede Passagem',cenotecnico:'Elem. Cenográfico'};
+      const count = (gameState._desfileOrdem||[]).filter(e=>e.tipo===tipo).length;
+      const newEl = {id:`el_${tipo}_${Date.now()}`,tipo,nome:`${tipos[tipo]} ${count+1}`,chassis:1,passageiros:'nenhum',setor:''};
+      gameState._desfileOrdem.push(newEl);
+      renderOrdemList();
+    };
 
     el.innerHTML = `
-    <div style="max-width:600px;margin:0 auto">
+    <div style="max-width:680px;margin:0 auto">
       <div style="text-align:center;margin-bottom:1rem">
-        <div style="font-size:3rem">🎪</div>
-        <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;margin:.5rem 0">Planejamento de Alegorias e Elementos</h3>
-        <p style="color:var(--text2);font-size:.82rem">Nomeie os carros e defina os elementos do desfile.</p>
+        <div style="font-size:2.5rem">🎭</div>
+        <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;margin:.4rem 0">Planejamento Visual do Desfile</h3>
+        <p style="color:var(--text2);font-size:.82rem">Monte a ordem do desfile. Adicione elementos e reordene com as setas ▲▼.</p>
       </div>
-      ${autoBanner}
-      <div style="display:flex;align-items:center;gap:.75rem;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem">
-        <span style="font-size:1.3rem">🎪</span>
-        <div style="flex:1">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem">Carros Alegóricos</div>
-          <div style="font-size:.7rem;color:var(--text3)">Sugerido: 4 a 8 carros</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:.5rem">
-          <button class="btn btn-gray btn-sm" style="padding:.3rem .6rem;font-size:1rem;line-height:1" onclick="_barrBtnCarMinus()">−</button>
-          <span id="carCountDisplay" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.4rem;color:var(--gold);min-width:28px;text-align:center">6</span>
-          <button class="btn btn-gray btn-sm" style="padding:.3rem .6rem;font-size:1rem;line-height:1" onclick="_barrBtnCarPlus()">+</button>
-        </div>
+      ${dirBanner}
+
+      <!-- Adicionar elementos -->
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.85rem;padding:.65rem .85rem;background:var(--panel2);border:1px solid var(--border);border-radius:8px">
+        <span style="font-size:.72rem;color:var(--text3);align-self:center;margin-right:.2rem">Adicionar:</span>
+        <button onclick="_desfileAdicionar('carro')" class="btn btn-gold btn-sm" style="font-size:.72rem">🎪 Carro Alegórico <span id="badge_add_carro" style="background:rgba(0,0,0,.3);padding:.05rem .3rem;border-radius:3px;font-size:.65rem">0</span></button>
+        <button onclick="_desfileAdicionar('tripe')" class="btn btn-blue btn-sm" style="font-size:.72rem">🗼 Tripé <span id="badge_add_tripe" style="background:rgba(0,0,0,.3);padding:.05rem .3rem;border-radius:3px;font-size:.65rem">0</span></button>
+        <button onclick="_desfileAdicionar('pede_passagem')" class="btn btn-gray btn-sm" style="font-size:.72rem">📣 Pede Passagem <span id="badge_add_pede_passagem" style="background:rgba(0,0,0,.3);padding:.05rem .3rem;border-radius:3px;font-size:.65rem">0</span></button>
+        <button onclick="_desfileAdicionar('cenotecnico')" class="btn btn-gray btn-sm" style="font-size:.72rem">🏛️ Cenográfico <span id="badge_add_cenotecnico" style="background:rgba(0,0,0,.3);padding:.05rem .3rem;border-radius:3px;font-size:.65rem">0</span></button>
       </div>
-      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;margin-bottom:.75rem">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.88rem;margin-bottom:.4rem">➕ Elementos Extras do Desfile</div>
-        <div style="font-size:.72rem;color:var(--text3);margin-bottom:.6rem">Tripés e Pés de Passagem são independentes dos carros — não têm produção no barracão.</div>
-        <div style="display:flex;gap:.75rem;flex-wrap:wrap">
-          <div style="flex:1;min-width:150px;background:var(--bg2);border:1px solid rgba(52,152,219,.3);border-radius:6px;padding:.55rem .7rem;display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:1.2rem">🗼</span>
-            <div style="flex:1"><div style="font-size:.82rem;font-weight:700">Tripé</div><div style="font-size:.62rem;color:var(--text3)">1 slot · Impacto visual +3</div></div>
-            <div style="display:flex;align-items:center;gap:.3rem">
-              <button class="btn btn-gray btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnTripeMinus()">−</button>
-              <span id="tripeCountDisplay" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:var(--info);min-width:20px;text-align:center">0</span>
-              <button class="btn btn-blue btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnTripePlus()">+</button>
-            </div>
-          </div>
-          <div style="flex:1;min-width:150px;background:var(--bg2);border:1px solid rgba(243,156,18,.3);border-radius:6px;padding:.55rem .7rem;display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:1.2rem">📣</span>
-            <div style="flex:1"><div style="font-size:.82rem;font-weight:700">Pé de Passagem</div><div style="font-size:.62rem;color:var(--text3)">Sem slot · Harmonia +2</div></div>
-            <div style="display:flex;align-items:center;gap:.3rem">
-              <button class="btn btn-gray btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnPedeMinus()">−</button>
-              <span id="pedeCountDisplay" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:var(--warn);min-width:20px;text-align:center">0</span>
-              <button class="btn btn-gray btn-sm" style="padding:.25rem .5rem;font-size:.9rem" onclick="_barrBtnPedePlus()">+</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div id="carrosConfigList" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem"></div>
-      <div id="extrasConfigList" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem"></div>
-      <button class="btn btn-gold" style="width:100%;font-size:1rem" onclick="confirmarCarros()">✅ Confirmar Estrutura do Desfile</button>
+
+      <!-- Ordem do desfile -->
+      <div id="desfileOrdemLista" style="margin-bottom:.85rem"></div>
+
+      <!-- Resumo -->
+      <div id="desfileResumo" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.85rem"></div>
+
+      <button class="btn btn-gold" style="width:100%;font-size:1rem;padding:.75rem" onclick="confirmarDesfileVisual()">✅ Confirmar Estrutura do Desfile</button>
     </div>`;
 
-    let _barrCarCount = 6, _barrTripeCount = 0, _barrPedeCount = 0;
+    renderOrdemList();
 
-    window._barrBtnCarMinus  = ()=>{ _barrCarCount  = clamp(_barrCarCount -1, 2, 10); const d=document.getElementById('carCountDisplay');  if(d) d.textContent=_barrCarCount;  _barrBuildCars(); };
-    window._barrBtnCarPlus   = ()=>{ _barrCarCount  = clamp(_barrCarCount +1, 2, 10); const d=document.getElementById('carCountDisplay');  if(d) d.textContent=_barrCarCount;  _barrBuildCars(); };
-    window._barrBtnTripeMinus= ()=>{ _barrTripeCount= clamp(_barrTripeCount-1, 0, 6); const d=document.getElementById('tripeCountDisplay'); if(d) d.textContent=_barrTripeCount; _barrBuildExtras(); };
-    window._barrBtnTripePlus = ()=>{ _barrTripeCount= clamp(_barrTripeCount+1, 0, 6); const d=document.getElementById('tripeCountDisplay'); if(d) d.textContent=_barrTripeCount; _barrBuildExtras(); };
-    window._barrBtnPedeMinus = ()=>{ _barrPedeCount = clamp(_barrPedeCount -1, 0, 4); const d=document.getElementById('pedeCountDisplay');  if(d) d.textContent=_barrPedeCount;  _barrBuildExtras(); };
-    window._barrBtnPedePlus  = ()=>{ _barrPedeCount = clamp(_barrPedeCount +1, 0, 4); const d=document.getElementById('pedeCountDisplay');  if(d) d.textContent=_barrPedeCount;  _barrBuildExtras(); };
-
-    window._barrGetCarCount   = ()=> _barrCarCount;
-    window._barrGetTripeCount = ()=> _barrTripeCount;
-    window._barrGetPedeCount  = ()=> _barrPedeCount;
-
-    window._barrBuildCars = function() {
-      const list = document.getElementById('carrosConfigList');
-      if(!list) return;
-      const setorOpts = (gameState.barracaoSetoresNomes||[]).map((s,si)=>`<option value="${si+1}">${s}</option>`).join('');
-      list.innerHTML = Array.from({length:_barrCarCount},(_,i)=>`
-        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.75rem .9rem">
-          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.45rem">🎪 CARRO ${i+1}</div>
-          <div style="display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:end">
-            <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Nome</div><input type="text" class="form-input car-nome" data-idx="${i}" placeholder="Ex: O Nascimento da Floresta" style="font-size:.85rem;padding:.35rem .5rem"></div>
-            <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Chassis</div><input type="number" class="form-input car-chassis" data-idx="${i}" min="1" max="4" value="1" style="padding:.35rem .5rem;font-size:.85rem;width:62px;text-align:center"></div>
-            <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Setor</div><select class="form-select car-setor" data-idx="${i}" style="font-size:.75rem;padding:.35rem .4rem;min-width:90px"><option value="">— livre —</option>${setorOpts}</select></div>
-          </div>
-          <div style="margin-top:.5rem">
-            <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Quem vem neste carro</div>
-            <select class="form-select car-passageiros" data-idx="${i}" style="font-size:.8rem;padding:.35rem .5rem;width:100%">
-              <option value="nenhum">Sem destaque especial</option>
-              <option value="velha_guarda">👴 Velha Guarda</option>
-              <option value="compositores">🎵 Compositores</option>
-              <option value="criancas">👧 Crianças</option>
-              <option value="convidados">⭐ Convidados Especiais</option>
-              <option value="rainha">👸 Rainha de Bateria</option>
-              <option value="destaque">💃 Destaque de Luxo</option>
-              <option value="interprete">🎤 Intérprete</option>
-            </select>
-          </div>
-        </div>`).join('');
-    };
-
-    window._barrBuildExtras = function() {
-      const extList = document.getElementById('extrasConfigList');
-      if(!extList) return;
-      const setorOpts = (gameState.barracaoSetoresNomes||[]).map((s,si)=>`<option value="${si+1}">${s}</option>`).join('');
-      const all = [
-        ...Array.from({length:_barrTripeCount},(_,i)=>({tipo:'tripe',idx:i})),
-        ...Array.from({length:_barrPedeCount}, (_,i)=>({tipo:'pede', idx:i})),
+    // Update resumo
+    setTimeout(()=>{
+      const resumo = document.getElementById('desfileResumo');
+      if(!resumo) return;
+      const ord = gameState._desfileOrdem||[];
+      const items = [
+        {icon:'🎪',label:'Carros',n:ord.filter(e=>e.tipo==='carro').length,cor:'var(--gold)'},
+        {icon:'🗼',label:'Tripés',n:ord.filter(e=>e.tipo==='tripe').length,cor:'var(--info)'},
+        {icon:'📣',label:'Pede Passagem',n:ord.filter(e=>e.tipo==='pede_passagem').length,cor:'var(--warn)'},
+        {icon:'🏛️',label:'Cenográficos',n:ord.filter(e=>e.tipo==='cenotecnico').length,cor:'var(--success)'},
       ];
-      if(!all.length) { extList.innerHTML=''; return; }
-      extList.innerHTML = `<div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:.2rem 0;margin-bottom:.3rem">Elementos Extras</div>`
-        + all.map(({tipo,idx})=>`
-        <div style="background:var(--panel2);border:1px solid ${tipo==='tripe'?'rgba(52,152,219,.3)':'rgba(243,156,18,.3)'};border-radius:8px;padding:.65rem .9rem;display:flex;align-items:center;gap:.75rem">
-          <span style="font-size:1.3rem">${tipo==='tripe'?'🗼':'📣'}</span>
-          <div style="flex:1">
-            <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">${tipo==='tripe'?'TRIPÉ':'PÉ DE PASSAGEM'} ${idx+1}</div>
-            <input type="text" class="form-input extra-nome" data-tipo="${tipo}" data-idx="${idx}" placeholder="${tipo==='tripe'?'Nome do tripé':'Nome'}" style="font-size:.82rem;padding:.3rem .5rem">
-          </div>
-          <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.3rem">Setor</div><select class="form-select extra-setor" data-tipo="${tipo}" data-idx="${idx}" style="font-size:.72rem;padding:.3rem .4rem;min-width:90px"><option value="">— livre —</option>${setorOpts}</select></div>
-        </div>`).join('');
-    };
-
-    _barrBuildCars();
-    _barrBuildExtras();
+      resumo.innerHTML = items.map(it=>`<div style="text-align:center;padding:.4rem;background:var(--panel2);border-radius:6px;border:1px solid var(--border)">
+        <div style="font-size:1.2rem">${it.icon}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.3rem;color:${it.cor}">${it.n}</div>
+        <div style="font-size:.62rem;color:var(--text3)">${it.label}</div>
+      </div>`).join('');
+    }, 50);
     return;
   }
   // STEP 4: Alas not planned
@@ -8067,87 +8564,68 @@ function confirmarSetores() {
   renderBarracão();
 }
 
-function confirmarCarros() {
-  // Read counts from window globals set by the planning UI buttons
-  const n = clamp(window._barrGetCarCount ? window._barrGetCarCount() : parseInt(document.getElementById('carCountDisplay')?.textContent||6), 2, 10);
+function confirmarDesfileVisual() {
+  const ordem = gameState._desfileOrdem || [];
+  const carros = ordem.filter(e=>e.tipo==='carro');
+  if(!carros.length) { toast('Adicione pelo menos 1 carro alegórico!','warn'); return; }
 
-  const cars = Array.from({length:n},(_,i)=>{
-    const nomeEl    = document.querySelector(`.car-nome[data-idx="${i}"]`);
-    const chassisEl = document.querySelector(`.car-chassis[data-idx="${i}"]`);
-    const passEl    = document.querySelector(`.car-passageiros[data-idx="${i}"]`);
-    const setorEl   = document.querySelector(`.car-setor[data-idx="${i}"]`);
-
-    const defaultName = 'Carro '+(i+1);
-    const nome        = (nomeEl?.value||'').trim() || defaultName;
-    const chassis     = clamp(parseInt(chassisEl?.value||1), 1, 4);
-    const passageiros = passEl?.value || 'nenhum';
-    const setorIdx    = parseInt(setorEl?.value||0) || 0;
-
-    return {
-      id: 'car_'+(i+1),
-      idx: i,
-      nome,
-      chassis,
-      passageiros,
-      setorIdx,
-      invest: 0,
-      altura: 8,
-      largura: 5,
-      esculturas: 5,
-      cor: '#D4AF37',
-      cor2: '#C0392B',
-      qualidade: 'Médio',
-      progress: 0,
-    };
+  // Read live input values from DOM (user may have typed after last oninput)
+  ordem.forEach(el=>{
+    const inp = document.querySelector(`.desfile-el-nome[data-id="${el.id}"]`);
+    if(inp) el.nome = inp.value || el.nome;
+    const ch  = document.querySelector(`.desfile-el-chassis[data-id="${el.id}"]`);
+    if(ch)  el.chassis = parseInt(ch.value)||1;
+    const ps  = document.querySelector(`.desfile-el-pass[data-id="${el.id}"]`);
+    if(ps)  el.passageiros = ps.value||'nenhum';
   });
 
-  // Read extras (tripés and pés de passagem)
-  const extras = [];
-  document.querySelectorAll('.extra-nome').forEach(el=>{
-    const tipo = el.dataset.tipo;
-    const idx  = parseInt(el.dataset.idx||0);
-    const nome = (el.value||'').trim() || (tipo==='tripe' ? `Tripé ${idx+1}` : `Pé de Passagem ${idx+1}`);
-    const setorEl = document.querySelector(`.extra-setor[data-tipo="${tipo}"][data-idx="${idx}"]`);
-    const setorIdx = parseInt(setorEl?.value||0) || 0;
-    extras.push({ id:`extra_${tipo}_${idx}`, tipo, nome, setorIdx });
-  });
+  // Build barracaoCarrosConfig from visual order (backward compat)
+  const cars = carros.map((c,i)=>({
+    id: c.id || `car_${i+1}`,
+    idx: i,
+    nome: c.nome || `Carro ${i+1}`,
+    chassis: c.chassis||1,
+    passageiros: c.passageiros||'nenhum',
+    setorIdx: c.setorIdx||0,
+    invest: 0, altura:8, largura:5, esculturas:5,
+    cor:'#D4AF37', cor2:'#C0392B', qualidade:'Médio', progress:0,
+  }));
 
-  // Count tripés for slot calculation
+  // Extras from non-car elements
+  const extras = ordem
+    .filter(e=>['tripe','pede_passagem','cenotecnico'].includes(e.tipo))
+    .map(e=>({id:e.id, tipo:e.tipo==='tripe'?'tripe':e.tipo==='pede_passagem'?'pede':'cenotecnico', nome:e.nome||'', setorIdx:e.setorIdx||0}));
+
   const tripeCount = extras.filter(e=>e.tipo==='tripe').length;
   const pedeCount  = extras.filter(e=>e.tipo==='pede').length;
+  const cenoCount  = extras.filter(e=>e.tipo==='cenotecnico').length;
 
-  // No upfront cost
-  gameState.barracaoCarrosConfig = {count:n, cars, extras, parintins:false, totalCost:0};
-  gameState.barracaoEquipeParintins = false;
+  gameState.barracaoCarrosConfig = {count:carros.length, cars, extras, parintins:false, totalCost:0};
   gameState.barracaoProgress = clamp(gameState.barracaoProgress + 10, 0, 100);
 
-  // Apply extras bonuses
-  if(tripeCount > 0) {
-    gameState.scores.alegorias = clamp(gameState.scores.alegorias + tripeCount * 3, 0, 100);
-    addEvent(`🗼 ${tripeCount} tripé${tripeCount>1?'s':''} adicionado${tripeCount>1?'s':''} ao desfile! Impacto visual +${tripeCount*3}.`, 'success');
-  }
-  if(pedeCount > 0) {
-    gameState.scores.harmonia = clamp(gameState.scores.harmonia + pedeCount * 2, 0, 100);
-    addEvent(`📣 ${pedeCount} pé${pedeCount>1?'s':''} de passagem no desfile! Harmonia +${pedeCount*2}.`, 'success');
+  // Apply bonuses
+  if(tripeCount>0) { gameState.scores.alegorias=clamp(gameState.scores.alegorias+tripeCount*3,0,100); addEvent(`🗼 ${tripeCount} tripé${tripeCount>1?'s':''} no desfile! Visual +${tripeCount*3}.`,'success'); }
+  if(pedeCount>0)  { gameState.scores.harmonia =clamp(gameState.scores.harmonia+pedeCount*2,0,100);  addEvent(`📣 ${pedeCount} pede passagem no desfile! Harmonia +${pedeCount*2}.`,'success'); }
+  if(cenoCount>0)  { gameState.scores.enredo   =clamp(gameState.scores.enredo+cenoCount*2,0,100);    addEvent(`🏛️ ${cenoCount} elemento cenográfico! Narrativa visual enriquecida.`,'success'); }
+
+  // Diretor reaction
+  const dir = gameState.team?.diretorBarracao;
+  if(dir) {
+    const lines = [
+      `${dir.name}: "Desfile planejado! Vou organizar o barracão por ordem de montagem."`,
+      `${dir.name}: "Ótimo! ${carros.length} carros confirmados. Já estou mobilizando as equipes."`,
+      `${dir.name}: "Estrutura definida. Posso começar a produção amanhã mesmo."`,
+    ];
+    addEvent(lines[Math.floor(Math.random()*3)],'gold');
   }
 
-  // Carnavalesco reaction
-  const carnav = gameState.team?.carnavalesco;
-  if(carnav) {
-    const personality = gameState.carnavalescoPersonality;
-    const hasAuto = !!(gameState.team?.diretorBarracao || gameState.team?.diretorCarnaval);
-    const reaction = n>=7 ? '😮 Projeto ambicioso! Muitos carros para planejar.' :
-      personality==='artista' ? '🎨 Bom começo. Agora é focar na qualidade de cada peça.' :
-      hasAuto ? '👍 Ótimo — com o diretor de barracão, a produção vai fluir!' :
-      '👍 Estrutura definida. Vamos ao barracão!';
-    addEvent(`${carnav.name}: "${reaction.replace(/^[^\s]+ /,'')}"`, 'gold');
-  }
-
-  const extrasDesc = extras.length > 0 ? ` + ${extras.length} elemento${extras.length>1?'s':''} extra${extras.length>1?'s':''}` : '';
-  addEvent(`${n} carros definidos${extrasDesc}. Configure investimentos no Barracão.`, 'success');
-  toast(`${n} carros${extrasDesc} confirmados!`, 'gold');
+  addEvent(`Desfile planejado: ${carros.length} carros + ${extras.length} elem. extras. Barracão iniciando produção.`,'success');
+  toast(`✅ ${carros.length} carros confirmados! Barracão em produção.`,'gold');
   renderBarracão();
 }
+
+// Legacy alias — kept so any old saved game still works
+function confirmarCarros() { confirmarDesfileVisual(); }
 
 function confirmarAlas() {
   const alas = clamp(parseInt(document.getElementById('alasCountInput')?.value||26), 18, 35);
@@ -8173,6 +8651,217 @@ function confirmarAlas() {
   toast(`Ateliê pronto! ${quality} — ${(alas*comp).toLocaleString('pt-BR')} componentes`, 'gold');
   renderBarracão();
 }
+
+// ============================================================
+// ==================== REUNIÕES COM DIRETOR ==================
+// ============================================================
+
+const BARRACAO_MEETINGS = {
+  marco: {
+    title: '📅 Reunião de Março — Planejamento',
+    subtitle: 'Início da temporada. O diretor precisa saber o orçamento.',
+    icon: '📋',
+    choices: [
+      { label: 'Orçamento alto — qualidade máxima',  budget: 0.40, quality: +15, speed: -5, desc: 'Materiais nobres, mais escultores, barracão reforçado.' },
+      { label: 'Orçamento médio — equilíbrio',        budget: 0.25, quality:  +5, speed:  0, desc: 'Bom custo-benefício. Suficiente para um desfile sólido.' },
+      { label: 'Orçamento baixo — cortes necessários',budget: 0.12, quality: -10, speed:+10, desc: 'Produção enxuta. Risco de acabamento inferior.' },
+    ],
+    dirLines: [
+      'Presidente, preciso saber quanto posso gastar nesta temporada.',
+      'Antes de começar, preciso definir o orçamento do barracão.',
+      'Para organizar as equipes, preciso do orçamento total disponível.',
+    ],
+  },
+  agosto: {
+    title: '📅 Reunião de Agosto — Revisão',
+    subtitle: 'Barracão em plena produção. Hora de avaliar o progresso.',
+    icon: '🔍',
+    choices: [
+      { label: 'Liberar verba extra — acelerar produção', budget: 0.15, quality: +8,  speed:+15, desc: 'Reforça equipes e acelera etapas atrasadas.' },
+      { label: 'Manter orçamento atual',                  budget: 0,    quality:  0,  speed:  0, desc: 'Segue o plano original sem alterações.' },
+      { label: 'Cortar custos — foco em carros-chefe',   budget:-0.05, quality: -8,  speed: -5, desc: 'Sacrifica elementos menores para salvar os principais.' },
+    ],
+    dirLines: [
+      'Presidente, aqui está o relatório de agosto. A produção está a %p% de progresso.',
+      'Metade do ano se foi. Vamos revisar o andamento: %p% concluído.',
+      'Relatório de agosto: barracão em %p%. Precisamos conversar sobre os próximos meses.',
+    ],
+  },
+  novembro: {
+    title: '📅 Reunião de Novembro — Reta Final',
+    subtitle: 'Três meses para o carnaval. Última chance de ajuste.',
+    icon: '🚨',
+    choices: [
+      { label: 'Exigir ritmo acelerado — sem descanso', budget: 0.08, quality: -5,  speed:+20, desc: 'Força a entrega no prazo com risco de erros.' },
+      { label: 'Ritmo normal — qualidade primeiro',      budget: 0,    quality: +5,  speed:  0, desc: 'Mantém padrão e aceita algum atraso.' },
+      { label: 'Contratar reforços emergenciais',        budget: 0.12, quality: +10, speed:+12, desc: 'Custo alto mas garante entrega com qualidade.' },
+    ],
+    dirLines: [
+      'Presidente, chegamos a novembro. Reta final: %p% do barracão concluído.',
+      'Três meses para o carnaval. Status atual: %p%. Tome sua decisão.',
+      'Novembro chegou. Barracão em %p% — como o senhor quer conduzir a reta final?',
+    ],
+  },
+  janeiro: {
+    title: '📅 Inspeção Final — Janeiro',
+    subtitle: 'Último mês antes do carnaval. Inspeção geral.',
+    icon: '🔎',
+    choices: [
+      { label: 'Exigir retoques em tudo',    budget: 0.08, quality: +12, speed: -5,  desc: 'Perfeicionismo máximo. Custo extra mas acabamento premium.' },
+      { label: 'Aprovar como está',           budget: 0,    quality:   0, speed:  0,  desc: 'Confiança no trabalho já feito. Sem alterações.' },
+      { label: 'Corrigir apenas problemas críticos', budget: 0.04, quality: +5, speed: +5, desc: 'Foco nos pontos mais urgentes.' },
+    ],
+    dirLines: [
+      'Presidente, tudo pronto para inspeção. Barracão em %p% — hora do senhor ver de perto.',
+      'Janeiro chegou. Carros montados, iluminação instalada. Seu parecer, presidente?',
+      'Inspeção final: barracão em %p%. O que o senhor determina para os ajustes finais?',
+    ],
+  },
+};
+
+// ── Diálogos do Diretor de Barracão por reunião ──────────────
+const BARRACAO_MEETING_DIALOGUES = {
+  marco: {
+    dirLines: [
+      ['Presidente, bom dia! Antes de montar a equipe, preciso saber quanto posso gastar nesta temporada.',
+       'Quero trabalhar com qualidade, mas preciso do número real. O orçamento define tudo: materiais, equipe, ritmo.'],
+    ],
+    reacoes: [
+      // Orçamento alto
+      { dirReact:'Ótimo! Com esse orçamento posso contratar mais escultores e usar materiais nobres. Vou montar um cronograma ambicioso.', resultado:'Orçamento alto liberado. Barracão inicia em ritmo pleno.' },
+      // Médio
+      { dirReact:'Certo. Vai dar pra fazer um trabalho sólido. Vou priorizar os carros-chefe e controlar bem o gasto.', resultado:'Orçamento equilibrado. Foco nos elementos principais.' },
+      // Baixo
+      { dirReact:'Entendido, presidente. Vou cortar o que for possível. Mas aviso que o acabamento pode ficar simples em alguns carros.', resultado:'Orçamento enxuto. Risco de acabamento inferior nos elementos menores.' },
+    ],
+  },
+  agosto: {
+    dirLines: [
+      ['Presidente, chegamos em agosto. Vou te dar o relatório honesto do barracão.',
+       'Temos partes bem adiantadas, mas algumas alegorias precisam de atenção. O que o senhor decide?'],
+    ],
+    reacoes: [
+      { dirReact:'Boa decisão! Vou chamar equipe adicional amanhã. Em 2 semanas recuperamos o atraso.', resultado:'Reforço liberado. Produção acelera nas próximas semanas.' },
+      { dirReact:'Tudo bem, vamos seguir o plano. Só me avise se precisar revisar alguma prioridade.', resultado:'Ritmo mantido. Sem alterações no cronograma.' },
+      { dirReact:'Entendido. Vou focar nos carros principais e adiar o acabamento dos elementos menores.', resultado:'Corte efetuado. Carros-chefe priorizados.' },
+    ],
+  },
+  novembro: {
+    dirLines: [
+      ['Presidente, três meses para o carnaval. Hora de decisões difíceis.',
+       'Tenho partes prontas e partes atrasadas. Dependendo do que o senhor decidir, mudo o ritmo agora.'],
+    ],
+    reacoes: [
+      { dirReact:'Vou colocar o barracão em modo de emergência. Dois turnos por dia, se necessário. A equipe entende a urgência.', resultado:'Ritmo acelerado ativado. Risco de pequenos erros de acabamento.' },
+      { dirReact:'Certo. Qualidade primeiro. Vou entregar menos perfeito do que entregar mal feito. Confia em mim.', resultado:'Ritmo controlado. Qualidade preservada.' },
+      { dirReact:'Boa decisão. Já tenho contatos que podem ajudar. Faz diferença nessa reta final.', resultado:'Reforços contratados. Produção ganha fôlego.' },
+    ],
+  },
+  janeiro: {
+    dirLines: [
+      ['Presidente, chegou a inspeção final. Quero que o senhor veja tudo com seus próprios olhos.',
+       'Os carros estão montados, iluminação instalada. Qual é a sua determinação antes do carnaval?'],
+    ],
+    reacoes: [
+      { dirReact:'Perfeito. Nos próximos 15 dias, minha equipe passa em cada detalhe. Quero nota 10 nos juízes.', resultado:'Retoques iniciados. Acabamento premium garantido.' },
+      { dirReact:'Obrigado pela confiança. Minha equipe se dedicou muito. Vamos para a avenida confiantes.', resultado:'Desfile aprovado como está. Equipe motivada.' },
+      { dirReact:'Anotado. Vou resolver os pontos críticos ainda essa semana. O resto fica como está.', resultado:'Correções pontuais realizadas. Foco nos problemas urgentes.' },
+    ],
+  },
+};
+
+function triggerBarracaoMeeting(mKey) {
+  if(!gameState.team?.diretorBarracao) return;
+  const dir = gameState.team.diretorBarracao;
+  const meet = BARRACAO_MEETINGS[mKey];
+  if(!meet) return;
+  if(!gameState.barracaoMeetingsDone) gameState.barracaoMeetingsDone = {};
+  if(gameState.barracaoMeetingsDone[mKey]) return;
+
+  const prog = Math.round(gameState.barracaoProgress||0);
+  const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const dialogues = BARRACAO_MEETING_DIALOGUES[mKey];
+  const dLines = dialogues.dirLines[0];
+  const cars = gameState.barracaoCarrosConfig?.cars||[];
+
+  // Build report for agosto/novembro/janeiro
+  const reportMsg = (mKey==='agosto'||mKey==='novembro'||mKey==='janeiro') ? {
+    from:'other', avatar:'📊', sender:'Relatório do Barracão',
+    text: `<div style="font-size:.75rem">
+      <div style="margin-bottom:.35rem">📊 Progresso geral: <strong style="color:${prog>=70?'var(--success)':prog>=45?'var(--warn)':'var(--danger)'}">${prog}%</strong></div>
+      ${cars.slice(0,4).map(c=>{
+        const st = gameState.barracaoCarStages?.[c.id||c.nome]||{};
+        const pct = Math.round(((st.estrutura||0)+(st.escultura||0)+(st.pintura||0)+(st.iluminacao||0))/4);
+        return `<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.15rem">
+          <span style="flex:1;color:var(--text3)">${c.nome||'Carro'}</span>
+          <div style="flex:2;background:var(--bg);border-radius:1px;height:3px"><div style="width:${pct}%;height:100%;background:${pct>=70?'#2ecc71':pct>=40?'#f39c12':'#e74c3c'}"></div></div>
+          <span style="min-width:30px;text-align:right;color:${pct>=70?'var(--success)':pct>=40?'var(--warn)':'var(--danger)'};font-weight:700;font-size:.7rem">${pct}%</span>
+        </div>`;
+      }).join('')}
+    </div>`,
+    time: hora,
+  } : null;
+
+  const initMsgs = [
+    {from:'other', avatar:'👷', sender:dir.name, text:dLines[0], time:hora},
+    ...(reportMsg?[reportMsg]:[]),
+    {from:'other', avatar:'👷', sender:dir.name, text:dLines[1], time:hora},
+  ];
+
+  const choices = meet.choices.map((ch,i)=>({label:ch.label, choiceIdx:i}));
+
+  openChatModal(`👷 ${dir.name} — ${meet.title.replace(/^[^ ]+ /,'')}`, initMsgs, choices, (idx, ch, msgs, rerender)=>{
+    const choice = meet.choices[idx];
+    const react = dialogues.reacoes[idx]||dialogues.reacoes[0];
+    const hora2 = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const schoolName = gameState.school?.name||'Presidente';
+
+    msgs.push({from:'player', sender:schoolName, text:choice.label, time:hora2});
+
+    setTimeout(()=>{
+      msgs.push({from:'other', avatar:'👷', sender:dir.name, text:react.dirReact, time:hora2});
+
+      // Apply budget
+      if(choice.budget > 0) {
+        const cost = Math.round(choice.budget * gameState.budget);
+        if(gameState.budget >= cost) {
+          gameState.budget -= cost;
+          gameState.expenses.barracão = (gameState.expenses.barracão||0) + cost;
+        }
+      }
+      gameState.scores.alegorias = clamp((gameState.scores.alegorias||60)+choice.quality*0.6, 0, 100);
+      gameState.scores.fantasias = clamp((gameState.scores.fantasias||60)+choice.quality*0.4, 0, 100);
+      gameState.barracaoProgress  = clamp((gameState.barracaoProgress||0)+choice.speed, 0, 100);
+      const dirBonus = Math.round(((dir.organizacao||70)+(dir.velocidade||70))/2/100 * 5);
+      gameState.barracaoProgress = clamp(gameState.barracaoProgress + dirBonus, 0, 100);
+
+      // Result card
+      msgs.push({from:'other', avatar:'✅', sender:'Resultado', text:`
+        <div style="font-size:.72rem">
+          <div style="color:var(--gold);margin-bottom:.2rem">📋 ${react.resultado}</div>
+          ${choice.quality!==0?`<div style="color:${choice.quality>0?'var(--success)':'var(--danger)'}">${choice.quality>0?'▲':'▼'} Qualidade: ${choice.quality>0?'+':''}${choice.quality}</div>`:''}
+          ${choice.speed!==0?`<div style="color:${choice.speed>0?'var(--info)':'var(--warn)'}">${choice.speed>0?'▲':'▼'} Ritmo: ${choice.speed>0?'+':''}${choice.speed}%</div>`:''}
+          <div style="color:var(--success)">▲ Bônus de ${dir.name}: +${dirBonus}% progresso</div>
+        </div>`, time:hora2});
+
+      gameState.barracaoMeetingsDone[mKey] = true;
+      addEvent(`👷 ${dir.name} (reunião de ${mKey}): ${react.resultado}`,'gold');
+      toast(`✅ Reunião com ${dir.name} concluída!`,'gold');
+
+      document.getElementById('modalBody').querySelector('div[style*="border-top"]')?.remove();
+      const chatBox = document.getElementById('chatBox');
+      if(chatBox) chatBox.innerHTML = buildChatHTML(msgs);
+      setTimeout(()=>{ if(chatBox) chatBox.scrollTop=chatBox.scrollHeight; },60);
+      document.getElementById('modalFooter').innerHTML = `<button class="btn btn-gold" onclick="closeModal();renderTab(currentTab)">✅ Encerrar reunião</button>`;
+    }, 550);
+  });
+}
+
+function chooseMeetingOption(mKey, choiceIdx) {
+  // Legacy fallback — redirects to the new chat-based system
+  triggerBarracaoMeeting(mKey);
+}
+
 
 function renderBarracaoFull(el) {
   const cc = gameState.barracaoCarrosConfig;
@@ -8561,6 +9250,7 @@ function renderBarracaoAdvancedSection() {
   <div style="margin-top:1.5rem">
     <div style="display:flex;gap:.25rem;border-bottom:2px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">
       ${[
+        {id:'desfile',     label:'🎭 Desfile'},
         {id:'setores',     label:'🏭 Setores'},
         {id:'producao',    label:'⚙️ Produção'},
         {id:'confeccao',   label:'🎪 Confecção'},
@@ -8575,6 +9265,7 @@ function renderBarracaoAdvancedSection() {
         onclick="gameState._barracaoActiveTab='${t.id}';renderBarracão()">${t.label}</button>`).join('')}
     </div>
     <div id="barracaoAdvancedContent">
+      ${activeTab==='desfile'     ? renderBTabDesfile()     : ''}
       ${activeTab==='setores'     ? renderBTabSetores()     : ''}
       ${activeTab==='producao'    ? renderBTabProducao()    : ''}
       ${activeTab==='confeccao'   ? renderBTabConfeccao()   : ''}
@@ -8587,6 +9278,81 @@ function renderBarracaoAdvancedSection() {
       ${activeTab==='desmontagem' ? renderBTabDesmontagem() : ''}
     </div>
   </div>`;
+}
+
+function renderBTabDesfile() {
+  const cc = gameState.barracaoCarrosConfig;
+  const ordem = gameState._desfileOrdem||[];
+  const dir = gameState.team?.diretorBarracao;
+  const meetings = gameState.barracaoMeetingsDone||{};
+  const meetKeys = ['marco','agosto','novembro','janeiro'];
+  const meetLabels = {marco:'Março',agosto:'Agosto',novembro:'Novembro',janeiro:'Janeiro'};
+
+  // Director panel
+  const dirPanel = dir
+    ? `<div style="display:flex;gap:.85rem;align-items:center;padding:.75rem 1rem;background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.3);border-radius:8px;margin-bottom:.85rem">
+        <span style="font-size:2rem">👷</span>
+        <div style="flex:1">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1rem;color:var(--success)">${dir.name}</div>
+          <div style="font-size:.72rem;color:var(--text2)">Diretor de Barracão · Organização <strong>${dir.organizacao||dir.management||80}</strong> · Velocidade <strong>${dir.velocidade||75}</strong> · Controle Financeiro <strong>${dir.controleFinanceiro||dir.discipline||80}</strong></div>
+          <div style="font-size:.68rem;color:var(--success);margin-top:.15rem">✅ Confecção automática ativa — avança etapas sem intervenção mensal</div>
+        </div>
+        <div style="font-size:.75rem;color:var(--gold)">R$ ${(dir.cost||0)/1000|0}k/ano</div>
+      </div>`
+    : `<div style="padding:.65rem 1rem;background:rgba(231,76,60,.07);border:1px solid rgba(231,76,60,.25);border-radius:8px;margin-bottom:.85rem;font-size:.82rem;color:var(--danger)">
+        ⚠️ <strong>Sem Diretor de Barracão.</strong> Contrate um na aba Equipe para automação total e acesso às reuniões estratégicas.
+        <button class="btn btn-gold btn-sm" style="margin-left:.75rem;font-size:.72rem" onclick="showTab('negociacoes')">Contratar →</button>
+      </div>`;
+
+  // Director meetings timeline
+  const meetTimeline = `
+    <div class="panel" style="margin-bottom:.85rem">
+      <div class="panel-header"><span class="panel-title">📅 Reuniões com o Diretor</span></div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem">
+          ${meetKeys.map(k=>{
+            const done = !!meetings[k];
+            const meet = BARRACAO_MEETINGS[k];
+            return `<div style="text-align:center;padding:.6rem .4rem;background:${done?'rgba(46,204,113,.1)':'var(--panel2)'};border:1px solid ${done?'rgba(46,204,113,.4)':'var(--border)'};border-radius:7px">
+              <div style="font-size:1.2rem">${meet.icon}</div>
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem;color:${done?'var(--success)':'var(--text2)'};margin:.2rem 0">${meetLabels[k]}</div>
+              <div style="font-size:.62rem;color:${done?'var(--success)':'var(--text3)'}">${done?'✓ Realizada':'Pendente'}</div>
+              ${!done&&dir?`<button class="btn btn-gray btn-sm" style="margin-top:.3rem;font-size:.62rem;padding:.15rem .4rem" onclick="triggerBarracaoMeeting('${k}');renderBarracão()">Iniciar</button>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+        ${!dir?`<div style="font-size:.75rem;color:var(--text3);text-align:center;margin-top:.5rem">Reuniões disponíveis após contratar Diretor de Barracão</div>`:''}
+      </div>
+    </div>`;
+
+  // Visual parade order
+  const ELEM_ICONS = {comissao:'💃',carro:'🎪',tripe:'🗼',pede_passagem:'📣',cenotecnico:'🏛️'};
+  const ELEM_LABELS = {comissao:'Comissão',carro:'Carro',tripe:'Tripé',pede_passagem:'Pede Passagem',cenotecnico:'Cenográfico'};
+  const ELEM_COLORS = {comissao:'rgba(155,89,182,.3)',carro:'rgba(212,175,55,.3)',tripe:'rgba(52,152,219,.3)',pede_passagem:'rgba(243,156,18,.3)',cenotecnico:'rgba(46,204,113,.3)'};
+
+  const ordemPanel = ordem.length ? `
+    <div class="panel" style="margin-bottom:.85rem">
+      <div class="panel-header">
+        <span class="panel-title">🎭 Ordem Visual do Desfile</span>
+        <span style="font-size:.72rem;color:var(--text3)">${ordem.length} elementos</span>
+        <button class="btn btn-gray btn-sm" style="margin-left:auto;font-size:.68rem" onclick="gameState.barracaoCarrosConfig=null;gameState._desfileOrdem=null;renderBarracão()">✏️ Replanejar</button>
+      </div>
+      <div class="panel-body" style="padding:.5rem 0">
+        ${ordem.map((el,i)=>{
+          const stages = el.tipo==='carro'?(gameState.barracaoCarStages?.[el.id||el.nome]||{}):{};
+          const pct = el.tipo==='carro'?Math.round(((stages.estrutura||0)+(stages.escultura||0)+(stages.pintura||0)+(stages.iluminacao||0))/4):null;
+          return `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .85rem;border-bottom:1px solid rgba(42,42,69,.3)">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;color:var(--text3);min-width:22px">${i+1}</span>
+            <span style="font-size:1rem">${ELEM_ICONS[el.tipo]||'🎪'}</span>
+            <span style="flex:1;font-size:.82rem;color:var(--text2)">${el.nome||'—'}</span>
+            <span style="font-size:.62rem;padding:.08rem .35rem;border-radius:3px;background:${ELEM_COLORS[el.tipo]||'var(--border)'};color:var(--text2)">${ELEM_LABELS[el.tipo]||el.tipo}</span>
+            ${pct!==null?`<span style="font-size:.7rem;color:${pct>=75?'var(--success)':pct>=40?'var(--warn)':'var(--danger)'};font-weight:700;min-width:35px;text-align:right">${pct}%</span>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : `<div style="color:var(--text3);font-size:.82rem;padding:.75rem;text-align:center">Desfile não planejado ainda.</div>`;
+
+  return `${dirPanel}${meetTimeline}${ordemPanel}`;
 }
 
 function renderBTabProducao() {
@@ -11587,74 +12353,486 @@ function doCommunityAction(cost, commGain, repGain, label) {
 // ==================== POLITICS ==============================
 // ============================================================
 
+// ── Líderes dos blocos das escolas rivais ───────────────────
+const BLOCOS_LIDERES = {
+  tradicionalistas: {lider:'Renato Vasconcellos', emoji:'🏛️'},
+  reformistas:      {lider:'Mauro Tadeu Freire',  emoji:'🔄'},
+  pragmaticos:      {lider:'Sandra Machado',      emoji:'💼'},
+  rebeldes:         {lider:'Fábio Coutinho',      emoji:'✊'},
+};
+
+// ── Notícias de bastidor geradas contextualmente ─────────────
+function getBastidorNews() {
+  const all = [
+    'Três escolas pressionam por mudança no tempo de desfile',
+    'Bloco reformista tenta reduzir número de jurados',
+    'Duas escolas discutem criação de nova comissão técnica',
+    'Presidente da liga se reúne com secretaria municipal de cultura',
+    'Patrocinador ameaça retirar cota se regulamento mudar',
+    'Carnavalescos pedem mais participação nas comissões técnicas',
+    'Escolas pequenas cobram equilíbrio no sorteio da ordem',
+    'Vazamento: reunião da comissão de julgamento foi gravada',
+    'Disputa por cadeira no conselho das escolas se acirra',
+    'Acordo de transmissão com TV em fase final de negociação',
+    'Escola histórica ameaça entrar com recurso contra resultado',
+    'Proposta de nova escola-escola aumenta tensão política',
+  ];
+  // Return 3 contextual ones
+  const cp = getCapitalPolitico();
+  const esc = (gameState.escandalosLog||[]).length;
+  const pool = [...all].sort(()=>Math.random()-.5);
+  return pool.slice(0,3);
+}
+
+// ── Votações ativa/histórico ─────────────────────────────────
+const LIGA_VOTACOES_POOL = [
+  {
+    id:'v_tempo', titulo:'Reduzir tempo de desfile de 70 para 65 minutos',
+    prol:'Mais agilidade, menos custo para escolas menores.',
+    contra:'Prejudica desfiles complexos do Grupo Especial.',
+    mesMin:1, icon:'⏱️',
+  },
+  {
+    id:'v_jurados', titulo:'Aumentar número de jurados por quesito de 4 para 5',
+    prol:'Mais imparcialidade, notas mais precisas.',
+    contra:'Mais difícil de coordenar e pode gerar mais polêmica.',
+    mesMin:3, icon:'⚖️',
+  },
+  {
+    id:'v_rebaixamento', titulo:'Rebaixar 2 escolas por grupo (em vez de 1)',
+    prol:'Aumenta competitividade e renovação.',
+    contra:'Prejudica escolas menores com menos recursos.',
+    mesMin:3, icon:'📉',
+  },
+  {
+    id:'v_sorteio', titulo:'Eliminar travas no sorteio de ordem',
+    prol:'Sorteio mais justo e democrático.',
+    contra:'Perde a tradição e contexto do sistema atual.',
+    mesMin:4, icon:'🎲',
+  },
+  {
+    id:'v_subvencao', titulo:'Aumentar subvenção para grupos inferiores',
+    prol:'Reduz desigualdade entre grupos.',
+    contra:'Diminui o valor destinado ao Grupo Especial.',
+    mesMin:6, icon:'💰',
+  },
+  {
+    id:'v_streaming', titulo:'Transmissão oficial pelo streaming sem exclusividade de TV',
+    prol:'Mais audiência global, nova fonte de receita.',
+    contra:'Risco de perda de cota de transmissão da TV aberta.',
+    mesMin:6, icon:'📡',
+  },
+];
+
+function getVotacaoAtiva() {
+  const month = gameState.month||0;
+  const done = gameState.votacoesFeitasIds||[];
+  const pool = LIGA_VOTACOES_POOL.filter(v=>v.mesMin<=month && !done.includes(v.id));
+  if(!pool.length) return null;
+  // Pick the one closest to the current month
+  return pool[Math.floor(Math.random()*Math.min(2,pool.length))];
+}
+
+function simularPlacarVotacao(votId, meuVoto) {
+  // Distribute rival votes based on their bloco
+  const rivals = gameState.rivals||[];
+  let favor = 0, contra = 0;
+  rivals.forEach(r=>{
+    const rVoto = Math.random()>0.5 ? 'favor' : 'contra';
+    if(rVoto==='favor') favor++; else contra++;
+  });
+  // Player vote counted with weight
+  const pesoVoto = getPesoVoto();
+  const meuPeso = Math.ceil(pesoVoto/20); // 1-5 votes based on weight
+  if(meuVoto==='favor') favor+=meuPeso; else contra+=meuPeso;
+  const total = favor+contra;
+  const passou = favor > contra;
+  return {favor, contra, total, passou, meuPeso};
+}
+
+// ── Negociações com escolas rivais ───────────────────────────
+const NEGOCIACAO_TIPOS = [
+  {id:'alianca',     label:'Propor aliança política',   desc:'Entrar no mesmo bloco. Votos conjuntos na liga.', budgetCost:0,      effects:{conselho:+12,politics:+8},  risco:0.15},
+  {id:'troca_votos', label:'Trocar apoio em votação',   desc:'Você apoia a pauta deles; eles apoiam a sua.', budgetCost:0,      effects:{conselho:+8,politics:+6},   risco:0.20},
+  {id:'acordo',      label:'Acordo político formal',     desc:'Apoio mútuo por 1 temporada completa.',         budgetCost:100000, effects:{conselho:+15,politics:+10}, risco:0.10},
+  {id:'suborno',     label:'Oferta financeira discreta', desc:'Recursos em troca de voto. Alto risco se vazar.', budgetCost:300000, effects:{conselho:+20,politics:+5},  risco:0.40},
+  {id:'romper',      label:'Romper relação diplomaticamente', desc:'Declarar oposição pública. Desgaste político.',budgetCost:0,    effects:{rivais:-20,politics:-5},   risco:0},
+];
+
+const ACORDO_RESPOSTAS = [
+  'Conversamos com nossa diretoria e apoiamos a proposta.',
+  'Faz sentido pra nossa escola neste momento. Fechado.',
+  'Não vejo problema. Podemos avançar nessa direção.',
+  'Interessante. Vamos precisar de uma pequena contrapartida.',
+  'Precisamos pensar. Mas o canal está aberto.',
+  'Por enquanto, preferimos manter neutralidade.',
+  'Não temos interesse nesse tipo de acordo no momento.',
+];
+
+function negociarComEscola(rivalId, tipoId) {
+  const rival = (gameState.rivals||[]).find(r=>r.id===rivalId);
+  const tipo = NEGOCIACAO_TIPOS.find(t=>t.id===tipoId);
+  if(!rival||!tipo) return;
+
+  if(gameState.budget < tipo.budgetCost) { toast('Orçamento insuficiente!','error'); return; }
+
+  const chance = 1 - tipo.risco - (gameState.rivals_hostile||[]).includes(rivalId)*0.25 + (gameState.rivals_friendly||[]).includes(rivalId)*0.15;
+  const sucesso = Math.random() < clamp(chance,0.1,0.95);
+  const resposta = sucesso
+    ? ACORDO_RESPOSTAS[Math.floor(Math.random()*3)]
+    : ACORDO_RESPOSTAS[3+Math.floor(Math.random()*4)];
+
+  // Apply costs
+  if(tipo.budgetCost>0) { gameState.budget-=tipo.budgetCost; gameState.expenses.politica=(gameState.expenses.politica||0)+tipo.budgetCost; }
+
+  // Apply effects if successful
+  if(sucesso) {
+    for(const [k,v] of Object.entries(tipo.effects)) {
+      if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+      else if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+      else if(k==='rivais') gameState.politicalRelations.rivais=clamp((gameState.politicalRelations.rivais||30)+v,0,100);
+    }
+    if(!gameState.rivals_friendly) gameState.rivals_friendly=[];
+    if(!gameState.rivals_friendly.includes(rivalId)) gameState.rivals_friendly.push(rivalId);
+    // Register agreement
+    if(!gameState.acordosFirmados) gameState.acordosFirmados=[];
+    gameState.acordosFirmados.unshift({escola:rival.name, tipo:tipo.label, ano:gameState.year, mes:MONTHS_DATA[gameState.month]?.name||'', ativo:true});
+    addEvent(`🤝 Acordo firmado com ${rival.name}: "${tipo.label}"`,'success');
+  } else {
+    // Suborno que vazou
+    if(tipoId==='suborno' && Math.random()<0.5) {
+      gameState.politicalRelations.liga=clamp((gameState.politicalRelations.liga||50)-15,0,100);
+      gameState.reputation=clamp(gameState.reputation-10,0,100);
+      addEvent(`💥 Tentativa de suborno com ${rival.name} vazou! Liga penaliza.`,'bad');
+    }
+    addEvent(`❌ Negociação com ${rival.name} não teve sucesso.`,'info');
+  }
+
+  const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const school = gameState.school?.name||'Sua escola';
+
+  const msgs = [
+    {from:'other', avatar:'🏟️', sender:rival.name, text:`Olá! ${school}. Interessante sua proposta.`, time:hora},
+    {from:'player', sender:school, text:tipo.label, time:hora},
+    {from:'other', avatar:'🏟️', sender:rival.name, text:resposta, time:hora},
+  ];
+  if(sucesso) msgs.push({from:'other', avatar:'✅', sender:'Resultado', text:`<div style="font-size:.72rem"><div style="color:var(--success)">✓ Acordo registrado: ${tipo.label}</div>${Object.entries(tipo.effects).map(([k,v])=>`<div style="color:${v>0?'var(--success)':'var(--danger)'}">${v>0?'▲':'▼'} ${k}: ${v>0?'+':''}${v}</div>`).join('')}</div>`, time:hora});
+  else msgs.push({from:'other', avatar:'❌', sender:'Resultado', text:`<div style="font-size:.72rem;color:var(--warn)">Proposta não aceita. Tente mais tarde ou com abordagem diferente.</div>`, time:hora});
+
+  openChatModal(`🤝 Negociação — ${rival.name}`, msgs, null, ()=>{}, true);
+  document.getElementById('modalFooter').innerHTML=`<button class="btn btn-gold" onclick="closeModal();renderPolitics()">Fechar</button>`;
+}
+
+function votarNaLiga(votId, meuVoto) {
+  const vot = LIGA_VOTACOES_POOL.find(v=>v.id===votId);
+  if(!vot) return;
+  if(!gameState.votacoesFeitasIds) gameState.votacoesFeitasIds=[];
+  if(gameState.votacoesFeitasIds.includes(votId)) return;
+  gameState.votacoesFeitasIds.push(votId);
+
+  const placar = simularPlacarVotacao(votId, meuVoto);
+  if(!gameState.votacoesHistorico) gameState.votacoesHistorico=[];
+  gameState.votacoesHistorico.unshift({...vot, meuVoto, placar, ano:gameState.year, mes:MONTHS_DATA[gameState.month]?.name});
+
+  const efeitoVitoria = {favor:{politics:+10,liga:+8}, contra:{politics:+8,liga:+5}}[meuVoto];
+  const meuVotoPas = (meuVoto==='favor'&&placar.passou)||(meuVoto==='contra'&&!placar.passou);
+  if(meuVotoPas) {
+    for(const [k,v] of Object.entries(efeitoVitoria)) {
+      if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+      if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+    }
+  }
+
+  const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const pres = LIGA_PRESIDENTES_POOL.find(p=>p.id===gameState.ligaPresidenteId)||LIGA_PRESIDENTES_POOL[0];
+  const school = gameState.school?.name||'Sua escola';
+  const msgs = [
+    {from:'other', avatar:pres.icon, sender:pres.nome, text:`A pauta em votação: <strong>"${vot.titulo}"</strong>`, time:hora},
+    {from:'other', avatar:pres.icon, sender:pres.nome, text:`${pres.nome}: "Cada escola tem até o fim da reunião para registrar seu voto."`, time:hora},
+    {from:'player', sender:school, text:`Voto: ${meuVoto==='favor'?'✅ A FAVOR':'❌ CONTRA'} — "${vot.titulo}"`, time:hora},
+    {from:'other', avatar:'🗳️', sender:'Resultado da Votação', text:`<div style="font-size:.75rem">
+      <div style="margin-bottom:.3rem;font-weight:700;color:${placar.passou?'var(--success)':'var(--danger)'}">${placar.passou?'✅ APROVADA':'❌ REJEITADA'}</div>
+      <div>A favor: <strong style="color:var(--success)">${placar.favor}</strong> voto${placar.favor>1?'s':''}</div>
+      <div>Contra: <strong style="color:var(--danger)">${placar.contra}</strong> voto${placar.contra>1?'s':''}</div>
+      <div style="margin-top:.3rem;color:${meuVotoPas?'var(--gold)':'var(--text3)'}">Seu voto ficou ${meuVotoPas?'🏆 com a maioria':'com a minoria'}.</div>
+      ${meuVotoPas?`<div style="color:var(--success)">▲ Política +10 · Liga +8</div>`:''}
+    </div>`, time:hora},
+  ];
+  openChatModal(`🗳️ ${vot.icon} Votação — ${vot.titulo.substring(0,35)}...`, msgs, null, ()=>{});
+  document.getElementById('modalFooter').innerHTML=`<button class="btn btn-gold" onclick="closeModal();renderPolitics()">Encerrar</button>`;
+  addEvent(`🗳️ Votou ${meuVoto==='favor'?'a favor':'contra'} "${vot.titulo}". Resultado: ${placar.passou?'aprovada':'rejeitada'} (${placar.favor}×${placar.contra})`,'info');
+}
+
 function renderPolitics() {
   const el = document.getElementById('tabPolitics');
-  el.innerHTML = `
-  <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;color:var(--text);margin-bottom:1rem">Sistema Político do Carnaval</h3>
+  const rel = gameState.politicalRelations||{};
+  const cp = getCapitalPolitico();
+  const pesoVoto = getPesoVoto();
+  const blocoAtual = getBlocoAtual();
+  const president = LIGA_PRESIDENTES_POOL.find(p=>p.id===gameState.ligaPresidenteId)||LIGA_PRESIDENTES_POOL[0];
+  const subTab = gameState._politicsSubTab||'relacoes';
+  const meetings = gameState.ligaMeetingsDone||{};
+  const escandalos = gameState.escandalosLog||[];
 
-  <div class="grid-2" style="margin-bottom:1rem">
-    ${POLITICAL_ENTITIES.map(e=>`
-      <div class="political-entity">
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-          <span style="font-size:1.5rem">${e.emoji}</span>
+  // ── Status bar ──────────────────────────────────────────────
+  const cpColor = cp>=70?'var(--success)':cp>=45?'var(--gold)':'var(--warn)';
+  const statusBar = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem">
+    <div style="text-align:center;padding:.5rem;background:var(--panel2);border:1px solid var(--border);border-radius:7px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.4rem;color:${cpColor}">${cp}</div>
+      <div style="font-size:.62rem;color:var(--text3)">Capital Político</div>
+    </div>
+    <div style="text-align:center;padding:.5rem;background:var(--panel2);border:1px solid var(--border);border-radius:7px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.4rem;color:var(--info)">${pesoVoto}</div>
+      <div style="font-size:.62rem;color:var(--text3)">Peso de Voto</div>
+    </div>
+    <div style="text-align:center;padding:.5rem;background:${blocoAtual?`${BLOCOS_POLITICOS[blocoAtual]?.color||'var(--gold)'}22`:'var(--panel2)'};border:1px solid ${blocoAtual?BLOCOS_POLITICOS[blocoAtual]?.color||'var(--gold)':'var(--border)'};border-radius:7px">
+      <div style="font-size:1rem">${blocoAtual?BLOCOS_POLITICOS[blocoAtual].icon:'—'}</div>
+      <div style="font-size:.62rem;color:var(--text3)">${blocoAtual?BLOCOS_POLITICOS[blocoAtual].label.replace('Bloco ',''):'Sem bloco'}</div>
+    </div>
+    <div style="text-align:center;padding:.5rem;background:var(--panel2);border:1px solid var(--border);border-radius:7px">
+      <div style="font-size:1rem">${president.icon}</div>
+      <div style="font-size:.62rem;color:var(--text3)">${president.nome.split(' ')[0]} ${president.nome.split(' ').slice(-1)}</div>
+    </div>
+  </div>`;
+
+  // ── Sub-tab nav ─────────────────────────────────────────────
+  const tabs = [
+    ['relacoes','🏛️ Relações'],['reunioes','📅 Reuniões'],['blocos','🤝 Blocos'],
+    ['acoes','⚡ Ações'],['eleicao','🗳️ Eleição'],['escandalos','💥 Escândalos'],
+  ];
+  const tabNav = `<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:1rem">
+    ${tabs.map(([k,l])=>`<button onclick="gameState._politicsSubTab='${k}';renderPolitics()" style="padding:.38rem .75rem;border-radius:5px;border:1px solid ${subTab===k?'var(--gold)':'var(--border)'};background:${subTab===k?'rgba(212,175,55,.15)':'var(--panel2)'};color:${subTab===k?'var(--gold)':'var(--text2)'};font-size:.78rem;cursor:pointer;font-family:inherit">${l}${k==='reunioes'&&Object.keys(meetings).length<Object.keys(LIGA_MEETINGS).length?' 🔴':''}</button>`).join('')}
+  </div>`;
+
+  // ── Content per sub-tab ─────────────────────────────────────
+  let content = '';
+
+  if(subTab==='relacoes') {
+    content = `
+    <div class="grid-2">
+      ${POLITICAL_ENTITIES.map(e=>`
+        <div class="political-entity">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+            <span style="font-size:1.4rem">${e.emoji}</span>
+            <div><div class="entity-name">${e.name}</div><div style="font-size:.68rem;color:var(--text3)">${e.role}</div></div>
+          </div>
+          <div class="relation-bar">
+            <span class="relation-label">Relação</span>
+            <div class="relation-track"><div class="relation-fill" style="width:${rel[e.id]||50}%;background:${(rel[e.id]||50)>60?'var(--success)':(rel[e.id]||50)>35?'var(--warn)':'var(--danger)'}"></div></div>
+            <span style="font-size:.75rem;font-weight:700;color:var(--text);min-width:28px;text-align:right">${rel[e.id]||50}%</span>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="panel" style="margin-top:1rem">
+      <div class="panel-header"><span class="panel-title">🏛️ Presidência Atual da Liga</span></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:.75rem;align-items:center">
+          <span style="font-size:2.5rem">${president.icon}</span>
           <div>
-            <div class="entity-name">${e.name}</div>
-            <div style="font-size:.7rem;color:var(--text3)">${e.role}</div>
+            <div style="font-weight:700;font-size:1rem;color:var(--gold)">${president.nome}</div>
+            <div style="font-size:.72rem;color:var(--text3)">${{conservador:'Perfil Conservador',reformista:'Perfil Reformista',pragmatica:'Perfil Pragmático',rebelde:'Perfil Rebelde'}[president.perfil]}</div>
+            <div style="font-size:.8rem;color:var(--text2);margin-top:.2rem">${president.desc}</div>
           </div>
         </div>
-        <div class="relation-bar">
-          <span class="relation-label">Relação</span>
-          <div class="relation-track">
-            <div class="relation-fill" style="width:${gameState.politicalRelations[e.id]}%;background:${gameState.politicalRelations[e.id]>60?'var(--success)':gameState.politicalRelations[e.id]>35?'var(--warn)':'var(--danger)'}"></div>
-          </div>
-          <span style="font-size:.75rem;font-weight:700;color:var(--text);min-width:30px;text-align:right">${gameState.politicalRelations[e.id]}%</span>
-        </div>
-      </div>
-    `).join('')}
-  </div>
-
-  <div class="panel">
-    <div class="panel-header"><span class="panel-title">🎯 Ações Políticas (${3-gameState.politicalActionsThisMonth} restantes este mês)</span></div>
-    <div class="panel-body">
-      <div class="flex-col">
-        ${POLITICAL_ACTIONS.map(a=>{
-          const canDo = gameState.politicalActionsThisMonth < 3;
-          return `<div style="background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:.7rem;display:flex;align-items:center;gap:.75rem;opacity:${canDo?1:.5}">
-            <div style="flex:1">
-              <div style="font-size:.9rem;font-weight:600;color:var(--text)">${a.text}</div>
-              <div style="font-size:.7rem;color:var(--text3);margin:.2rem 0">${a.desc}</div>
-              <div style="font-size:.7rem;color:var(--gold)">${a.budgetCost>0?`Custo: R$ ${fmt(a.budgetCost)} • `:'Gratuito • '}${Object.entries(a.effects).map(([k,v])=>`${v>0?'+':''}${v} ${k}`).join(' • ')}</div>
-            </div>
-            <button class="btn btn-blue btn-sm ${canDo?'':'btn-disabled'}" onclick="doPoliticalAction('${a.id}')">Executar</button>
-          </div>`;
-        }).join('')}
       </div>
     </div>
-  </div>
-  ${renderRivalidades()}
-  ${renderLigaPanel()}`;
+    ${renderRivalidades()}
+    ${renderLigaPanel()}`;
+
+  } else if(subTab==='reunioes') {
+    const meetKeys = Object.keys(LIGA_MEETINGS);
+    content = `
+    <p style="font-size:.82rem;color:var(--text2);margin-bottom:.85rem">A liga realiza 4 reuniões anuais obrigatórias. Cada posição adotada tem consequências políticas duradouras.</p>
+    <div style="display:flex;flex-direction:column;gap:.6rem">
+      ${meetKeys.map(k=>{
+        const m = LIGA_MEETINGS[k];
+        const done = !!meetings[k];
+        const monthName = MONTHS_DATA[m.mes]?.name||'';
+        const hist = (gameState.ligaMeetingsHistory||[]).find(h=>h.mKey===k&&h.ano===gameState.year);
+        return `<div style="background:var(--panel2);border:1px solid ${done?'rgba(46,204,113,.4)':'var(--border)'};border-radius:8px;padding:.75rem 1rem">
+          <div style="display:flex;align-items:flex-start;gap:.65rem">
+            <span style="font-size:1.5rem;margin-top:.1rem">${m.icon||'📅'}</span>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem">
+                <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem">${m.title.replace(/^[^ ]+ /,'')}</span>
+                <span style="font-size:.65rem;padding:.08rem .35rem;background:var(--bg2);border-radius:3px;color:var(--text3)">${monthName}</span>
+                ${done?`<span style="font-size:.62rem;background:rgba(46,204,113,.2);color:var(--success);padding:.08rem .35rem;border-radius:3px">✓ Realizada</span>`:'<span style="font-size:.62rem;background:rgba(243,156,18,.15);color:var(--warn);padding:.08rem .35rem;border-radius:3px">Pendente</span>'}
+              </div>
+              <div style="font-size:.78rem;color:var(--text2)">${m.desc}</div>
+              ${hist?`<div style="font-size:.72rem;color:var(--success);margin-top:.3rem">✓ Você escolheu: "${hist.opcao}"</div>`:''}
+              <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem">
+                ${m.temas.map(t=>`<span style="font-size:.62rem;padding:.06rem .3rem;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text3)">📌 ${t}</span>`).join('')}
+              </div>
+            </div>
+            ${!done?`<button class="btn btn-gold btn-sm" style="font-size:.72rem" onclick="triggerLigaMeeting('${k}')">Participar →</button>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:1rem;padding:.65rem .9rem;background:rgba(52,152,219,.07);border:1px solid rgba(52,152,219,.2);border-radius:6px;font-size:.78rem;color:var(--text3)">
+      💡 As reuniões da liga ficam disponíveis automaticamente nos meses de Abril, Junho, Setembro e Dezembro. Seu capital político determina o peso da sua posição.
+    </div>`;
+
+  } else if(subTab==='blocos') {
+    content = `
+    <p style="font-size:.82rem;color:var(--text2);margin-bottom:.85rem">Escolas se organizam em blocos políticos. Cada bloco vota junto e oferece benefícios diferentes.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem">
+      ${Object.entries(BLOCOS_POLITICOS).map(([k,b])=>{
+        const isActive = blocoAtual===k;
+        return `<div style="background:${isActive?`${b.color}18`:'var(--panel2)'};border:2px solid ${isActive?b.color:'var(--border)'};border-radius:10px;padding:.85rem;cursor:${isActive?'default':'pointer'};transition:all .2s" ${!isActive?`onclick="confirmarBloco('${k}')" onmouseover="this.style.borderColor='${b.color}'" onmouseout="this.style.borderColor='var(--border)'"`:''}>
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+            <span style="font-size:1.5rem">${b.icon}</span>
+            <div>
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;color:${isActive?b.color:'var(--text)'}">${b.label}${isActive?' ✓ ATIVO':''}</div>
+            </div>
+          </div>
+          <div style="font-size:.75rem;color:var(--text2);margin-bottom:.4rem">${b.desc}</div>
+          <div style="font-size:.68rem;color:${b.color};background:${b.color}18;border-radius:4px;padding:.2rem .4rem">🎯 ${b.beneficios}</div>
+          ${!isActive?`<div style="font-size:.65rem;color:var(--text3);margin-top:.3rem">Clique para entrar neste bloco</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+    ${blocoAtual?`<div style="margin-top:1rem;padding:.65rem .9rem;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);border-radius:6px;font-size:.82rem;color:var(--text2)">
+      ✅ Você está no <strong style="color:${BLOCOS_POLITICOS[blocoAtual].color}">${BLOCOS_POLITICOS[blocoAtual].label}</strong>. Nas reuniões da liga, seus aliados de bloco ampliam o peso das suas posições.
+      <button class="btn btn-gray btn-sm" style="margin-left:.5rem;font-size:.7rem" onclick="gameState.blocoPolitico=null;renderPolitics()">Sair do bloco</button>
+    </div>`:''}`;
+
+  } else if(subTab==='acoes') {
+    content = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div style="font-size:.82rem;color:var(--text2)">Ações políticas disponíveis este mês</div>
+      <div style="font-size:.78rem;color:var(--gold);font-weight:700">${3-gameState.politicalActionsThisMonth}/3 restantes</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.45rem">
+      ${POLITICAL_ACTIONS.map(a=>{
+        const canDo = gameState.politicalActionsThisMonth < 3;
+        const canAfford = gameState.budget >= (a.budgetCost||0);
+        const ok = canDo && canAfford;
+        const isLobby = a.id.includes('lobby')||a.id==='pa_cupula';
+        const isCampanha = a.id==='pa_campanha';
+        return `<div style="background:var(--panel2);border:1px solid ${isLobby?'rgba(155,89,182,.3)':isCampanha?'rgba(212,175,55,.3)':'var(--border)'};border-radius:7px;padding:.65rem .85rem;opacity:${ok?1:.55}">
+          <div style="display:flex;align-items:flex-start;gap:.6rem">
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:.88rem;color:${isLobby?'var(--accent)':isCampanha?'var(--gold)':'var(--text)'};margin-bottom:.15rem">${a.text}</div>
+              <div style="font-size:.72rem;color:var(--text3);margin-bottom:.3rem">${a.desc}</div>
+              <div style="display:flex;gap:.25rem;flex-wrap:wrap">
+                ${a.budgetCost?`<span style="font-size:.65rem;padding:.06rem .3rem;background:rgba(231,76,60,.1);color:var(--danger);border-radius:3px">💰 R$ ${fmt(a.budgetCost)}</span>`:'<span style="font-size:.65rem;padding:.06rem .3rem;background:rgba(46,204,113,.1);color:var(--success);border-radius:3px">Gratuito</span>'}
+                ${Object.entries(a.effects).map(([k,v])=>`<span style="font-size:.65rem;padding:.06rem .3rem;background:${v>0?'rgba(46,204,113,.1)':'rgba(231,76,60,.1)'};color:${v>0?'var(--success)':'var(--danger)'};border-radius:3px">${v>0?'+':''}${v} ${k}</span>`).join('')}
+              </div>
+            </div>
+            <button class="btn ${isLobby?'btn-outline':isCampanha?'btn-gold':'btn-blue'} btn-sm" style="font-size:.72rem;white-space:nowrap;flex-shrink:0" ${ok?`onclick="doPoliticalAction('${a.id}')"`:' disabled'}>
+              ${ok?'Executar':'🔒'}
+            </button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  } else if(subTab==='eleicao') {
+    const hist = (gameState.seasonHistory||[]).filter(h=>h.ligaEleicao).slice(-5);
+    content = `
+    <div class="panel" style="margin-bottom:1rem">
+      <div class="panel-header"><span class="panel-title">🗳️ Sistema de Eleições da Liga</span></div>
+      <div class="panel-body">
+        <div style="font-size:.82rem;color:var(--text2);margin-bottom:.75rem">A eleição da liga ocorre a cada 4 anos no mês de Junho. Seu capital político determina o peso do seu voto — escolas com maior prestígio influenciam mais o resultado.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.85rem">
+          <div style="padding:.6rem;background:var(--bg2);border-radius:6px;text-align:center">
+            <div style="font-size:.65rem;color:var(--text3)">PRÓXIMA ELEIÇÃO</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:var(--gold)">${(gameState.year||2025)+((4-((gameState.year||2025)%4))%4||4)}</div>
+          </div>
+          <div style="padding:.6rem;background:var(--bg2);border-radius:6px;text-align:center">
+            <div style="font-size:.65rem;color:var(--text3)">SEU PESO</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:${cpColor}">${pesoVoto}/100</div>
+          </div>
+        </div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Candidatos Possíveis</div>
+        <div style="display:flex;flex-direction:column;gap:.35rem">
+          ${LIGA_PRESIDENTES_POOL.map(c=>`<div style="display:flex;align-items:center;gap:.6rem;padding:.4rem .65rem;background:var(--panel2);border:1px solid ${c.id===gameState.ligaPresidenteId?'rgba(212,175,55,.4)':'var(--border)'};border-radius:5px">
+            <span style="font-size:1.2rem">${c.icon}</span>
+            <div style="flex:1"><div style="font-size:.82rem;font-weight:${c.id===gameState.ligaPresidenteId?700:400}">${c.nome}${c.id===gameState.ligaPresidenteId?' 👑 ATUAL':''}</div>
+            <div style="font-size:.68rem;color:var(--text3)">${c.desc}</div></div>
+          </div>`).join('')}
+        </div>
+        ${gameState.ligaElectionPending?`<button class="btn btn-gold" style="width:100%;margin-top:.75rem" onclick="triggerEleicaoLiga()">🗳️ ELEIÇÃO EM ANDAMENTO — Votar agora</button>`:''}
+      </div>
+    </div>
+    ${hist.length?`<div class="panel">
+      <div class="panel-header"><span class="panel-title">📜 Histórico de Eleições</span></div>
+      <div class="panel-body" style="padding:.4rem 0">
+        ${hist.map(h=>`<div style="display:flex;justify-content:space-between;padding:.3rem .75rem;border-bottom:1px solid rgba(42,42,69,.3);font-size:.8rem">
+          <span style="color:var(--text3)">${h.season}</span>
+          <span style="color:var(--text2)">${h.ligaEleicao||'—'}</span>
+        </div>`).join('')}
+      </div>
+    </div>`:''}`;
+
+  } else if(subTab==='escandalos') {
+    content = `
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:.82rem;color:var(--text2)">Escândalos políticos afetam diretamente a relação com a liga, reputação e às vezes o orçamento.</div>
+    </div>
+    ${escandalos.length===0?`<div style="text-align:center;padding:2rem;color:var(--text3);font-size:.85rem">
+      🕊️ Nenhum escândalo político registrado. Sua escola mantém uma imagem limpa.
+    </div>`:`<div style="display:flex;flex-direction:column;gap:.4rem">
+      ${escandalos.slice(0,12).map(e=>`<div style="padding:.5rem .75rem;background:${e.severity==='critica'?'rgba(231,76,60,.1)':e.severity==='alta'?'rgba(243,156,18,.08)':'var(--panel2)'};border:1px solid ${e.severity==='critica'?'rgba(231,76,60,.4)':e.severity==='alta'?'rgba(243,156,18,.35)':'var(--border)'};border-radius:6px">
+        <div style="display:flex;align-items:flex-start;gap:.4rem">
+          <span>${e.icon}</span>
+          <div style="flex:1">
+            <div style="font-size:.78rem;color:var(--text2);font-style:italic">"${e.texto}"</div>
+            <div style="font-size:.65rem;color:var(--text3);margin-top:.2rem">${e.mes||''} ${e.ano||''} · Gravidade: ${e.severity}</div>
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`}`;
+  }
+
+  el.innerHTML = `
+  <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;color:var(--text);margin-bottom:.75rem">🏛️ Sistema Político do Carnaval</h3>
+  ${statusBar}
+  ${tabNav}
+  <div>${content}</div>`;
+}
+
+function confirmarBloco(blocoId) {
+  const b = BLOCOS_POLITICOS[blocoId];
+  if(!b) return;
+  if(gameState.blocoPolitico===blocoId) return;
+  if(gameState.blocoPolitico) {
+    openModal(`🤝 Trocar de Bloco`, `<p>Você vai sair do <strong>${BLOCOS_POLITICOS[gameState.blocoPolitico].label}</strong> para entrar no <strong style="color:${b.color}">${b.label}</strong>.<br><br>${b.desc}</p>`,
+      [{text:'Confirmar', cls:'btn-gold', action:()=>{ entrarBloco(blocoId); closeModal(); renderPolitics(); }},{text:'Cancelar',cls:'btn-gray',action:closeModal}]);
+  } else {
+    openModal(`🤝 Entrar no ${b.label}`, `<p>${b.desc}</p><p style="margin-top:.5rem;font-size:.8rem;color:var(--gold)">Benefícios: ${b.beneficios}</p>`,
+      [{text:'Entrar no bloco', cls:'btn-gold', action:()=>{ entrarBloco(blocoId); closeModal(); renderPolitics(); }},{text:'Cancelar',cls:'btn-gray',action:closeModal}]);
+  }
 }
 
 function doPoliticalAction(id) {
   const action = POLITICAL_ACTIONS.find(a=>a.id===id);
   if(!action) return;
   if(gameState.politicalActionsThisMonth >= 3) { toast('Limite de ações políticas este mês!','warn'); return; }
-  if(gameState.budget < action.budgetCost) { toast('Sem orçamento!','error'); return; }
+  if(gameState.budget < (action.budgetCost||0)) { toast('Sem orçamento!','error'); return; }
 
-  gameState.budget -= action.budgetCost;
-  gameState.expenses.politica += action.budgetCost;
+  gameState.budget -= (action.budgetCost||0);
+  gameState.expenses.politica = (gameState.expenses.politica||0) + (action.budgetCost||0);
   gameState.politicalActionsThisMonth++;
 
   for(const [k,v] of Object.entries(action.effects)) {
-    if(k in gameState.politicalRelations) { gameState.politicalRelations[k] = clamp(gameState.politicalRelations[k]+v,0,100); }
-    else if(k==='politics') { gameState.politics = clamp(gameState.politics+v,0,100); }
-    else if(k==='reputation') { gameState.reputation = clamp(gameState.reputation+v,0,100); }
-    else if(k==='community') { gameState.community = clamp(gameState.community+v,0,100); }
-    else if(k==='budget') { gameState.budget += v; }
+    if(k in gameState.politicalRelations) gameState.politicalRelations[k]=clamp(gameState.politicalRelations[k]+v,0,100);
+    else if(k==='politics') gameState.politics=clamp(gameState.politics+v,0,100);
+    else if(k==='reputation') gameState.reputation=clamp(gameState.reputation+v,0,100);
+    else if(k==='community') gameState.community=clamp(gameState.community+v,0,100);
+    else if(k==='budget') gameState.budget+=v;
+  }
+
+  if(action.id==='pa_lobby_medio' && Math.random()<0.25) {
+    addEvent(`⚠️ Lobby de "${gameState.school.name}" foi vazado para a imprensa!`,'bad');
+    gameState.politicalRelations.imprensa=clamp((gameState.politicalRelations.imprensa||50)-10,0,100);
+    gameState.politicalRelations.liga=clamp((gameState.politicalRelations.liga||50)-8,0,100);
   }
 
   addEvent(`Ação política: "${action.text}". ${Object.entries(action.effects).map(([k,v])=>`${v>0?'+':''}${v} ${k}`).join(', ')}`,'success');
-  toast(`Ação executada: ${action.text}`,'success');
+  toast(`✅ ${action.text}`,'success');
   renderSidebar(); renderPolitics(); checkBadges();
 }
 
@@ -12812,12 +13990,30 @@ const DB_HARMONIA = [
 
 // Map slot → which DB to draw from
 const DB_DIRETORES_BARRACAO = [
-  {id:'db1',name:'Roberto Melo',       role:'diretorBarracao',emoji:'🏗️',management:92,creativity:85,experience:90,discipline:88,cost:350000},
-  {id:'db2',name:'Cláudio Figueiredo', role:'diretorBarracao',emoji:'🏗️',management:88,creativity:80,experience:85,discipline:90,cost:280000},
-  {id:'db3',name:'Vanessa Lima',        role:'diretorBarracao',emoji:'🏗️',management:85,creativity:88,experience:82,discipline:85,cost:240000},
-  {id:'db4',name:'Jorge Teixeira',      role:'diretorBarracao',emoji:'🏗️',management:82,creativity:75,experience:80,discipline:87,cost:180000},
-  {id:'db5',name:'Adriana Santos',      role:'diretorBarracao',emoji:'🏗️',management:78,creativity:82,experience:75,discipline:80,cost:130000},
-  {id:'db6',name:'Paulo Brito',         role:'diretorBarracao',emoji:'🏗️',management:72,creativity:70,experience:68,discipline:75,cost:80000},
+  // Elite — profissionais de referência no carnaval
+  {id:'db01',name:'Renato Farias',      role:'diretorBarracao',emoji:'🏗️',organizacao:95,velocidade:90,controleFinanceiro:92,management:95,creativity:88,experience:94,discipline:92,cost:420000},
+  {id:'db02',name:'Paulo Ventura',      role:'diretorBarracao',emoji:'🏗️',organizacao:92,velocidade:88,controleFinanceiro:95,management:92,creativity:82,experience:90,discipline:94,cost:380000},
+  {id:'db03',name:'Eduardo Mota',       role:'diretorBarracao',emoji:'🏗️',organizacao:90,velocidade:92,controleFinanceiro:88,management:90,creativity:90,experience:88,discipline:88,cost:350000},
+  {id:'db04',name:'Sérgio Valença',     role:'diretorBarracao',emoji:'🏗️',organizacao:88,velocidade:85,controleFinanceiro:90,management:88,creativity:85,experience:86,discipline:90,cost:300000},
+  {id:'db05',name:'Anderson Batista',   role:'diretorBarracao',emoji:'🏗️',organizacao:87,velocidade:90,controleFinanceiro:85,management:87,creativity:82,experience:85,discipline:86,cost:270000},
+  // Profissionais consolidados
+  {id:'db06',name:'Diego Cardoso',      role:'diretorBarracao',emoji:'🏗️',organizacao:85,velocidade:82,controleFinanceiro:88,management:85,creativity:80,experience:83,discipline:87,cost:240000},
+  {id:'db07',name:'Vinícius Lemos',     role:'diretorBarracao',emoji:'🏗️',organizacao:84,velocidade:88,controleFinanceiro:82,management:84,creativity:86,experience:80,discipline:83,cost:220000},
+  {id:'db08',name:'Márcio Cunha',       role:'diretorBarracao',emoji:'🏗️',organizacao:83,velocidade:80,controleFinanceiro:86,management:83,creativity:78,experience:82,discipline:85,cost:200000},
+  {id:'db09',name:'Roberto Campelo',    role:'diretorBarracao',emoji:'🏗️',organizacao:82,velocidade:84,controleFinanceiro:83,management:82,creativity:80,experience:80,discipline:82,cost:185000},
+  {id:'db10',name:'Alexandre Barreto',  role:'diretorBarracao',emoji:'🏗️',organizacao:80,velocidade:82,controleFinanceiro:84,management:80,creativity:76,experience:78,discipline:84,cost:170000},
+  // Intermediários
+  {id:'db11',name:'Carlos Nogueira',    role:'diretorBarracao',emoji:'🏗️',organizacao:78,velocidade:80,controleFinanceiro:80,management:78,creativity:74,experience:76,discipline:80,cost:150000},
+  {id:'db12',name:'Felipe Moraes',      role:'diretorBarracao',emoji:'🏗️',organizacao:76,velocidade:78,controleFinanceiro:78,management:76,creativity:78,experience:74,discipline:78,cost:135000},
+  {id:'db13',name:'Bruno Pacheco',      role:'diretorBarracao',emoji:'🏗️',organizacao:75,velocidade:82,controleFinanceiro:74,management:75,creativity:80,experience:72,discipline:75,cost:120000},
+  {id:'db14',name:'Marcelo Rezende',    role:'diretorBarracao',emoji:'🏗️',organizacao:74,velocidade:76,controleFinanceiro:78,management:74,creativity:72,experience:74,discipline:78,cost:110000},
+  {id:'db15',name:'Gustavo Peixoto',    role:'diretorBarracao',emoji:'🏗️',organizacao:72,velocidade:75,controleFinanceiro:76,management:72,creativity:74,experience:70,discipline:76,cost:100000},
+  // Iniciantes / baixo custo
+  {id:'db16',name:'Daniel Freitas',     role:'diretorBarracao',emoji:'🏗️',organizacao:70,velocidade:74,controleFinanceiro:72,management:70,creativity:72,experience:68,discipline:73,cost:85000},
+  {id:'db17',name:'Rodrigo Tavares',    role:'diretorBarracao',emoji:'🏗️',organizacao:68,velocidade:72,controleFinanceiro:70,management:68,creativity:70,experience:65,discipline:70,cost:75000},
+  {id:'db18',name:'Rafael Guedes',      role:'diretorBarracao',emoji:'🏗️',organizacao:66,velocidade:70,controleFinanceiro:68,management:66,creativity:68,experience:62,discipline:68,cost:65000},
+  {id:'db19',name:'Leandro Viana',      role:'diretorBarracao',emoji:'🏗️',organizacao:64,velocidade:68,controleFinanceiro:66,management:64,creativity:66,experience:60,discipline:66,cost:55000},
+  {id:'db20',name:'Thiago Barcellos',   role:'diretorBarracao',emoji:'🏗️',organizacao:62,velocidade:66,controleFinanceiro:64,management:62,creativity:64,experience:58,discipline:64,cost:45000},
 ];
 
 const SLOT_NAME_DB = {
@@ -12856,6 +14052,35 @@ function clearUsedProfNames() { _usedProfNames.clear(); }
 function generateFreeAgent(slotKey) {
   const def = TEAM_SLOT_DEFS.find(d=>d.key===slotKey);
   if(!def) return null;
+
+  // ── Diretor de Barracão: usa o DB próprio ─────────────────────
+  if(slotKey==='diretorBarracao') {
+    const alreadyHired = new Set(
+      Object.values(gameState.mercadoProfissionais||[])
+        .filter(a=>a?.slotKey==='diretorBarracao')
+        .map(a=>a.id)
+        .concat(gameState.team?.diretorBarracao?.id||'')
+    );
+    const available = DB_DIRETORES_BARRACAO.filter(d=>!alreadyHired.has(d.id));
+    if(!available.length) return null;
+    const dir = available[Math.floor(Math.random()*available.length)];
+    return {
+      ...dir,
+      slotKey:'diretorBarracao',
+      label:'Diretor de Barracão',
+      salary: dir.cost,
+      quality: Math.round((dir.organizacao+dir.velocidade+dir.controleFinanceiro)/3),
+      contractYears: 1+Math.floor(Math.random()*3),
+      origin:'Livre',
+      interest:'disponível',
+      // map to common attrs for display compatibility
+      creativity: dir.organizacao,
+      experience: dir.controleFinanceiro,
+      discipline: dir.velocidade,
+      popularity: Math.round((dir.organizacao+dir.velocidade)/2),
+    };
+  }
+
   const nameGen = SLOT_NAME_DB[slotKey];
   // Tenta até 20 vezes encontrar nome não usado
   let name = null;
@@ -12886,10 +14111,23 @@ function ensureMercado() {
   if(!gameState.mercadoProfissionais || gameState.mercadoProfissionais.length === 0) {
     const agents = [];
     TEAM_SLOT_DEFS.forEach(def => {
-      const count = Math.floor(1 + Math.random()*2);
-      for(let i=0;i<count;i++) agents.push(generateFreeAgent(def.key));
+      // diretorBarracao: always show 3 options from the DB
+      const count = def.key==='diretorBarracao' ? 3 : Math.floor(1 + Math.random()*2);
+      for(let i=0;i<count;i++) {
+        const a = generateFreeAgent(def.key);
+        if(a) agents.push(a);
+      }
     });
     gameState.mercadoProfissionais = agents.filter(Boolean);
+  } else {
+    // Ensure there's always at least 1 director available if none hired yet
+    const hasDir = gameState.mercadoProfissionais.some(a=>a?.slotKey==='diretorBarracao');
+    if(!hasDir && !gameState.team?.diretorBarracao) {
+      for(let i=0;i<3;i++) {
+        const a = generateFreeAgent('diretorBarracao');
+        if(a) gameState.mercadoProfissionais.push(a);
+      }
+    }
   }
   if(!gameState.proposalReceived || gameState.proposalReceived.length === 0) {
     gameState.proposalReceived = [];
@@ -13027,32 +14265,44 @@ function renderNegMercado(el) {
 
   el.innerHTML = `
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.65rem">
-    ${agents.map(a => `
-      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.75rem">
+    ${agents.map(a => {
+      const isDir = a.slotKey==='diretorBarracao';
+      const statsHTML = isDir ? `
+        <span>Organização: <strong style="color:var(--gold)">${a.organizacao||a.creativity}</strong></span>
+        <span>Velocidade: <strong style="color:var(--info)">${a.velocidade||a.discipline}</strong></span>
+        <span>Ctrl. Financeiro: <strong style="color:var(--success)">${a.controleFinanceiro||a.experience}</strong></span>
+        <span>Qualidade geral: <strong>${a.quality}</strong> ${QUALITY_LABEL(a.quality)}</span>
+      ` : `
+        <span>Qualidade: <strong style="color:var(--gold)">${a.quality}</strong> ${QUALITY_LABEL(a.quality)}</span>
+        <span>Criatividade: ${a.creativity}</span>
+        <span>Experiência: ${a.experience}</span>
+        <span>Disciplina: ${a.discipline}</span>
+      `;
+      return `
+      <div style="background:var(--panel2);border:1px solid ${isDir?'rgba(212,175,55,.35)':'var(--border)'};border-radius:8px;padding:.75rem">
         <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem">
           <span style="font-size:1.5rem">${a.emoji}</span>
           <div>
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem">${a.name}</div>
-            <div style="font-size:.72rem;color:var(--text3)">${a.label} • ${a.origin}</div>
+            <div style="font-size:.72rem;color:var(--text3)">${a.label} • ${a.origin||'Livre'}</div>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;font-size:.75rem;color:var(--text2);margin-bottom:.6rem">
-          <span>Qualidade: <strong style="color:var(--gold)">${a.quality}</strong> ${QUALITY_LABEL(a.quality)}</span>
+          ${statsHTML}
           <span>Salário: <strong>R$ ${fmt(a.salary)}</strong></span>
-          <span>Criatividade: ${a.creativity}</span>
-          <span>Experiência: ${a.experience}</span>
-          <span>Disciplina: ${a.discipline}</span>
-          <span>Popularidade: ${a.popularity}</span>
         </div>
         <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">
           Contrato pedido: ${a.contractYears} ano${a.contractYears>1?'s':''}
         </div>
+        ${isDir?`<div style="font-size:.7rem;color:var(--gold);padding:.3rem .5rem;background:rgba(212,175,55,.08);border-radius:4px;margin-bottom:.5rem">
+          🏗️ Com ele: confecção automática + 4 reuniões estratégicas/ano
+        </div>`:''}
         ${gameState.team[a.slotKey]
           ? `<div style="font-size:.72rem;color:var(--text3);font-style:italic">Vaga ocupada — demita o atual para contratar.</div>`
-          : `<button class="btn btn-gold btn-sm" style="width:100%" onclick="negContratar('${a.id}')">✅ Fazer Proposta</button>`
+          : `<button class="btn btn-gold btn-sm" style="width:100%" onclick="negContratar('${a.id}')">✅ Contratar por R$ ${fmt(a.salary)}/ano</button>`
         }
-      </div>
-    `).join('')}
+      </div>`;
+    }).join('')}
   </div>`;
 }
 
@@ -13251,6 +14501,18 @@ function negContratar(agentId) {
   if(idx<0) return;
   const a = gameState.mercadoProfissionais[idx];
   const totalCost = a.salary * a.contractYears;
+  const isDir = a.slotKey==='diretorBarracao';
+  const statsDetail = isDir ? `
+    <div class="stat-block"><div class="sb-val">${a.organizacao||a.creativity}</div><div class="sb-lbl">Organização</div></div>
+    <div class="stat-block"><div class="sb-val">${a.velocidade||a.discipline}</div><div class="sb-lbl">Velocidade</div></div>
+    <div class="stat-block"><div class="sb-val">${a.controleFinanceiro||a.experience}</div><div class="sb-lbl">Ctrl. Financeiro</div></div>
+    <div class="stat-block"><div class="sb-val">${a.quality}</div><div class="sb-lbl">Qualidade geral</div></div>
+  ` : `
+    <div class="stat-block"><div class="sb-val">${a.creativity}</div><div class="sb-lbl">Criatividade</div></div>
+    <div class="stat-block"><div class="sb-val">${a.experience}</div><div class="sb-lbl">Experiência</div></div>
+    <div class="stat-block"><div class="sb-val">${a.discipline}</div><div class="sb-lbl">Disciplina</div></div>
+    <div class="stat-block"><div class="sb-val">${a.popularity}</div><div class="sb-lbl">Popularidade</div></div>
+  `;
   openModal(`✅ Contratar — ${a.name}`,`
     <div style="text-align:center;margin-bottom:.75rem">
       <div style="font-size:2.5rem">${a.emoji}</div>
@@ -13258,19 +14520,32 @@ function negContratar(agentId) {
       <div style="font-size:.8rem;color:var(--text3)">${a.label} • ${QUALITY_LABEL(a.quality)} (${a.quality})</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.8rem;margin-bottom:.75rem">
+      ${statsDetail}
       <div class="stat-block"><div class="sb-val">R$ ${fmt(a.salary)}</div><div class="sb-lbl">Salário/ano</div></div>
-      <div class="stat-block"><div class="sb-val">${a.contractYears} anos</div><div class="sb-lbl">Contrato</div></div>
+      <div class="stat-block"><div class="sb-val">${a.contractYears} ano${a.contractYears>1?'s':''}</div><div class="sb-lbl">Contrato</div></div>
     </div>
+    ${isDir?`<div style="padding:.5rem .75rem;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);border-radius:6px;font-size:.78rem;color:var(--gold);margin-bottom:.75rem">
+      🏗️ Com este diretor: confecção automática ativa, 4 reuniões estratégicas por ano, barracão produz sozinho mês a mês.
+    </div>`:''}
     <p style="color:var(--text2);font-size:.82rem">Custo total do contrato: R$ ${fmt(totalCost)}</p>
   `,[
     {text:'Contratar', cls:'btn-gold', action:()=>{
       const def = TEAM_SLOT_DEFS.find(d=>d.key===a.slotKey);
       const prof = {
-        id:'hired_'+Date.now(), name:a.name, role:def?.label||a.slotKey,
-        cost:a.salary, quality:a.quality,
-        creativity:a.creativity, experience:a.experience, discipline:a.discipline, popularity:a.popularity,
-        fromMarket:true,
+        id: a.id || ('hired_'+Date.now()),
+        name: a.name, role: def?.label||a.slotKey,
+        cost: a.salary, quality: a.quality,
+        creativity: a.creativity, experience: a.experience,
+        discipline: a.discipline, popularity: a.popularity,
+        fromMarket: true,
       };
+      // Preserve director-specific attributes
+      if(a.slotKey==='diretorBarracao') {
+        prof.organizacao        = a.organizacao        || a.creativity;
+        prof.velocidade         = a.velocidade         || a.discipline;
+        prof.controleFinanceiro = a.controleFinanceiro || a.experience;
+        prof.management         = a.management         || a.quality;
+      }
       gameState.team[a.slotKey] = prof;
       gameState.contractYears = gameState.contractYears||{};
       gameState.contractYears[a.slotKey] = a.contractYears;
@@ -13282,10 +14557,17 @@ function negContratar(agentId) {
       // score bonus
       const def2 = TEAM_SLOT_DEFS.find(d=>d.key===a.slotKey);
       (def2?.affects||[]).forEach(qk => {
-        gameState.scores[qk] = clamp((gameState.scores[qk]||60)+Math.floor((a.quality-70)*0.4),0,100);
+        if(qk==='barracaoProgress') {
+          gameState.barracaoProgress = clamp((gameState.barracaoProgress||0)+5,0,100);
+        } else {
+          gameState.scores[qk] = clamp((gameState.scores[qk]||60)+Math.floor((a.quality-70)*0.4),0,100);
+        }
       });
       gameState.mercadoProfissionais.splice(idx,1);
-      addEvent(`${a.name} contratado como ${def?.label}!`,'gold');
+      const msg = a.slotKey==='diretorBarracao'
+        ? `${a.name} contratado como Diretor de Barracão! Confecção automática ativa e reuniões estratégicas liberadas.`
+        : `${a.name} contratado como ${def?.label}!`;
+      addEvent(msg,'gold');
       closeModal(); toast(`${a.name} contratado!`,'gold'); renderNegociacoes();
     }},
     {text:'Cancelar', cls:'btn-gray', action:closeModal},
@@ -14434,6 +15716,72 @@ function pickNote(dist) {
 
 // Um jurado individual: pega a distribuição do quality e opcionalmente
 // inclina ±1 step conforme perfil de julgamento
+// Regenera notas de jurado que somam EXATAMENTE um total-alvo.
+// Garante que verifiedTotal (soma dos jurados) bate com finalNotes[k].
+function regenJudgesFromTotal(targetTotal, numJudges, descarta) {
+  const T = Math.round(targetTotal * 10); // integer cents, e.g. 298 for 29.8
+  const kept = descarta ? numJudges - 1 : numJudges; // quantas notas contam
+
+  // Busca recursiva por combinação de notas válidas que soma T
+  function findCombo(remaining, count, maxNoteIdx) {
+    if(count === 0) return remaining === 0 ? [] : null;
+    for(let i = maxNoteIdx; i >= 0; i--) {
+      const nInt = Math.round(NOTE_STEPS[i] * 10);
+      if(nInt > remaining) continue;                                        // nota excede o restante
+      const minAfter = Math.round(NOTE_STEPS[0] * 10) * (count - 1);       // mínimo possível com count-1 notas
+      const maxAfter = nInt * (count - 1);                                  // máximo possível com count-1 notas
+      const after = remaining - nInt;
+      if(after < minAfter || after > maxAfter) continue;                    // impossível atingir remaining
+      const sub = findCombo(after, count - 1, i);
+      if(sub !== null) return [NOTE_STEPS[i], ...sub];
+    }
+    return null;
+  }
+
+  const maxIdx = NOTE_STEPS.length - 1;
+  const keptNotes = findCombo(T, kept, maxIdx);
+
+  if(!keptNotes) {
+    // Fallback: uniform notes closest to target/kept
+    const each = Math.round(targetTotal / kept * 10) / 10;
+    const fallback = Array(numJudges).fill(clamp(each, NOTE_STEPS[0], NOTE_STEPS[maxIdx]));
+    return { judges: fallback, discardIdx: descarta ? 0 : -1 };
+  }
+
+  // Nota descartada: menor ou igual ao mínimo das notas mantidas
+  let discardedNote = NOTE_STEPS[0];
+  if(descarta) {
+    const minKept = Math.min(...keptNotes);
+    const candidates = NOTE_STEPS.filter(n => n <= minKept);
+    discardedNote = candidates[Math.floor(Math.random() * candidates.length)] || minKept;
+  }
+
+  // Embaralha as notas mantidas e insere a descartada em posição aleatória
+  const shuffled = [...keptNotes].sort(() => Math.random() - 0.5);
+  if(descarta) {
+    const insertPos = Math.floor(Math.random() * numJudges);
+    shuffled.splice(insertPos, 0, discardedNote);
+    // A posição da nota descartada é a que tem menor valor (poderia ser outra igual, mas é suficiente)
+    let discardIdx = insertPos;
+    // Verificação de segurança: garantir que o índice é realmente o menor
+    for(let i=0;i<shuffled.length;i++) if(shuffled[i]<shuffled[discardIdx]) discardIdx=i;
+    // Recomputa para garantir consistência
+    const checkSum = shuffled.reduce((s,v,i)=>i===discardIdx?s:s+Math.round(v*10),0);
+    if(checkSum !== T) {
+      // Corrige: ajusta a menor nota mantida para acertar o total
+      const notDiscardedIdxs = shuffled.map((_,i)=>i).filter(i=>i!==discardIdx);
+      const currentSum = notDiscardedIdxs.reduce((s,i)=>s+Math.round(shuffled[i]*10),0);
+      const diff = T - currentSum; // em centésimos de nota
+      // Aplica diff ao primeiro elemento não-descartado
+      const adjIdx = notDiscardedIdxs[0];
+      const adjNote = clamp(Math.round((shuffled[adjIdx]+diff/10)*10)/10, NOTE_STEPS[0], NOTE_STEPS[maxIdx]);
+      shuffled[adjIdx] = adjNote;
+    }
+    return { judges: shuffled, discardIdx };
+  }
+  return { judges: shuffled, discardIdx: -1 };
+}
+
 function judgeNote(quality, profile, quesito) {
   const dist = [...getNoteDist(quality, quesito)];
   // perfil rigoroso: desloca peso para baixo
@@ -14719,22 +16067,44 @@ function simulateRivalScores() {
     if(e.isPlayer) {
       const diff = newTotal - gameState.finalNotes._total;
       const noteKeys = Object.keys(gameState.finalNotes).filter(k=>k!=='_total');
+      const rules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
       for(const k of noteKeys) {
-        const maxQue = rules.jurados===2 ? 20.0 : rules.descarta ? 30.0 : 30.0;
-        const adjInt = Math.round(clamp(gameState.finalNotes[k] + diff/9, botMin/9, maxQue) * 10);
-        gameState.finalNotes[k] = adjInt / 10;
-        if(gameState.finalNotesDetail?.[k]) gameState.finalNotesDetail[k].total = adjInt/10;
+        const maxQue = rules.jurados===2 ? 20.0 : 30.0;
+        const minQue = rules.descarta ? (NOTE_STEPS[0]*3) : (NOTE_STEPS[0]*rules.jurados);
+        const raw = gameState.finalNotes[k] + diff/9;
+        // Snap to nearest valid quesito total (multiples of 0.1 in range)
+        const snapped = Math.round(clamp(raw, minQue, maxQue) * 10) / 10;
+        gameState.finalNotes[k] = snapped;
+        // Regenera jurado notes para bater com o total equalizado
+        const regen = regenJudgesFromTotal(snapped, rules.jurados, rules.descarta);
+        if(gameState.finalNotesDetail?.[k]) {
+          gameState.finalNotesDetail[k].judges      = regen.judges;
+          gameState.finalNotesDetail[k].discardIdx  = regen.discardIdx;
+          gameState.finalNotesDetail[k].discarded   = regen.discardIdx >= 0 ? regen.judges[regen.discardIdx] : null;
+          gameState.finalNotesDetail[k].total       = snapped;
+        }
       }
+      // Total = soma exata dos quesitos
       const totalInt = noteKeys.reduce((s,k)=>s+Math.round((gameState.finalNotes[k]||0)*10), 0);
       gameState.finalNotes._total = totalInt / 10;
     } else {
       const scale = newTotal / (e.rival._simulatedTotal || 268);
       let scaledTotal = 0;
       const [qMin, qMax] = [botMin/9, 30.0];
+      const rRules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
       for(const k of Object.keys(e.rival._simulatedNotes)) {
-        const scaled = clamp(Math.round(e.rival._simulatedNotes[k] * scale * 10)/10, qMin, qMax);
-        e.rival._simulatedNotes[k] = scaled;
-        scaledTotal += scaled;
+        const raw = e.rival._simulatedNotes[k] * scale;
+        const snapped = Math.round(clamp(raw, qMin, qMax) * 10) / 10;
+        e.rival._simulatedNotes[k] = snapped;
+        // Regenera jurado notes do rival para consistência
+        const regen = regenJudgesFromTotal(snapped, rRules.jurados, rRules.descarta);
+        if(e.rival._simulatedDetail?.[k]) {
+          e.rival._simulatedDetail[k].judges     = regen.judges;
+          e.rival._simulatedDetail[k].discardIdx = regen.discardIdx;
+          e.rival._simulatedDetail[k].discarded  = regen.discardIdx >= 0 ? regen.judges[regen.discardIdx] : null;
+          e.rival._simulatedDetail[k].total      = snapped;
+        }
+        scaledTotal += snapped;
       }
       e.rival._simulatedTotal = Math.round(scaledTotal*10)/10;
     }
@@ -14780,17 +16150,17 @@ function renderApuracaoQuesito() {
       qTotal: r._simulatedNotes?.[q.k]||0,
     }))
   ].map(sch => {
-    // Always compute verified total directly from judge integers
+    // Use the stored equalized total — it was regenerated to match the judge notes
     const detail = sch.detail;
-    let discardIdx = 0;
-    const judges = detail?.judges || [9.8,9.9,9.8,9.9];
-    if(detail?.discardIdx !== undefined) {
-      discardIdx = detail.discardIdx;
-    } else {
+    const judges = detail?.judges || [9.8, 9.9, 9.8, 9.9];
+    let discardIdx = detail?.discardIdx ?? -1;
+    if(discardIdx < 0) {
+      // Fallback: find actual minimum
+      discardIdx = 0;
       for(let i=1;i<judges.length;i++) if(judges[i]<judges[discardIdx]) discardIdx=i;
     }
-    const sumInt = judges.reduce((s,v,i)=>s+(i===discardIdx?0:Math.round(v*10)),0);
-    const verifiedTotal = sumInt / 10;
+    // Use stored total (guaranteed consistent with judges after regen)
+    const verifiedTotal = detail?.total ?? sch.qTotal;
     return {...sch, judges, discardIdx, verifiedTotal};
   }).sort((a,b)=>b.verifiedTotal-a.verifiedTotal);
 
@@ -15054,6 +16424,35 @@ function showFinalResults() {
            group==='prata'?'3 jurados/quesito · menor descartada':
            group==='bronze'?'3 jurados/quesito · sem descarte':
            '2 jurados/quesito · sem descarte'} · escala 9.5–10.0
+    </div>
+
+    <!-- Planilha de quesitos do jogador — prova que total = soma dos quesitos -->
+    <div style="margin-top:1rem;background:var(--panel2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <div style="padding:.5rem .75rem;background:rgba(212,175,55,.1);border-bottom:1px solid var(--border);font-size:.72rem;font-weight:700;color:var(--gold);display:flex;justify-content:space-between">
+        <span>📊 Planilha de Notas — ${gameState.school.name}</span>
+        <span>Total: <strong>${(gameState.finalNotes?._total||0).toFixed(1)}</strong></span>
+      </div>
+      ${APURACAO_QUESITOS.map(q=>{
+        const noteQ = gameState.finalNotes?.[q.k]||0;
+        const detail = gameState.finalNotesDetail?.[q.k];
+        const judges = detail?.judges||[];
+        const discardIdx = detail?.discardIdx ?? -1;
+        return `<div style="display:flex;align-items:center;gap:.4rem;padding:.3rem .75rem;border-bottom:1px solid rgba(42,42,69,.4);font-size:.72rem">
+          <span style="min-width:16px;color:var(--text3)">${q.icon}</span>
+          <span style="flex:1;color:var(--text2)">${q.label}</span>
+          <span style="display:flex;gap:.15rem;align-items:center">
+            ${judges.map((j,i)=>`<span style="font-size:.65rem;padding:.05rem .22rem;border-radius:2px;background:${i===discardIdx?'rgba(231,76,60,.15)':'rgba(46,204,113,.1)'};color:${i===discardIdx?'var(--danger)':'var(--success)'};${i===discardIdx?'text-decoration:line-through;opacity:.6':''}">${j.toFixed(1)}</span>`).join('')}
+          </span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.88rem;color:var(--gold);min-width:38px;text-align:right">${noteQ.toFixed(1)}</span>
+        </div>`;
+      }).join('')}
+      <div style="padding:.4rem .75rem;display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;background:rgba(212,175,55,.08)">
+        <span style="color:var(--text3)">SOMA DOS 9 QUESITOS</span>
+        <span style="color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-size:1rem">${(()=>{
+          const sum = APURACAO_QUESITOS.reduce((s,q)=>s+Math.round((gameState.finalNotes?.[q.k]||0)*10),0)/10;
+          return sum.toFixed(1);
+        })()}</span>
+      </div>
     </div>`;
 
   // Your notes
@@ -15445,6 +16844,8 @@ function startNextSeason() {
   gameState.barracaoAlasConfig = null;
   gameState.barracaoEquipeParintins = false;
   gameState.barracaoUnlocked = false;
+  gameState._desfileOrdem = null;          // reset parade visual each season
+  gameState.barracaoMeetingsDone = {};     // reset director meetings
   // Carry advanced barracão data
   const prevAv = history[history.length-1]?.assinaturaVisual || null;
   if(prevAv) {
@@ -15501,6 +16902,8 @@ function startNextSeason() {
   gameState.mercadoProfissionais = [];
   gameState.proposalReceived = [];
   gameState.negociacoesOpen = true;
+  gameState.ligaMeetingsDone = {};    // reset annual meetings
+  gameState.ligaElectionPending = false;
 
   // Apply economic multiplier for this year
   const eco = getEconomyData(gameState.year);
