@@ -1149,11 +1149,11 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
     <h2>Simulador de Escola de Samba</h2>
     <div class="intro-buttons">
       <button class="btn btn-gold" onclick="startNewGame()">🎊 Novo Jogo</button>
-      <button class="btn btn-outline" onclick="showSaveSlots()">📂 Carregar Jogo</button>
+      <button class="btn btn-outline" onclick="document.getElementById('saveSlotsContainer').scrollIntoView({behavior:'smooth'})">📂 Carregar Jogo</button>
       <button class="btn btn-gray btn-sm" onclick="showCredits()">Sobre o Jogo</button>
     </div>
-    <div class="intro-saves hidden" id="introSaves">
-      <div style="color:var(--text2);font-size:.8rem;text-align:center;margin-bottom:.5rem">Escolha um slot:</div>
+    <div class="intro-saves" id="introSaves">
+      <div style="color:var(--text3);font-size:.68rem;text-align:center;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">Saves</div>
       <div id="saveSlotsContainer" style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center"></div>
     </div>
   </div>
@@ -1313,7 +1313,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
         <span class="nav-icon">💃</span> Comissão de Frente
       </div>
       <div class="nav-section">Jogo</div>
-      <div class="nav-item" onclick="saveGame()">
+      <div class="nav-item" onclick="openSaveSlotModal()">
         <span class="nav-icon">💾</span> Salvar Jogo
       </div>
       <div class="nav-item" onclick="confirmGoToMenu()" style="color:var(--text3)">
@@ -1525,6 +1525,9 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 // ============================================================
 // ==================== GAME DATA ============================
 // ============================================================
+
+// Fator de escala global de orçamento: teto de R$ 15 mi (Beija-Flor tinha R$ 35 mi)
+const BUDGET_SCALE = 15000000 / 35000000; // ≈ 0.42857
 
 const SCHOOLS_DATA = {
   especial: [
@@ -5333,7 +5336,7 @@ function initGameState(school, difficulty) {
     barracão:   Math.floor(r.barracão   * rivalStrMult),
     creativity: Math.floor(r.creativity * rivalStrMult),
     org:        Math.floor(r.org        * rivalStrMult),
-    budget: r.budget * diffMult,
+    budget: Math.floor(r.budget * BUDGET_SCALE), // sem diffMult — rivais têm orçamento base
     // Internal quality used by simulateRivalScores (0-100)
     _baseQuality: clamp(Math.floor((r.tradition+r.community+r.barracão+r.creativity+r.org)/5 * rivalStrMult), 50, 97),
   }));
@@ -5369,7 +5372,7 @@ function initGameState(school, difficulty) {
     year: 2010,
 
     // Resources — CONTINUOUS CASH (carries between seasons)
-    budget: Math.floor(s.budget * diffMult),
+    budget: Math.floor(s.budget * BUDGET_SCALE * diffMult),
     budgetSpent: 0,
     income: {
       subvencao:       _getSubvencaoByGroup(group),
@@ -5377,8 +5380,8 @@ function initGameState(school, difficulty) {
       apoioEstado:     group==='especial' ? 2000000 : 0,
       rendaIngresso:   group==='especial' ? 1200000 : 0,
       patrocinioLiga:  group==='especial' ? 3000000 : 0,
-      patrocinioPrivado: Math.floor(s.budget*0.10),
-      eventos: Math.floor(s.budget*0.04),
+      patrocinioPrivado: Math.floor(s.budget * BUDGET_SCALE * 0.10),
+      eventos: Math.floor(s.budget * BUDGET_SCALE * 0.04),
     },
     incomePending: [],
     debtAlerts: [],
@@ -5498,6 +5501,9 @@ function initGameState(school, difficulty) {
     // Rivals
     rivals,
 
+    // Equipes de profissionais dos rivais {rivalId: {carnavalesco,mestre,interprete}}
+    rivalTeams: {},
+
     // History across seasons
     seasonHistory: [],
 
@@ -5581,7 +5587,7 @@ function initGameState(school, difficulty) {
       escultura:  clamp(Math.floor(s.barracão * 0.5 + (s.creativity||60) * 0.3), 0, 100),
       cor:        clamp(Math.floor((s.creativity||60) * 0.4 + 30), 0, 100),
       movimento:  clamp(Math.floor((s.barracão||60) * 0.3 + 20), 0, 100),
-      luxo:       clamp(Math.floor((s.budget||5000000) / 600000), 0, 100),
+      luxo:       clamp(Math.floor((s.budget * BUDGET_SCALE) / 250000), 0, 100),
       teatralidade: clamp(Math.floor((s.creativity||60) * 0.4 + (s.tradition||60) * 0.2), 0, 100),
     },
     assinaturaConsolidada: false,
@@ -5607,7 +5613,20 @@ function initGameState(school, difficulty) {
     rainhaNotoriedade: 0,  // mídia acumulada por esta rainha (0-100)
     eventoRainhaGratis: null, // evento raro: famosa quer desfilar grátis
     juradoProfiles: null,     // perfis dos jurados desta temporada (gerado 1x por ano)
+
+    // Sistema dinâmico de grupos — composição real de cada divisão
+    grupos: _buildGruposFromSchoolsData(),
+    campeaOuroAnterior: null,
   };
+}
+
+// Constrói o mapa inicial de grupos a partir de SCHOOLS_DATA (objetos completos)
+function _buildGruposFromSchoolsData() {
+  const g = {};
+  ['especial','ouro','prata','bronze','avaliacao'].forEach(grp => {
+    g[grp] = (SCHOOLS_DATA[grp]||[]).map(s => ({...s, _group: grp}));
+  });
+  return g;
 }
 
 // ============================================================
@@ -5623,11 +5642,16 @@ function saveGame(slot) {
       savedAt: new Date().toISOString(),
       slot,
       schoolName: gameState.school.name,
-      season: gameState.season,
-      group: gameState.school.displayGroup,
+      year: gameState.year,
+      group: gameState.school.group,
+      displayGroup: gameState.school.displayGroup,
+      budget: gameState.budget,
+      reputation: Math.round(gameState.reputation||0),
+      month: gameState.month,
     };
     localStorage.setItem(`avenida_save_${slot}`, JSON.stringify(data));
-    toast('Jogo salvo com sucesso!','success');
+    currentSaveSlot = slot;
+    toast(`💾 Salvo no Slot ${slot+1}!`, 'success');
   } catch(e) {
     toast('Erro ao salvar: '+e.message,'error');
   }
@@ -5661,7 +5685,7 @@ function confirmGoToMenu() {
           setTimeout(() => {
             gameState = null;
             showScreen('screen-intro');
-            document.getElementById('introSaves').classList.add('hidden');
+            
           }, 600);
         }
       },
@@ -5672,7 +5696,7 @@ function confirmGoToMenu() {
           closeModal();
           gameState = null;
           showScreen('screen-intro');
-          document.getElementById('introSaves').classList.add('hidden');
+          
         }
       },
       {
@@ -5705,7 +5729,19 @@ function loadGame(slot) {
 function getSaveData(slot) {
   try {
     const raw = localStorage.getItem(`avenida_save_${slot}`);
-    return raw ? JSON.parse(raw) : null;
+    if(!raw) return null;
+    const d = JSON.parse(raw);
+    // Retorna apenas metadados — não carrega gameState inteiro
+    return {
+      schoolName:   d.schoolName   || '—',
+      year:         d.year         || d.gameState?.year || '?',
+      group:        d.group        || d.gameState?.school?.group || '?',
+      displayGroup: d.displayGroup || d.group || '—',
+      budget:       d.budget       ?? d.gameState?.budget ?? 0,
+      reputation:   d.reputation   ?? d.gameState?.reputation ?? 0,
+      month:        d.month        ?? d.gameState?.month ?? 0,
+      savedAt:      d.savedAt      || null,
+    };
   } catch(e) { return null; }
 }
 
@@ -6189,27 +6225,88 @@ function goToSchoolSelect() {
 
 function showSaveSlots() {
   const el = document.getElementById('introSaves');
-  el.classList.toggle('hidden');
-  if(!el.classList.contains('hidden')) renderSaveSlots('introSaves');
+  el.classList.remove('hidden');
+  renderSaveSlots();
 }
 
-function renderSaveSlots(containerId) {
+function renderSaveSlots() {
   const c = document.getElementById('saveSlotsContainer');
   if(!c) return;
   c.innerHTML = '';
   for(let i=0;i<3;i++) {
-    const data = getSaveData(i);
+    const d = getSaveData(i);
     const div = document.createElement('div');
-    div.className = 'save-slot'+(data?'':' empty');
-    div.innerHTML = data
-      ? `<div class="slot-name">Slot ${i+1}</div>
-         <div class="slot-info">${data.schoolName}</div>
-         <div class="slot-info">${data.group} • ${data.season}</div>
-         <div class="slot-info" style="font-size:.65rem;color:var(--text3)">${new Date(data.savedAt).toLocaleDateString('pt-BR')}</div>`
-      : `<div class="slot-name">Slot ${i+1} (vazio)</div><div class="slot-info">Sem dados</div>`;
-    div.onclick = data ? ()=>loadGame(i) : null;
+    div.className = 'save-slot'+(d?'':' empty');
+    div.style.cssText = 'min-width:200px;max-width:240px;flex:1;cursor:pointer;position:relative';
+
+    if(d) {
+      const dt = d.savedAt ? new Date(d.savedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+      const monthName = typeof MONTHS_DATA !== 'undefined' && MONTHS_DATA[d.month]?.name || ['Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev'][d.month] || '—';
+      const fmtB = typeof fmtM === 'function' ? fmtM(d.budget) : (d.budget/1e6).toFixed(1)+'M';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">
+          <div class="slot-name" style="font-size:.72rem;color:var(--text3)">SLOT ${i+1}</div>
+          <button onclick="event.stopPropagation();confirmDeleteSave(${i})" title="Apagar slot"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.7rem;padding:0;line-height:1">✕</button>
+        </div>
+        <div style="font-family:'Playfair Display',serif;font-style:italic;font-size:.95rem;color:var(--gold);line-height:1.2;margin-bottom:.2rem">${d.schoolName}</div>
+        <div style="font-size:.72rem;color:var(--text2);margin-bottom:.15rem">${d.displayGroup} · ${d.year}</div>
+        <div style="display:flex;gap:.5rem;font-size:.68rem;color:var(--text3);margin-bottom:.3rem">
+          <span>💰 R$ ${fmtB}</span>
+          <span>📅 ${monthName}</span>
+          <span>⭐ ${Math.round(d.reputation||0)}%</span>
+        </div>
+        <div style="font-size:.62rem;color:var(--text3);border-top:1px solid var(--border);padding-top:.25rem">${dt}</div>`;
+      div.onclick = () => loadGame(i);
+    } else {
+      div.innerHTML = `
+        <div class="slot-name" style="font-size:.72rem;color:var(--text3);margin-bottom:.3rem">SLOT ${i+1}</div>
+        <div style="font-size:.8rem;color:var(--text3);text-align:center;padding:.5rem 0">
+          <div style="font-size:1.4rem;margin-bottom:.25rem">➕</div>
+          <div>Slot vazio</div>
+          <div style="font-size:.68rem;margin-top:.15rem">Inicie um novo jogo</div>
+        </div>`;
+      div.onclick = () => startNewGame();
+    }
     c.appendChild(div);
   }
+}
+
+function confirmDeleteSave(slot) {
+  openModal(`🗑️ Apagar Slot ${slot+1}`,
+    `<div style="text-align:center;padding:.5rem 0">
+      <div style="font-size:2rem;margin-bottom:.5rem">⚠️</div>
+      <p style="color:var(--text2)">Tem certeza que deseja apagar o Slot ${slot+1}? Esta ação não pode ser desfeita.</p>
+    </div>`,
+    [{text:'Apagar', cls:'btn-danger', action:()=>{ localStorage.removeItem(`avenida_save_${slot}`); closeModal(); renderSaveSlots(); }},
+     {text:'Cancelar', cls:'btn-gray', action:closeModal}]
+  );
+}
+
+function openSaveSlotModal() {
+  const slotsHtml = [0,1,2].map(i => {
+    const d = getSaveData(i);
+    const dt = d?.savedAt ? new Date(d.savedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : null;
+    const fmtB = d ? (typeof fmtM==='function' ? fmtM(d.budget) : (d.budget/1e6).toFixed(1)+'M') : null;
+    return `
+      <div onclick="saveGame(${i});closeModal()" style="
+        display:flex;justify-content:space-between;align-items:center;
+        padding:.65rem .85rem;background:var(--panel2);border:1px solid var(--border);
+        border-radius:7px;cursor:pointer;transition:border-color .15s"
+        onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;color:var(--text3);margin-bottom:.15rem">SLOT ${i+1}${i===currentSaveSlot?' <span style=\'color:var(--accent);font-size:.65rem\'>(atual)</span>':''}</div>
+          ${d
+            ? `<div style="font-size:.88rem;color:var(--gold);font-weight:600">${d.schoolName}</div>
+               <div style="font-size:.7rem;color:var(--text2)">${d.displayGroup} · ${d.year} · 💰 R$ ${fmtB}</div>
+               <div style="font-size:.62rem;color:var(--text3)">${dt}</div>`
+            : `<div style="font-size:.8rem;color:var(--text3)">Slot vazio</div>`}
+        </div>
+        <button class="btn btn-gold btn-sm" onclick="event.stopPropagation();saveGame(${i});closeModal()">Salvar</button>
+      </div>`;
+  }).join('');
+  openModal('💾 Salvar Jogo', `<div style="display:flex;flex-direction:column;gap:.45rem">${slotsHtml}</div>`,
+    [{text:'Cancelar', cls:'btn-gray', action:closeModal}]);
 }
 
 function renderLeaguesSidebar() {
@@ -6244,7 +6341,7 @@ function renderSchoolsGrid(league) {
         <div class="attr-bar"><div class="attr-label">Barracão</div><div class="attr-track"><div class="attr-fill blue" style="width:${s.barracão}%"></div></div></div>
         <div class="attr-bar"><div class="attr-label">Política</div><div class="attr-track"><div class="attr-fill red" style="width:${s.politics}%"></div></div></div>
       </div>
-      <div class="school-budget">💰 R$ ${fmt(s.budget)}</div>
+      <div class="school-budget">💰 R$ ${fmt(Math.floor(s.budget * BUDGET_SCALE))}</div>
       <div style="display:flex;gap:.3rem;margin-top:.4rem;flex-wrap:wrap">
         <span class="card-tag tag-gold">Criatividade ${s.creativity}</span>
         <span class="card-tag tag-blue">Compositores ${s.composers}</span>
@@ -6266,7 +6363,7 @@ function selectSchool(id, league) {
   const s = SCHOOLS_DATA[league].find(sc=>sc.id===id);
   selectedSchool = {...s, group:league};
   document.getElementById('selectedSchoolInfo').innerHTML =
-    `Selecionado: <strong>${s.name}</strong> — ${LEAGUE_NAMES[league]} — R$ ${fmt(s.budget)}`;
+    `Selecionado: <strong>${s.name}</strong> — ${LEAGUE_NAMES[league]} — R$ ${fmt(Math.floor(s.budget * BUDGET_SCALE))}`;
   document.getElementById('startGameBtn').removeAttribute('disabled');
 }
 
@@ -6277,7 +6374,20 @@ function confirmStartGame() {
   currentSaveSlot = slot;
   gameState = initGameState(selectedSchool, difficulty);
   initAICycles(gameState.rivals);
+  initRivalTeams(gameState.rivals, gameState.team);
   initQuesitoDept();
+
+  // Pré-popular histórico de campeãs com dados reais antes do primeiro carnaval
+  if(!gameState.championsHistory?.length) {
+    const startYear = selectedYear || 2025;
+    HISTORICAL_CHAMPIONS
+      .filter(h => h.year < startYear && h.school)
+      .forEach(h => {
+        const normalized = {...h, school: normalizeSchoolName(h.school)};
+        if(!gameState.championsHistory.some(c=>c.year===normalized.year&&c.group===normalized.group))
+          gameState.championsHistory.push(normalized);
+      });
+  }
 
   // Apply selected year
   const startYear = selectedYear || 2025;
@@ -6759,6 +6869,7 @@ function renderDashboard() {
           <div style="font-size:.75rem;color:var(--text2);margin-top:.2rem">
             ${gameState.paradeOrder===1?'🎺 Abre a noite':gameState.paradeOrder===(gameState.paradeSchedule||[]).filter(s=>s.day===gameState.paradeDay).length?'⭐ Fecha a noite':'🎯 Posição intermediária'}
           </div>
+          <button onclick="showOrdemCompleta()" class="btn btn-outline btn-sm" style="width:100%;margin-top:.6rem;font-size:.75rem">📋 Ver Ordem Completa dos Desfiles</button>
         </div>` : gameState.month <= 1 ? `
         <div style="margin-top:.85rem;padding:.6rem .85rem;background:rgba(212,175,55,.07);border:1px dashed rgba(212,175,55,.3);border-radius:6px;text-align:center">
           <div style="font-size:.78rem;color:var(--text3)">🎲 Sorteio de ordem ainda não realizado</div>
@@ -17529,20 +17640,20 @@ function applyPesoBandeira(quality, schoolId, seasonHistory, group) {
 // ============================================================
 
 const GROUP_JUDGING_RULES = {
-  especial:  {jurados:4, descarta:true,  topTotal:[269.0,270.0], botTotal:[266.0,268.0], spreadMin:1.0, spreadMax:4.0},
-  ouro:      {jurados:4, descarta:true,  topTotal:[268.5,270.0], botTotal:[267.0,268.5], spreadMin:0.4, spreadMax:1.2},
-  prata:     {jurados:3, descarta:true,  topTotal:[267.0,268.0], botTotal:[264.0,266.5], spreadMin:0.4, spreadMax:1.0},
-  bronze:    {jurados:3, descarta:false, topTotal:[264.0,265.0], botTotal:[261.0,263.0], spreadMin:0.5, spreadMax:1.5},
-  avaliacao: {jurados:2, descarta:false, topTotal:[260.0,262.0], botTotal:[255.0,259.0], spreadMin:0.5, spreadMax:1.2},
+  especial:  {jurados:4, descarta:true,  topTotal:[268.5,270.0], botTotal:[265.5,268.0], spreadMin:1.0, spreadMax:4.0},
+  ouro:      {jurados:4, descarta:true,  topTotal:[263.5,268.0], botTotal:[260.0,263.5], spreadMin:0.4, spreadMax:1.5},
+  prata:     {jurados:3, descarta:true,  topTotal:[259.5,265.0], botTotal:[256.0,259.5], spreadMin:0.4, spreadMax:1.2},
+  bronze:    {jurados:3, descarta:false, topTotal:[254.5,261.0], botTotal:[250.0,254.5], spreadMin:0.5, spreadMax:1.8},
+  avaliacao: {jurados:2, descarta:false, topTotal:[246.0,256.0], botTotal:[240.0,246.0], spreadMin:0.5, spreadMax:2.5},
 };
 
 // Alias em centésimos para uso interno
 const GROUP_RULES = {
-  especial:  { jurados:4, descarta:true,  top:2700, bottom:2660 },
-  ouro:      { jurados:4, descarta:true,  top:2700, bottom:2670 },
-  prata:     { jurados:3, descarta:true,  top:2700, bottom:2640 },
-  bronze:    { jurados:3, descarta:false, top:2700, bottom:2610 },
-  avaliacao: { jurados:2, descarta:false, top:2700, bottom:2550 },
+  especial:  { jurados:4, descarta:true,  top:2700, bottom:2650 },
+  ouro:      { jurados:4, descarta:true,  top:2680, bottom:2600 },
+  prata:     { jurados:3, descarta:true,  top:2655, bottom:2560 },
+  bronze:    { jurados:3, descarta:false, top:2615, bottom:2510 },
+  avaliacao: { jurados:2, descarta:false, top:2560, bottom:2450 },
 };
 
 function scoreToQuesitoByGroup(quality, group) {
@@ -17591,6 +17702,126 @@ function calcRiscoChance() {
 // ============================================================
 
 const AI_SCHOOL_CYCLES = {};  // schoolId → {peakStart, declineStart, rebuilding}
+
+// ============================================================
+// ======= SISTEMA DE PROFISSIONAIS – UNICIDADE ===============
+// ============================================================
+
+/**
+ * Retorna um profissional único do pool, excluindo os IDs já usados.
+ * Se o pool acabar, retorna null (sem fallback genérico para não poluir o histórico).
+ */
+function _pickUniquePro(pool, takenIds) {
+  const available = pool.filter(p => !takenIds.has(p.id));
+  if(!available.length) return null;
+  const chosen = available[Math.floor(Math.random() * available.length)];
+  takenIds.add(chosen.id);
+  return {...chosen, yearsAtSchool: 0};
+}
+
+/**
+ * Inicializa as equipes dos rivais com profissionais únicos.
+ * Chamado em initGameState e startNextSeason (se rivalTeams não existir).
+ */
+function initRivalTeams(rivals, playerTeam) {
+  if(!gameState.rivalTeams) gameState.rivalTeams = {};
+  const takenIds = new Set();
+
+  // Reservar IDs da equipe do jogador
+  if(playerTeam) {
+    for(const v of Object.values(playerTeam)) {
+      if(v?.id) takenIds.add(v.id);
+    }
+  }
+
+  const SLOTS = ['carnavalesco','mestre','interprete'];
+  rivals.forEach(r => {
+    if(gameState.rivalTeams[r.id]) {
+      // Já tem equipe — apenas marcar IDs como usados
+      for(const slot of SLOTS) {
+        const p = gameState.rivalTeams[r.id][slot];
+        if(p?.id) takenIds.add(p.id);
+      }
+      return;
+    }
+    const team = {};
+    for(const slot of SLOTS) {
+      const pool = PROFESSIONALS_DATA[slot] || [];
+      team[slot] = _pickUniquePro(pool, takenIds);
+    }
+    gameState.rivalTeams[r.id] = team;
+  });
+}
+
+/**
+ * Atualiza equipes entre temporadas: profissionais com alta chance de ficar,
+ * saindo os que têm resultado ruim ou muitos anos na escola.
+ * Chamado em startNextSeason.
+ */
+function updateRivalTeamsNextSeason(rivals, playerTeam, allResults) {
+  if(!gameState.rivalTeams) { initRivalTeams(rivals, playerTeam); return; }
+
+  const takenIds = new Set();
+  // Reservar IDs do jogador
+  if(playerTeam) {
+    for(const v of Object.values(playerTeam)) if(v?.id) takenIds.add(v.id);
+  }
+
+  const SLOTS = ['carnavalesco','mestre','interprete'];
+  const freeAgents = []; // profissionais que saíram
+
+  // ── 1. Decidir quem fica e quem vai ─────────────────────────
+  rivals.forEach(r => {
+    const team = gameState.rivalTeams[r.id] || {};
+    const result = allResults?.[r.id] || 'normal'; // 'champion'|'relegated'|'normal'
+
+    for(const slot of SLOTS) {
+      const p = team[slot];
+      if(!p) continue;
+
+      const years = (p.yearsAtSchool || 0);
+      let stayChance = 0.75;
+      if(result === 'champion')  stayChance += 0.15;
+      if(result === 'relegated') stayChance -= 0.20;
+      if(years > 3) stayChance -= 0.08 * (years - 3);
+      stayChance = Math.max(0.15, Math.min(0.95, stayChance));
+
+      if(Math.random() < stayChance) {
+        // Fica — marcar como usado e incrementar anos
+        takenIds.add(p.id);
+        p.yearsAtSchool = years + 1;
+      } else {
+        // Sai — vira free agent
+        freeAgents.push({...p, slot});
+        team[slot] = null;
+      }
+    }
+    gameState.rivalTeams[r.id] = team;
+  });
+
+  // ── 2. Preencher vagas ───────────────────────────────────────
+  rivals.forEach(r => {
+    const team = gameState.rivalTeams[r.id] || {};
+    for(const slot of SLOTS) {
+      if(team[slot] !== null) continue; // não está vago
+
+      // Tentar free agent do mesmo slot
+      const faIdx = freeAgents.findIndex(p => p.slot === slot && !takenIds.has(p.id));
+      if(faIdx >= 0) {
+        const fa = freeAgents.splice(faIdx, 1)[0];
+        fa.yearsAtSchool = 0;
+        team[slot] = fa;
+        takenIds.add(fa.id);
+      } else {
+        // Novo do pool
+        const pool = PROFESSIONALS_DATA[slot] || [];
+        const picked = _pickUniquePro(pool, takenIds);
+        if(picked) team[slot] = picked;
+      }
+    }
+    gameState.rivalTeams[r.id] = team;
+  });
+}
 
 function initAICycles(rivals) {
   rivals.forEach(r=>{
@@ -18089,7 +18320,17 @@ function calculateFinalNotes() {
   gameState.finalNotes = {};
   gameState.finalNotesDetail = {};
   let total = 0;
-  const openerPenalty = (gameState.isOpenerThisYear && gameState.school.group === 'especial') ? -0.1 : 0;
+
+  // ── Penalidade de abertura (combinada) ───────────────────────
+  // Quem abre um dia no Especial: qualidade reduzida a 85% + −0.1 por quesito na nota
+  const isOpenerEspecial = gameState.isOpenerThisYear && gameState.school.group === 'especial'
+    && !(gameState.openerPenaltyDisabled);
+  if(isOpenerEspecial) {
+    for(const k of Object.keys(raw)) raw[k] = Math.floor(raw[k] * 0.85);
+    addEvent(`🎺 Sua escola abre a noite — jurados seguram a nota. Penalidade de abertura ativa.`, 'warn');
+  }
+  const openerPenalty = isOpenerEspecial ? -0.1 : 0;
+
   // Usa perfis fixos da temporada (mesmos que serão exibidos na apuração)
   const seasonProfiles = getOrCreateJuradoProfiles();
   for(const [k,sc] of Object.entries(raw)) {
@@ -18149,6 +18390,22 @@ function simulateRivalScores() {
     r._simulatedTotal = Math.round(total*10)/10;
   });
 
+  // ── Penalidade de abertura para rivais abridores ───────────
+  if(group === 'especial') {
+    const dayOpeners = gameState.dayOpeners || {};
+    const openerNames = new Set(Object.values(dayOpeners));
+    gameState.rivals.forEach(r => {
+      if(!openerNames.has(r.name)) return;
+      // Penalidade combinada: reduz cada quesito em qualidade × 0.85 + −0.1 pt
+      const notes = r._simulatedNotes || {};
+      for(const k of Object.keys(notes)) {
+        notes[k] = Math.max(28.8, Math.round((notes[k] * 0.85 - 0.1) * 10) / 10);
+      }
+      r._simulatedNotes = notes;
+      r._simulatedTotal = Math.round(Object.values(notes).reduce((s,v)=>s+v,0)*10)/10;
+    });
+  }
+
   // ── 2. Montar lista unificada jogador + rivais ─────────────
   const allEntries = [
     { isPlayer:true,  total: playerTotal },
@@ -18159,37 +18416,52 @@ function simulateRivalScores() {
   // ── 3. Ordenar pelo total bruto (desc) ────────────────────
   allEntries.sort((a,b) => b.total - a.total);
 
-  // ── 4. Calcular targets (escola_total × 10) ───────────────
-  const topCent   = (gRules.top - 5) + Math.floor(Math.random() * 6); // 2695–2700
-  // Bottom aleatório entre 265.0 e 266.0 (×10 = 2650–2660)
-  const botCent   = Math.max(gRules.bottom, 2650 + Math.floor(Math.random() * 11));
-  const step      = (topCent - botCent) / Math.max(N - 1, 1);
-  const targets   = [];
+  // ── 4. Calcular targets com distribuição NÃO-LINEAR ───────
+  // Faixas realistas por grupo (em centésimos, i.e. 270.0 = 2700)
+  const GRUPO_TOP = {especial:2700, ouro:2680, prata:2655, bronze:2615, avaliacao:2560};
+  const GRUPO_BOT = {especial:2650, ouro:2600, prata:2560, bronze:2510, avaliacao:2450};
+
+  // Campeão: top - 0..4 décimos aleatórios
+  const topCent = (GRUPO_TOP[group] || 2700) - Math.floor(Math.random() * 5);
+  const botCent = (GRUPO_BOT[group] || 2650) + Math.floor(Math.random() * 10);
+
+  // Posições 1–7: passo de 1 (0,1 pt). A partir do 8º: passo maior.
+  // O 7º fica em topCent - 6 (0,6 abaixo do campeão)
+  const TIGHT_N = Math.min(7, N); // quantas posições ficam no bloco "apertado"
+  const tight7th = topCent - (TIGHT_N - 1); // valor do 7º lugar (ou último do bloco apertado)
+  const remainingN = N - TIGHT_N;
+
+  const targets = [];
   for(let i = 0; i < N; i++) {
-    let t = Math.round(topCent - i * step);
-    if(i > 0 && t >= targets[i-1]) t = targets[i-1] - 1;
-    t = Math.max(t, botCent);
-    targets.push(t);
+    if(i < TIGHT_N) {
+      // Bloco apertado: exatamente 0,1 ponto de diferença
+      targets.push(topCent - i);
+    } else {
+      // Bloco espaçado: distribuição linear entre tight7th-1 e botCent
+      const spread = tight7th - 1 - botCent;
+      const stepLarge = remainingN > 1 ? spread / (remainingN - 1) : spread;
+      const t = Math.round(tight7th - 1 - (i - TIGHT_N) * stepLarge);
+      targets.push(Math.max(t, botCent));
+    }
+  }
+  // Garantir estritamente decrescente
+  for(let i = 1; i < targets.length; i++) {
+    if(targets[i] >= targets[i-1]) targets[i] = targets[i-1] - 1;
   }
 
   // ── 5. Aplicar equalização a cada escola ──────────────────
   const queKeys = APURACAO_QUESITOS.map(q=>q.k);
-  // Limites por quesito em unidades de nota×10 (e.g. 9.6×10=96, 10.0×10=100)
-  // oldQ = Math.round(note * 10) → 29.8 * 10 = 298 ✓
-  // minQCent/maxQCent devem estar na mesma escala
-  const keepJurados = gRules.descarta ? gRules.jurados - 1 : gRules.jurados;
-  const minQCent = keepJurados * 96;   // 3×96=288 (29.8 min) ou 2×96=192 (19.2 min)
-  const maxQCent = keepJurados * 100;  // 3×100=300 (30.0 max) ou 2×100=200 (20.0 max)
+  const keepJurados = jRules.descarta ? jRules.jurados - 1 : jRules.jurados;
+  const minQCent = keepJurados * 96;
+  const maxQCent = keepJurados * 100;
 
   allEntries.forEach((e, idx) => {
     const newTotalCent = targets[idx];
 
     if(e.isPlayer) {
-      // Total atual em centésimos
       const oldTotalCent = Math.round(gameState.finalNotes._total * 10);
       const factor = newTotalCent / Math.max(oldTotalCent, 1);
 
-      // Distribuir proporcionalmente pelos quesitos
       let sumAdjusted = 0;
       const adjusted = {};
       for(const k of queKeys) {
@@ -18199,7 +18471,7 @@ function simulateRivalScores() {
         adjusted[k] = newQ;
         sumAdjusted += newQ;
       }
-      // Corrigir arredondamento distribuindo diff pelo quesito de maior peso
+      // Corrigir resíduo de arredondamento
       let diff = newTotalCent - sumAdjusted;
       if(diff !== 0) {
         const sortedQ = [...queKeys].sort((a,b) => adjusted[b]-adjusted[a]);
@@ -18212,7 +18484,6 @@ function simulateRivalScores() {
         }
       }
 
-      // Aplicar e regerar notas dos jurados
       for(const k of queKeys) {
         const snappedTotal = adjusted[k] / 10;
         gameState.finalNotes[k] = snappedTotal;
@@ -18240,7 +18511,6 @@ function simulateRivalScores() {
         adjusted[k] = newQ;
         sumAdjusted += newQ;
       }
-      // Corrigir resíduo
       let diff = newTotalCent - sumAdjusted;
       if(diff !== 0) {
         const sortedQ = [...queKeys].sort((a,b) => adjusted[b]-adjusted[a]);
@@ -18773,6 +19043,10 @@ function showFinalResults() {
   // Registrar campeãs de todos os grupos desta temporada
   registrarCampeas(allSchools, group);
 
+  // ── SISTEMA DINÂMICO DE GRUPOS ────────────────────────────────
+  // Simula todos os grupos, aplica promoções/rebaixamentos e salva campeã da Ouro
+  atualizarGruposAposCarnaval(gameState.finalNotes);
+
   // ── HANDLE PLAYER PROMOTION/RELEGATION ───────────────────────
   const effectivelyPromoted = isPromoted;
 
@@ -18966,6 +19240,10 @@ function startNextSeason() {
   const oldChampionsHistory = [...(gameState.championsHistory||[])];
   const oldGlobalCycles     = {...(gameState.globalCycles||{})};
   const oldLigaRegras       = [...(gameState.ligaRegras||[])];
+  const oldGrupos           = gameState.grupos ? JSON.parse(JSON.stringify(gameState.grupos)) : null;
+  const oldCampeaOuro       = gameState.campeaOuroAnterior || null;
+  const _nextGroupOverride  = gameState._nextSeasonGroup || null;
+  const oldRivalTeams       = gameState.rivalTeams ? JSON.parse(JSON.stringify(gameState.rivalTeams)) : null;
 
   // Re-initialize for new season — PRESERVE BUDGET (continuous cash)
   const oldBudget = gameState.budget; // carry forward!
@@ -19007,6 +19285,59 @@ function startNextSeason() {
   gameState.globalCycles     = oldGlobalCycles;
   // ligaRegras: manter apenas regras permanentes; regras temporárias expiram
   gameState.ligaRegras = oldLigaRegras.filter(r => !r.temporario);
+
+  // ── Restaurar grupos dinâmicos e substituir rivais ─────────────
+  if(oldGrupos) {
+    gameState.grupos = oldGrupos;
+    // Se grupo mudou na última temporada, ajustar aqui também
+    if(_nextGroupOverride && _nextGroupOverride !== gameState.school.group) {
+      // O school.group já foi ajustado por showFinalResults; apenas garantir consistência
+      gameState.school.group = _nextGroupOverride;
+      gameState.school.displayGroup = LEAGUE_NAMES[_nextGroupOverride];
+    }
+    const currentGroup = gameState.school.group;
+    const escolasNoGrupo = gameState.grupos[currentGroup] || [];
+    if(escolasNoGrupo.length > 1) {
+      const rivalStrMult = {facil:0.80, normal:0.92, dificil:1.02, lendario:1.08}[gameState.difficulty] || 0.92;
+      const novosRivais = escolasNoGrupo
+        .filter(e => e.id !== gameState.school.id)
+        .map(e => ({
+          id:         e.id,
+          name:       e.name,
+          tradition:  Math.floor((e.tradition||60)  * rivalStrMult),
+          community:  Math.floor((e.community||55)  * rivalStrMult),
+          barracão:   Math.floor((e.barracão||55)   * rivalStrMult),
+          creativity: Math.floor((e.creativity||55) * rivalStrMult),
+          org:        Math.floor((e.org||55)        * rivalStrMult),
+          budget:     Math.floor((e.budget||1000000) * BUDGET_SCALE),
+          _baseQuality: clamp(
+            Math.floor(((e.tradition||60)+(e.community||55)+(e.barracão||55)+(e.creativity||55)+(e.org||55))/5 * rivalStrMult), 50, 97
+          ),
+        }));
+      gameState.rivals = novosRivais;
+      initAICycles(gameState.rivals);
+      addEvent(`📋 Composição do grupo atualizada: ${novosRivais.length} escolas rivais para ${gameState.year}.`, 'info');
+    }
+  }
+  if(oldCampeaOuro) gameState.campeaOuroAnterior = oldCampeaOuro;
+
+  // ── Equipes de profissionais dos rivais ────────────────────
+  if(oldRivalTeams) gameState.rivalTeams = oldRivalTeams;
+  // Calcular resultados da última temporada para cada rival (para estabilidade)
+  const lastHistory = oldHistory[oldHistory.length-1];
+  const rivalResults = {};
+  if(lastHistory?.ranking) {
+    const n = lastHistory.ranking.length;
+    lastHistory.ranking.forEach((r,i) => {
+      if(r.isPlayer) return;
+      const rid = gameState.rivals.find(rv=>rv.name===r.name)?.id;
+      if(!rid) return;
+      if(i===0) rivalResults[rid]='champion';
+      else if(i>=n-2) rivalResults[rid]='relegated';
+      else rivalResults[rid]='normal';
+    });
+  }
+  updateRivalTeamsNextSeason(gameState.rivals, gameState.team, rivalResults);
   // Carry forward half of active sponsors (some renew)
   gameState.activeSponsors = oldSponsors.filter(()=>Math.random()>0.4);
   gameState.income.patrocinioPrivado += gameState.activeSponsors.reduce((s,sp)=>s+Math.floor(sp.value*0.3),0);
@@ -19155,53 +19486,346 @@ function startNextSeason() {
 // ==================== HISTÓRICO DE CAMPEÃS ================
 // ============================================================
 
+// Mapa de normalização: qualquer variante → nome canônico do jogo (igual a SCHOOLS_DATA)
+const SCHOOL_NAME_ALIASES = {
+  // Mangueira
+  'Mangueira':                          'Estação Primeira de Mangueira',
+  'Estação Primeira da Mangueira':      'Estação Primeira de Mangueira',
+  // Viradouro
+  'Viradouro':                          'Viradouro',
+  'Unidos do Viradouro':                'Viradouro',
+  // Vila Isabel
+  'Vila Isabel':                        'Unidos de Vila Isabel',
+  'Unidos de Vila Isabel':              'Unidos de Vila Isabel',
+  // Beija-Flor
+  'Beija-Flor':                         'Beija-Flor de Nilópolis',
+  'Beija Flor':                         'Beija-Flor de Nilópolis',
+  // Salgueiro
+  'Salgueiro':                          'Acadêmicos do Salgueiro',
+  'Academicos do Salgueiro':            'Acadêmicos do Salgueiro',
+  // Mocidade
+  'Mocidade':                           'Mocidade Independente de Padre Miguel',
+  'Mocidade Independente':              'Mocidade Independente de Padre Miguel',
+  // Tijuca
+  'Tijuca':                             'Unidos da Tijuca',
+  // Grande Rio
+  'Grande Rio':                         'Grande Rio',
+  'Acadêmicos do Grande Rio':           'Grande Rio',
+  'Academicos do Grande Rio':           'Grande Rio',
+  // União da Ilha
+  'União da Ilha':                      'União da Ilha do Governador',
+  'Uniao da Ilha':                      'União da Ilha do Governador',
+  'União da Ilha do Governador':        'União da Ilha do Governador',
+  // Estácio
+  'Estácio':                            'Estácio de Sá',
+  'Estacio de Sa':                      'Estácio de Sá',
+  // Porto da Pedra
+  'Porto da Pedra':                     'Porto da Pedra',
+  // Imperatriz
+  'Imperatriz':                         'Imperatriz Leopoldinense',
+  // Portela
+  'Portela':                            'Portela',
+};
+
+/**
+ * Normaliza o nome de uma escola para o nome canônico usado em SCHOOLS_DATA.
+ * Se não houver alias, devolve o próprio nome.
+ */
+function normalizeSchoolName(name) {
+  if(!name) return name;
+  return SCHOOL_NAME_ALIASES[name] || name;
+}
+
 // Dados históricos reais 2010–2026 (Grupo Especial)
 const HISTORICAL_CHAMPIONS = [
   {year:2010,group:'especial',school:'Imperatriz Leopoldinense',score:269.8,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Rinaldo',rainha:'Quitéria Chagas',enredo:'O Meu Destino é Ser Estrela'},
-  {year:2011,group:'especial',school:'Mangueira',score:269.5,carnavalesco:'Milton Cunha',mestreBateria:'Mestre Andrezinho',rainha:'Sheron Menezes',enredo:'Sou Simples, Sou Amor, Sou Mangueira'},
-  {year:2012,group:'especial',school:'Unidos do Viradouro',score:269.4,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Robertinho',rainha:'Milena Nogueira',enredo:'Minha Terra Tem Palmeiras — Brasil em Mim'},
+  {year:2011,group:'especial',school:'Estação Primeira de Mangueira',score:269.5,carnavalesco:'Milton Cunha',mestreBateria:'Mestre Andrezinho',rainha:'Sheron Menezes',enredo:'Sou Simples, Sou Amor, Sou Mangueira'},
+  {year:2012,group:'especial',school:'Viradouro',score:269.4,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Robertinho',rainha:'Milena Nogueira',enredo:'Minha Terra Tem Palmeiras — Brasil em Mim'},
   {year:2013,group:'especial',school:'Portela',score:269.6,carnavalesco:'Renato Lage',mestreBateria:'Mestre Ciça',rainha:'Tatiane Melo',enredo:'Ilu Ayê — A Festa do Povo Preto'},
   {year:2014,group:'especial',school:'Unidos da Tijuca',score:269.8,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Wagner',rainha:'Carol Nakamura',enredo:'Planeta Sonhos'},
   {year:2015,group:'especial',school:'Imperatriz Leopoldinense',score:269.5,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Falcão',rainha:'Evelyn Bastos',enredo:'Não Há Segundo Reinado Sem o Povo Negro'},
-  {year:2016,group:'especial',school:'Mangueira',score:269.7,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Bruna Caltabiano',enredo:'Com Deus, Minha Vida Tem Mais Cor'},
+  {year:2016,group:'especial',school:'Estação Primeira de Mangueira',score:269.7,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Bruna Caltabiano',enredo:'Com Deus, Minha Vida Tem Mais Cor'},
   {year:2017,group:'especial',school:'Porto da Pedra',score:269.5,carnavalesco:'Leonardo Bora',mestreBateria:'Mestre Robertinho',rainha:'Evelyn Bastos',enredo:'Sublime Questão'},
-  {year:2018,group:'especial',school:'Beija-Flor',score:269.8,carnavalesco:'Alexandre Louzada',mestreBateria:'Mestre Ciça',rainha:'Evelyn Bastos',enredo:'Eu Sou Monarca, Soberano das Passarelas'},
-  {year:2019,group:'especial',school:'Mangueira',score:270.0,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Evelyn Bastos',enredo:'História para Ninar Gente Grande'},
-  {year:2020,group:'especial',school:'Vila Isabel',score:269.6,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Ciça',rainha:'Camila Silva',enredo:'Conselho de Deus'},
+  {year:2018,group:'especial',school:'Beija-Flor de Nilópolis',score:269.8,carnavalesco:'Alexandre Louzada',mestreBateria:'Mestre Ciça',rainha:'Evelyn Bastos',enredo:'Eu Sou Monarca, Soberano das Passarelas'},
+  {year:2019,group:'especial',school:'Estação Primeira de Mangueira',score:270.0,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Evelyn Bastos',enredo:'História para Ninar Gente Grande'},
+  {year:2020,group:'especial',school:'Unidos de Vila Isabel',score:269.6,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Ciça',rainha:'Camila Silva',enredo:'Conselho de Deus'},
   {year:2021,group:'especial',school:null,score:null,carnavalesco:null,mestreBateria:null,rainha:null,enredo:'Carnaval cancelado (COVID-19)'},
   {year:2022,group:'especial',school:'Imperatriz Leopoldinense',score:269.8,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Falcão',rainha:'Quitéria Chagas',enredo:'Arranca Ísis, Abre o Coração'},
   {year:2023,group:'especial',school:'Portela',score:269.7,carnavalesco:'Renato Lage',mestreBateria:'Mestre Ciça',rainha:'Bianca Monteiro',enredo:'Boca de Ouro'},
-  {year:2024,group:'especial',school:'Mangueira',score:269.9,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Evelyn Bastos',enredo:'Imagens de um Rio que Não Existe Mais'},
-  {year:2025,group:'especial',school:'Beija-Flor',score:269.8,carnavalesco:'Alexandre Louzada',mestreBateria:'Mestre Ciça',rainha:'Gracyanne Barbosa',enredo:'A Suprema Corte do Samba'},
+  {year:2024,group:'especial',school:'Estação Primeira de Mangueira',score:269.9,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Evelyn Bastos',enredo:'Imagens de um Rio que Não Existe Mais'},
+  {year:2025,group:'especial',school:'Beija-Flor de Nilópolis',score:269.8,carnavalesco:'Alexandre Louzada',mestreBateria:'Mestre Ciça',rainha:'Gracyanne Barbosa',enredo:'A Suprema Corte do Samba'},
   {year:2026,group:'especial',school:'Imperatriz Leopoldinense',score:269.7,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Falcão',rainha:'Viviane Araújo',enredo:'Dona do Baile, Rainha da Passarela'},
 ];
+
+// ============================================================
+// ======= SISTEMA DINÂMICO DE GRUPOS =========================
+// ============================================================
+
+/**
+ * Simula a classificação de um grupo inteiro.
+ * Retorna array ordenado { ...escola, _totalSim } do maior para o menor.
+ */
+function simularGrupoCompleto(escolas, grupo) {
+  if(!escolas || !escolas.length) return [];
+  const jRules = GROUP_JUDGING_RULES[grupo] || GROUP_JUDGING_RULES.especial;
+  const [minS, maxS] = GRUPO_SCORE_RANGES[grupo] || [260.0, 270.0];
+
+  const resultados = escolas.map(escola => {
+    const cy = gameState.globalCycles?.[escola.id];
+    const cicloMod = cy?.phase==='peak' ? 8 : cy?.phase==='decline' ? -8 : 0;
+    const baseQ = clamp(
+      ((escola.tradition||60) + (escola.community||55) + (escola.barracão||55) +
+       (escola.creativity||55) + (escola.org||55)) / 5 + cicloMod, 40, 98
+    );
+
+    let totalCent = 0;
+    const quesitos = ['bateria','harmonia','alegorias','comissao','enredo','evolucao','fantasias','casal','samba'];
+    const qualMap = {
+      bateria:   clamp(baseQ * 0.6 + (escola.community||55) * 0.4 * 0.4, 40, 100),
+      harmonia:  clamp((escola.community||55) * 0.7 + 30, 40, 100),
+      alegorias: clamp((escola.barracão||55) * 0.5 + (escola.creativity||55) * 0.5, 40, 100),
+      comissao:  clamp((escola.creativity||55) * 0.6 + 40, 40, 100),
+      enredo:    clamp((escola.creativity||55) * 0.4 + (escola.tradition||60) * 0.6, 40, 100),
+      evolucao:  clamp((escola.org||55) * 0.6 + (escola.community||55) * 0.4, 40, 100),
+      fantasias: clamp((escola.barracão||55) * 0.7 + 30, 40, 100),
+      casal:     clamp((escola.tradition||60) * 0.5 + 50, 40, 100),
+      samba:     clamp(((escola.composers||55) * 0.6 + (escola.community||55) * 0.4), 40, 100),
+    };
+
+    quesitos.forEach(k => {
+      const q = clamp((qualMap[k] || baseQ) + (Math.random()-0.5)*10, 40, 100);
+      const pisoCent = getPisoBandeira(escola.id, [], grupo);
+      const nota = judgeNote(q, 'tecnico', null, pisoCent);
+      const kept = jRules.descarta ? jRules.jurados-1 : jRules.jurados;
+      totalCent += Math.round(nota * 10) * kept;
+    });
+
+    return { ...escola, _totalCent: totalCent };
+  });
+
+  resultados.sort((a,b) => b._totalCent - a._totalCent);
+
+  // Equalizar notas para faixa realista do grupo
+  const maxC = resultados[0]._totalCent, minC = resultados[resultados.length-1]._totalCent;
+  const spread = maxC - minC || 1;
+  resultados.forEach((r, i) => {
+    const ratio = (r._totalCent - minC) / spread;
+    r._totalSim = Math.round((minS + ratio * (maxS - minS)) * 10) / 10;
+  });
+
+  return resultados;
+}
+
+/**
+ * Chamado após a apuração do jogador.
+ * Simula todos os grupos, aplica promoções/rebaixamentos e atualiza gameState.grupos.
+ * Também salva campeaOuroAnterior para o sorteio do próximo ano.
+ */
+function atualizarGruposAposCarnaval(playerFinalNotes) {
+  if(!gameState.grupos) gameState.grupos = _buildGruposFromSchoolsData();
+  if(!gameState.globalCycles) gameState.globalCycles = {};
+
+  const playerGroup   = gameState.school.group;
+  const playerSchool  = { ...gameState.school };
+  const playerTotal   = (playerFinalNotes?._total || 268.0);
+
+  const GRUPOS_ORDEM = ['avaliacao','bronze','prata','ouro','especial'];
+
+  // ── 1. Simular todos os grupos ───────────────────────────────
+  const resultadosPorGrupo = {};
+  GRUPOS_ORDEM.forEach(g => {
+    let escolas = [...(gameState.grupos[g] || [])];
+    // Garante que o jogador está no array do seu grupo com o total real
+    if(g === playerGroup) {
+      escolas = escolas.filter(e => e.id !== playerSchool.id);
+      // Também injeta os rivais (caso o grupo tenha escolas simuladas)
+      const rivalEscolas = (gameState.rivals||[]).map(r => ({
+        id: r.id, name: r.name,
+        tradition: r.tradition||60, community: r.community||55,
+        barracão: r.barracão||55, creativity: r.creativity||55,
+        org: r.org||55, composers: r.composers||55,
+        budget: r.budget||1000000, _group: g,
+      }));
+      // Mescla: mantém escolas do grupo que não são rivais
+      const escIds = new Set(rivalEscolas.map(r=>r.id));
+      const extra = escolas.filter(e => !escIds.has(e.id));
+      escolas = [...rivalEscolas, ...extra];
+    }
+    const simulados = simularGrupoCompleto(escolas, g);
+    // Para o grupo do jogador, substituir a nota do jogador pelo total real
+    if(g === playerGroup) {
+      const playerEntry = { ...playerSchool, _totalCent: Math.round(playerTotal*100), _totalSim: playerTotal, _isPlayer: true };
+      const filtered = simulados.filter(e => e.id !== playerSchool.id);
+      filtered.push(playerEntry);
+      filtered.sort((a,b) => b._totalSim - a._totalSim);
+      resultadosPorGrupo[g] = filtered;
+    } else {
+      resultadosPorGrupo[g] = simulados;
+    }
+  });
+
+  // ── 2. Regras de promoção / rebaixamento ─────────────────────
+  const PROMOVIDOS_N   = { avaliacao:1, bronze:2, prata:2, ouro:1, especial:0 };
+  const REBAIXADOS_N   = { especial:1, ouro:2, prata:2, bronze:1, avaliacao:0 };
+  // Ajustar se regra de rebaixamento duplo estiver ativa
+  const duasRebaixadas = (gameState.ligaRegras||[]).some(r=>r.tipo==='rebaixamento_duplo');
+  if(duasRebaixadas) REBAIXADOS_N.especial = 2;
+
+  // ── 3. Montar nova composição de grupos ──────────────────────
+  const novosGrupos = {};
+  GRUPOS_ORDEM.forEach(g => { novosGrupos[g] = []; });
+
+  GRUPOS_ORDEM.forEach((g, gIdx) => {
+    const rank = resultadosPorGrupo[g];
+    const nRebaixados = REBAIXADOS_N[g] || 0;
+    const nPromovidos = PROMOVIDOS_N[g] || 0;
+
+    const promovidos  = rank.slice(0, nPromovidos).map(e => ({...e, _group: GRUPOS_ORDEM[gIdx+1]}));
+    const rebaixados  = rank.slice(rank.length - nRebaixados).map(e => ({...e, _group: GRUPOS_ORDEM[gIdx-1]}));
+    const permanecem  = rank.slice(nPromovidos, rank.length - nRebaixados || undefined).map(e => ({...e, _group: g}));
+
+    // Permanentes ficam no próprio grupo
+    novosGrupos[g].push(...permanecem);
+
+    // Promovidos sobem
+    if(GRUPOS_ORDEM[gIdx+1]) {
+      novosGrupos[GRUPOS_ORDEM[gIdx+1]].push(...promovidos);
+    }
+    // Rebaixados descem
+    if(GRUPOS_ORDEM[gIdx-1]) {
+      novosGrupos[GRUPOS_ORDEM[gIdx-1]].push(...rebaixados);
+    }
+  });
+
+  // ── 4. Atualizar grupo do jogador ─────────────────────────────
+  let playerNovoGrupo = playerGroup;
+  GRUPOS_ORDEM.forEach(g => {
+    if(novosGrupos[g].some(e => e.id === playerSchool.id)) {
+      playerNovoGrupo = g;
+    }
+  });
+
+  gameState.grupos = novosGrupos;
+
+  // Guarda grupo do jogador para ser aplicado em startNextSeason
+  gameState._nextSeasonGroup = playerNovoGrupo;
+
+  // ── 5. Campeã da Série Ouro → abre o domingo no próximo ano ──
+  const campeaOuro = resultadosPorGrupo.ouro?.[0];
+  if(campeaOuro) {
+    gameState.ouroChampion = campeaOuro.name || campeaOuro.id;
+    gameState.campeaOuroAnterior = campeaOuro.id;
+  }
+
+  // ── 6. Log de resultados dos outros grupos ────────────────────
+  ['ouro','prata','bronze','avaliacao'].forEach(g => {
+    const campeaG = resultadosPorGrupo[g]?.[0];
+    if(campeaG && !campeaG._isPlayer) {
+      const promMoveu = resultadosPorGrupo[g]?.slice(0, PROMOVIDOS_N[g]||0).map(e=>e.name).join(', ');
+      const rebMoveu  = resultadosPorGrupo[g]?.slice(-(REBAIXADOS_N[g]||0)).map(e=>e.name).join(', ');
+      if(PROMOVIDOS_N[g]>0 && promMoveu)
+        addEvent(`📈 ${LEAGUE_NAMES[g]}: ${promMoveu} ${PROMOVIDOS_N[g]>1?'sobem':'sobe'} de grupo.`, 'info');
+      if(REBAIXADOS_N[g]>0 && rebMoveu)
+        addEvent(`📉 ${LEAGUE_NAMES[g]}: ${rebMoveu} ${REBAIXADOS_N[g]>1?'são rebaixadas':'é rebaixada'}.`, 'bad');
+    }
+  });
+
+  return playerNovoGrupo;
+}
+
+// Templates de enredo para escolas simuladas
+const ENREDO_TEMPLATES_SIM = [
+  'A Saga de {escola}', 'O Legado de {escola}', '{escola}: Raízes do Samba',
+  'As Raízes do Samba', 'O Carnaval que Nunca Acaba', 'Brasil: Tempo de Festa',
+  'A Força da Tradição', 'Encantos e Mistérios', 'A Cor do Brasil',
+  'Um Grito de Liberdade', 'A Viagem dos Sonhos', 'O Poder da Comunidade',
+  'Eternos Momentos', 'O Samba que Nos Une', 'Memórias de um Povo',
+  'A Festa do Povo', 'Sonhos de Aço e Glória', 'Brasilidade',
+  'O Dom da Alegria', 'A Arte que Liberta', 'Cultura Viva',
+  'No Ritmo do Coração', 'A Magia do Carnaval', 'Tradição e Renovação',
+];
+
+function _gerarEnredoSim(schoolName) {
+  const t = ENREDO_TEMPLATES_SIM[Math.floor(Math.random()*ENREDO_TEMPLATES_SIM.length)];
+  return t.replace('{escola}', schoolName);
+}
+
+/**
+ * Retorna detalhes do profissional de um rival (carnavalesco/mestre) a partir
+ * de rivalTeams, evitando duplicar com o time do jogador.
+ */
+function _getProfDetalheRival(rivalId, slot) {
+  const team = gameState.rivalTeams?.[rivalId];
+  if(team?.[slot]?.name) return team[slot].name;
+  return null;
+}
 
 function registrarCampeas(allSchools, playerGroup) {
   if(!gameState.championsHistory) gameState.championsHistory = [];
   if(!gameState.globalCycles) gameState.globalCycles = {};
+  _initChampGroupPools();
 
   // Pré-popula histórico real na primeira chamada
   if(gameState.championsHistory.length === 0) {
     const startYear = gameState.year;
     HISTORICAL_CHAMPIONS
       .filter(h => h.year < startYear && h.school)
-      .forEach(h => { if(!gameState.championsHistory.some(c=>c.year===h.year&&c.group===h.group)) gameState.championsHistory.push({...h}); });
+      .forEach(h => {
+        const normalized = {...h, school: normalizeSchoolName(h.school)};
+        if(!gameState.championsHistory.some(c=>c.year===normalized.year&&c.group===normalized.group))
+          gameState.championsHistory.push(normalized);
+      });
   }
 
   // ── Registrar campeão do grupo do jogador ──────────────────
   const playerChampion = allSchools[0];
-  if(!gameState.championsHistory.some(c=>c.year===gameState.year && c.group===playerGroup)) {
-    gameState.championsHistory.push({
-      year: gameState.year,
-      group: playerGroup,
-      school: playerChampion.name,
-      score: playerChampion.note,
-      isPlayer: playerChampion.isPlayer,
-      carnavalesco: gameState.team?.carnavalesco?.name || null,
-      mestreBateria: gameState.team?.mestre?.name || null,
-      rainha: gameState.rainha?.name || null,
-      enredo: gameState.enredoTitle || (gameState.enredo ? ENREDO_TYPES?.find(e=>e.id===gameState.enredo)?.name : null) || null,
-    });
+  const isPlayerChampion = playerChampion.isPlayer;
+
+  // Remover entrada duplicada do mesmo ano/grupo, se já existir
+  const dupIdx = gameState.championsHistory.findIndex(c=>c.year===gameState.year && c.group===playerGroup);
+  if(dupIdx >= 0) gameState.championsHistory.splice(dupIdx, 1);
+
+  // Determinar carnavalesco/mestre do campeão (jogador ou rival)
+  let champCarnav, champMestre, champRainha, champEnredo;
+  if(isPlayerChampion) {
+    champCarnav  = gameState.team?.carnavalesco?.name || null;
+    champMestre  = gameState.team?.mestre?.name || null;
+    champRainha  = gameState.rainha?.name || null;
+    champEnredo  = gameState.enredoTitle || (gameState.enredo ? ENREDO_TYPES?.find(e=>e.id===gameState.enredo)?.name : null) || null;
+  } else {
+    const champRival = gameState.rivals?.find(r => r.name === playerChampion.name);
+    champCarnav = (champRival ? _getProfDetalheRival(champRival.id,'carnavalesco') : null)
+                  || _randExcluding(PROFESSIONALS_DATA.carnavalesco, gameState.team?.carnavalesco?.name);
+    champMestre = (champRival ? _getProfDetalheRival(champRival.id,'mestre') : null)
+                  || _randExcluding(PROFESSIONALS_DATA.mestre, gameState.team?.mestre?.name);
+    champRainha = _randRainhaExcluding(gameState.rainha?.name);
+    champEnredo = _gerarEnredoSim(playerChampion.name);
+  }
+
+  gameState.championsHistory.push({
+    year: gameState.year,
+    group: playerGroup,
+    school: normalizeSchoolName(playerChampion.name),
+    score: playerChampion.note,
+    isPlayer: isPlayerChampion,
+    carnavalesco: champCarnav,
+    mestreBateria: champMestre,
+    rainha: champRainha,
+    enredo: champEnredo,
+  });
+
+  // Atualizar pools de promoção para o jogador
+  if(isPlayerChampion && playerGroup !== 'especial') {
+    const pId = gameState.school?.id;
+    if(pId) {
+      if(gameState.champGroupPools[playerGroup])
+        gameState.champGroupPools[playerGroup] = gameState.champGroupPools[playerGroup].filter(id=>id!==pId);
+      const nextGrp = GROUP_ORDER[GROUP_ORDER.indexOf(playerGroup)+1];
+      if(nextGrp) {
+        if(!gameState.champGroupPools[nextGrp]) gameState.champGroupPools[nextGrp]=(SCHOOLS_DATA[nextGrp]||[]).map(s=>s.id);
+        if(!gameState.champGroupPools[nextGrp].includes(pId)) gameState.champGroupPools[nextGrp].push(pId);
+      }
+    }
   }
 
   // ── Simular campeões dos outros grupos ─────────────────────
@@ -19209,8 +19833,23 @@ function registrarCampeas(allSchools, playerGroup) {
   allGroups.filter(g => g !== playerGroup).forEach(g => {
     if(gameState.championsHistory.some(c=>c.year===gameState.year && c.group===g)) return;
     const champ = _simularCampeaGrupo(g);
-    if(champ) gameState.championsHistory.push({year:gameState.year, group:g, ...champ});
+    if(champ) {
+      const normName = normalizeSchoolName(champ.school);
+      gameState.championsHistory.push({
+        year: gameState.year, group: g,
+        ...champ,
+        school: normName,
+        enredo: champ.enredo || _gerarEnredoSim(normName),
+      });
+    }
   });
+
+  // ── Garantir que ouroChampion e 10º/11º do especial estão salvos ──
+  // (atualizarGruposAposCarnaval já faz isso, mas garantimos aqui como fallback)
+  const ouroEntry = gameState.championsHistory.find(c=>c.year===gameState.year && c.group==='ouro');
+  if(ouroEntry && !gameState.ouroChampion) {
+    gameState.ouroChampion = ouroEntry.school;
+  }
 
   // ── Atualizar ciclos globais de todas as escolas ───────────
   Object.values(SCHOOLS_DATA).flat().forEach(s => {
@@ -19232,9 +19871,58 @@ function registrarCampeas(allSchools, playerGroup) {
   });
 }
 
+// Helpers para picks únicos sem duplicar com o jogador
+function _randExcluding(pool, excludeName) {
+  const avail = pool.filter(p => p.name !== excludeName);
+  return avail.length ? avail[Math.floor(Math.random()*avail.length)].name : pool[0]?.name || null;
+}
+function _randRainhaExcluding(excludeName) {
+  if(!DB_FAMOSAS?.length) return null;
+  const avail = DB_FAMOSAS.filter(f => f.name !== excludeName);
+  return avail.length ? avail[Math.floor(Math.random()*avail.length)].name : null;
+}
+
+// Ranges realistas de pontuação total por grupo (nota do campeão)
+const GRUPO_SCORE_RANGES = {
+  especial:  [267.0, 270.0],
+  ouro:      [263.5, 268.0],
+  prata:     [259.5, 265.5],
+  bronze:    [254.5, 261.5],
+  avaliacao: [246.0, 256.0],
+};
+const GROUP_ORDER = ['avaliacao','bronze','prata','ouro','especial'];
+
+// Inicializa pools dinâmicos do Livro das Campeãs
+function _initChampGroupPools() {
+  if(gameState.champGroupPools) return;
+  gameState.champGroupPools = {};
+  GROUP_ORDER.forEach(g => {
+    gameState.champGroupPools[g] = (SCHOOLS_DATA[g]||[]).map(s=>s.id);
+  });
+}
+
+// Retorna objeto escola dado um id (busca em todos os grupos)
+function _findSchoolById(id) {
+  return Object.values(SCHOOLS_DATA).flat().find(s=>s.id===id) || null;
+}
+
 function _simularCampeaGrupo(group) {
-  const schools = SCHOOLS_DATA[group];
-  if(!schools || !schools.length) return null;
+  _initChampGroupPools();
+
+  // Pool dinâmico: escolas que ainda estão neste grupo (não promovidas)
+  let poolIds = [...(gameState.champGroupPools[group] || [])];
+
+  // Se o pool ficar muito pequeno, reintegra escolas originais do grupo (simulando rebaixamentos)
+  if(poolIds.length < 3) {
+    const origIds = (SCHOOLS_DATA[group]||[]).map(s=>s.id);
+    origIds.forEach(id => { if(!poolIds.includes(id)) poolIds.push(id); });
+    gameState.champGroupPools[group] = poolIds;
+  }
+
+  // Resolver objetos escola a partir dos ids
+  const schools = poolIds.map(id=>_findSchoolById(id)).filter(Boolean);
+  if(!schools.length) return null;
+
   const jRules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
 
   const results = schools.map(s => {
@@ -19253,29 +19941,91 @@ function _simularCampeaGrupo(group) {
   }).sort((a,b)=>b.totalCent-a.totalCent);
 
   const winner = results[0].s;
-  const score = clamp(Math.round(results[0].totalCent/10)/10, 250, 270);
 
-  // Gerar profissionais aleatórios — excluindo os da escola do jogador no ano atual
+  // ── Pontuação realista baseada no grupo ────────────────────
+  const [minS, maxS] = GRUPO_SCORE_RANGES[group] || [265.0, 270.0];
+  const allCents = results.map(r=>r.totalCent);
+  const minCent = Math.min(...allCents), maxCent = Math.max(...allCents);
+  const qualRatio = maxCent > minCent
+    ? (results[0].totalCent - minCent) / (maxCent - minCent)
+    : (0.65 + Math.random()*0.3);
+  const score = Math.round((minS + qualRatio * (maxS - minS)) * 10) / 10;
+
+  // ── Promoção do vencedor (grupos não-especial) ─────────────
+  if(group !== 'especial') {
+    const groupIdx = GROUP_ORDER.indexOf(group);
+    const nextGroup = GROUP_ORDER[groupIdx + 1];
+
+    // Remove vencedor do pool atual (ele sobe de grupo)
+    gameState.champGroupPools[group] = poolIds.filter(id => id !== winner.id);
+
+    // Adiciona ao pool do grupo acima
+    if(nextGroup) {
+      if(!gameState.champGroupPools[nextGroup]) {
+        gameState.champGroupPools[nextGroup] = (SCHOOLS_DATA[nextGroup]||[]).map(s=>s.id);
+      }
+      if(!gameState.champGroupPools[nextGroup].includes(winner.id)) {
+        gameState.champGroupPools[nextGroup].push(winner.id);
+      }
+    }
+
+    // Simular rebaixamento: escola do grupo acima cai para repor (exceto campeãs recentes)
+    if(nextGroup && gameState.champGroupPools[nextGroup] && Math.random() < 0.65) {
+      const abovePool = gameState.champGroupPools[nextGroup];
+      const recentChamps = new Set(
+        (gameState.championsHistory||[])
+          .filter(c => c.group === nextGroup && c.year >= (gameState.year||2024) - 2)
+          .map(c => { const s = _findSchoolById(c.school) || Object.values(SCHOOLS_DATA).flat().find(x=>x.name===c.school); return s?.id; })
+          .filter(Boolean)
+      );
+      const eligible = abovePool.filter(id => !recentChamps.has(id) && id !== winner.id);
+      if(eligible.length) {
+        const relegated = eligible[Math.floor(Math.random() * eligible.length)];
+        gameState.champGroupPools[nextGroup] = abovePool.filter(id => id !== relegated);
+        if(!gameState.champGroupPools[group].includes(relegated)) {
+          gameState.champGroupPools[group].push(relegated);
+        }
+      }
+    }
+  }
+
+  // ── Profissionais do campeão — preferir rivalTeams, depois pool exclusivo ──
   const playerCarnavalesco = gameState.team?.carnavalesco?.name;
   const playerMestre       = gameState.team?.mestre?.name;
   const playerRainha       = gameState.rainha?.name;
 
-  const carnAvail = PROFESSIONALS_DATA.carnavalesco.filter(p=>p.name!==playerCarnavalesco);
-  const mestAvail = PROFESSIONALS_DATA.mestre.filter(p=>p.name!==playerMestre);
-  const rainhaPool = DB_FAMOSAS.filter(f=>f.name!==playerRainha);
+  // IDs já usados pelo jogador e rivais do grupo do jogador
+  const usedIds = new Set();
+  if(gameState.team) Object.values(gameState.team).forEach(v=>{ if(v?.id) usedIds.add(v.id); });
+  Object.values(gameState.rivalTeams||{}).forEach(t=>{
+    Object.values(t).forEach(p=>{ if(p?.id) usedIds.add(p.id); });
+  });
 
-  const randCarnav = carnAvail[Math.floor(Math.random()*carnAvail.length)]?.name || null;
-  const randMestre = mestAvail[Math.floor(Math.random()*mestAvail.length)]?.name || null;
+  // Tentar usar equipe real do vencedor (se ela existir em rivalTeams)
+  const winnerTeam = gameState.rivalTeams?.[winner.id];
+  let randCarnav = winnerTeam?.carnavalesco?.name || null;
+  let randMestre = winnerTeam?.mestre?.name || null;
+
+  // Fallback: pool excluindo usados
+  if(!randCarnav) {
+    const carnAvail = PROFESSIONALS_DATA.carnavalesco.filter(p=>p.name!==playerCarnavalesco && !usedIds.has(p.id));
+    randCarnav = carnAvail[Math.floor(Math.random()*carnAvail.length)]?.name || null;
+  }
+  if(!randMestre) {
+    const mestAvail = PROFESSIONALS_DATA.mestre.filter(p=>p.name!==playerMestre && !usedIds.has(p.id));
+    randMestre = mestAvail[Math.floor(Math.random()*mestAvail.length)]?.name || null;
+  }
+  const rainhaPool = DB_FAMOSAS.filter(f=>f.name!==playerRainha);
   const randRainha = Math.random()>0.3 ? (rainhaPool[Math.floor(Math.random()*rainhaPool.length)]?.name || null) : null;
 
   return {
-    school: winner.name,
+    school: normalizeSchoolName(winner.name),
     score,
     isPlayer: false,
     carnavalesco: randCarnav,
     mestreBateria: randMestre,
     rainha: randRainha,
-    enredo: null,
+    enredo: _gerarEnredoSim(winner.name),
   };
 }
 
@@ -20685,6 +21435,89 @@ function showRenovationDialog(renewals, index) {
 // Terça   1ª = 10º lugar do carnaval anterior
 // ============================================================
 
+function showOrdemCompleta() {
+  const schedule = gameState.paradeSchedule;
+  if(!schedule || !schedule.length) { toast('Ordem ainda não sorteada.','warn'); return; }
+
+  const byDay = {};
+  schedule.forEach(s => { if(!byDay[s.day]) byDay[s.day]=[]; byDay[s.day].push(s); });
+
+  const dayColors = {
+    'Domingo':       '#C9A040',
+    'Segunda-feira': '#3498DB',
+    'Terça-feira':   '#9B59B6',
+    'Sexta-feira':   '#C9A040',
+    'Sábado':        '#27AE60',
+    'Quinta-feira':  '#E67E22',
+    'Quarta-feira de Cinzas': '#7F8C8D',
+    'Sexta-feira das Campeãs':'#D4AF37',
+  };
+
+  const posIcon = (s, dayList) => {
+    if(s.order === 1) return '🎺';
+    if(s.order === dayList.length) return '⭐';
+    return `${s.order}`;
+  };
+
+  const body = Object.entries(byDay).map(([dia, escolas]) => {
+    const cor = dayColors[dia] || 'var(--gold)';
+    const rows = escolas.map(s => {
+      const isPlayer = s.name === gameState.school.name;
+      const isLocked = s.locked;
+      const isOpener = s.order === 1;
+      return `
+        <div style="display:flex;align-items:center;gap:.55rem;padding:.35rem .65rem;
+                    border-radius:5px;
+                    background:${isPlayer?'rgba(212,175,55,.13)':'transparent'};
+                    border:1px solid ${isPlayer?'rgba(212,175,55,.4)':'transparent'};
+                    transition:background .1s">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.95rem;
+                       min-width:26px;text-align:right;
+                       color:${isOpener?'var(--danger)':s.order===escolas.length?'var(--gold)':'var(--text3)'}">${posIcon(s,escolas)}</span>
+          <span style="flex:1;font-size:.85rem;font-weight:${isPlayer?700:400};
+                       color:${isPlayer?'var(--gold-light)':'var(--text)'}">
+            ${s.name}${isPlayer?' 🎭':''}
+          </span>
+          ${isLocked?`<span style="font-size:.6rem;padding:.08rem .3rem;border-radius:3px;background:rgba(155,89,182,.2);color:var(--accent)">🔒 TRAVA</span>`:''}
+          ${isOpener&&!isLocked?`<span style="font-size:.6rem;padding:.08rem .3rem;border-radius:3px;background:rgba(231,76,60,.18);color:var(--danger)">ABRE</span>`:''}
+          ${s.order===escolas.length?`<span style="font-size:.6rem;padding:.08rem .3rem;border-radius:3px;background:rgba(212,175,55,.2);color:var(--gold)">FECHA</span>`:''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div style="margin-bottom:1rem">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.8rem;
+                    letter-spacing:.12em;text-transform:uppercase;color:${cor};
+                    border-bottom:2px solid ${cor}33;padding-bottom:.3rem;margin-bottom:.4rem">
+          ${dia} · ${escolas.length} escola${escolas.length>1?'s':''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.18rem">${rows}</div>
+      </div>`;
+  }).join('');
+
+  // Resumo da posição do jogador
+  const mine = schedule.find(s=>s.name===gameState.school.name);
+  const dayList = byDay[mine?.day]||[];
+  const posDesc = mine?.order===1?'🎺 Abre a noite':mine?.order===dayList.length?'⭐ Fecha a noite':'🎯 Posição intermediária';
+
+  openModal('📋 Ordem Completa dos Desfiles', `
+    <div style="padding:.5rem .85rem;margin-bottom:1rem;
+                background:rgba(212,175,55,.09);border:1px solid rgba(212,175,55,.25);
+                border-radius:7px;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <div>
+        <div style="font-size:.65rem;color:var(--text3);letter-spacing:.1em">SUA ESCOLA</div>
+        <div style="font-family:'Playfair Display',serif;font-style:italic;font-size:1rem;color:var(--gold)">${gameState.school.name}</div>
+      </div>
+      <div style="border-left:1px solid var(--border);padding-left:.75rem">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.6rem;color:var(--gold);line-height:1">${mine?.order}ª</div>
+        <div style="font-size:.78rem;color:var(--text2)">${mine?.day}</div>
+      </div>
+      <div style="font-size:.8rem;color:var(--text2)">${posDesc}</div>
+    </div>
+    <div style="max-height:62vh;overflow-y:auto;padding-right:.25rem">${body}</div>
+  `, [{text:'Fechar', cls:'btn-gray', action:closeModal}], '90vh');
+}
+
 function triggerSorteioOrdem() {
   if(gameState.paradeOrder) return;
 
@@ -20738,6 +21571,17 @@ function triggerSorteioOrdem() {
   // Trava Terça 1ª: 10º lugar do carnaval anterior
   let tercaAbridora = gameState.prevSeason10th || null;
   // Sem registro histórico = sem trava
+
+  // ── Fallback primeira temporada: 3 escolas mais fracas do grupo ──
+  if(!domingoAbridora && !segundaAbridora && !tercaAbridora) {
+    const poolEspecial = (gameState.grupos?.especial || SCHOOLS_DATA.especial || []);
+    const sorted = [...poolEspecial]
+      .sort((a,b) => ((a.tradition||60)+(a.community||55)) - ((b.tradition||60)+(b.community||55)));
+    const weak = sorted.slice(0, 3);
+    domingoAbridora = weak[0]?.name || null;
+    segundaAbridora = weak[1]?.name || null;
+    tercaAbridora   = weak[2]?.name || null;
+  }
 
   // Garantir unicidade — se a mesma escola aparecer em dois slots, anula o duplicado
   const usedLocks = new Set();
@@ -20798,6 +21642,9 @@ function triggerSorteioOrdem() {
   gameState.dayOpeners = lockedOpeners;
   gameState.isOpenerThisYear = (mine.order === 1);
 
+  // Mapa id→nome para armazenar openerSchools com ids (usado em simulateRivalScores pelo nome)
+  // dayOpeners já usa nome — compatível com simulateRivalScores
+
   const byDay = {};
   schedule.forEach(s=>{ if(!byDay[s.day]) byDay[s.day]=[]; byDay[s.day].push(s); });
 
@@ -20813,8 +21660,11 @@ function triggerSorteioOrdem() {
   const playerIsOpener = mine.order === 1;
   const openerAlert = playerIsOpener ? `
     <div style="padding:.65rem .85rem;margin-top:.6rem;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:6px;font-size:.8rem;color:var(--danger)">
-      ⚠️ <strong>Atenção:</strong> Abrir a noite é uma posição desafiadora. O público está chegando e os jurados ainda estão calibrando.
-      Sua escola precisará de um desfile excepcional para compensar. <em>Penalidade de abertura: −0.1 por quesito.</em>
+      ⚠️ <strong>Atenção — Penalidade de Abertura Ativa:</strong><br>
+      O público está chegando, os jurados ainda estão calibrando o olhar.
+      Sua escola sofrerá penalidade real: <strong>qualidade dos quesitos reduzida em 15%</strong> e <strong>−0.1 ponto por quesito</strong> na nota final.
+      Isso equivale a perda de até <strong>~2 pontos no total</strong> — prepare um desfile excepcional!
+      ${gameState.openerPenaltyDisabled ? '<br><span style="color:var(--success)">✅ Penalidade negociada e reduzida via Cúpula.</span>' : ''}
     </div>` : '';
 
   openModal('🎲 Sorteio da Ordem dos Desfiles — Grupo Especial', `
@@ -22106,6 +22956,7 @@ window._verResultadoEnsaio = function(ordem) {
 document.addEventListener('DOMContentLoaded', ()=>{
   const ov = document.getElementById('loadingOverlay');
   if(ov) ov.style.display = 'none';
+  renderSaveSlots(); // Renderiza slots na tela inicial
 });
 // Fallback extra: esconde em 800ms de qualquer forma
 setTimeout(()=>{ const ov = document.getElementById('loadingOverlay'); if(ov) ov.style.display = 'none'; }, 800);
