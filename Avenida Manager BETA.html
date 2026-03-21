@@ -1645,6 +1645,88 @@ const LEAGUE_NAMES = {
   bronze:'Série Bronze',avaliacao:'Grupo de Avaliação'
 };
 
+// Profissionais por escola (grupos Ouro/Prata: carnavalesco + mestre; Bronze/Avaliação: diretorEscola)
+const SCHOOL_PROFESSIONALS = {
+  // ── Série Ouro ──────────────────────────────────────────────
+  niteroi:         { carnavalesco:'Cahê Rodrigues',    mestre:'Mestre Júnior'       },
+  imperioserrano:  { carnavalesco:'Mauro Quintaes',    mestre:'Mestre Fafá'         },
+  padremiguel:     { carnavalesco:'Wagner Gonçalves',  mestre:'Mestre Serginho'     },
+  uniaodailha:     { carnavalesco:'Rosa Magalhães',    mestre:'Mestre Dedé'         },
+  emcimadahora:    { carnavalesco:'Renato Sant\'Anna', mestre:'Mestre Thiago'       },
+  estacio:         { carnavalesco:'Cid Carvalho',      mestre:'Mestre André'        },
+  portodapedra:    { carnavalesco:'Leonardo Bora',     mestre:'Mestre Robertinho'   },
+  parqueacari:     { carnavalesco:'Gustavo Fernandes', mestre:'Mestre Helinho'      },
+  botafogo:        { carnavalesco:'Marcos Pereira',    mestre:'Mestre Gilson'       },
+  vigario:         { carnavalesco:'Elmo Martins',      mestre:'Mestre Renatinho'    },
+  unidosdaponte:   { carnavalesco:'Oswaldo Cruz Jr.',  mestre:'Mestre Evandro'      },
+  bangu:           { carnavalesco:'Edson Pereira',     mestre:'Mestre Paulinho'     },
+  arranco:         { carnavalesco:'Roberto Alves',     mestre:'Mestre Claudio'      },
+  santacruz:       { carnavalesco:'Felipe Braga',      mestre:'Mestre Sérgio Lima'  },
+  // ── Série Prata ─────────────────────────────────────────────
+  inocentes:       { carnavalesco:'André Rodrigues',   mestre:'Mestre Didi'         },
+  jacarezinho:     { carnavalesco:'Sandro Lima',       mestre:'Mestre Carlinhos'    },
+  saoclemente:     { carnavalesco:'Tarcísio Zanon',    mestre:'Mestre Renato Jr.'   },
+  vilasantatereza: { carnavalesco:'Maria das Graças',  mestre:'Mestre Beto'         },
+  cubango:         { carnavalesco:'Jorge Ramos',       mestre:'Mestre Márcio'       },
+  imperioduva:     { carnavalesco:'Claudinho Moura',   mestre:'Mestre Alex'         },
+  renascer:        { carnavalesco:'Nilton Souza',      mestre:'Mestre Toninho'      },
+  flamanguaca:     { carnavalesco:'Davi Castro',       mestre:'Mestre Wanderley'    },
+  unidosdelucas:   { carnavalesco:'Paulo Henrique',    mestre:'Mestre Gilberto'     },
+  abolicao:        { carnavalesco:'Renata Costa',      mestre:'Mestre Léo'          },
+  feiticarioca:    { carnavalesco:'Carlos Vidal',      mestre:'Mestre Edmundo'      },
+  imperiotijuca:   { carnavalesco:'Fábio Luiz',        mestre:'Mestre Waldemar'     },
+  tubarao:         { carnavalesco:'Márcia Ramos',      mestre:'Mestre Henrique'     },
+  tradicao:        { carnavalesco:'José Carlos',       mestre:'Mestre Antônio'      },
+  alegriadevilar:  { carnavalesco:'Silvana Azevedo',   mestre:'Mestre Douglas'      },
+  santamarta:      { carnavalesco:'Roberto Mesquita',  mestre:'Mestre Luiz'         },
+  olaria:          { carnavalesco:'Vera Lúcia',        mestre:'Mestre Rodrigo'      },
+  rocinha:         { carnavalesco:'Ivo Meirelles',     mestre:'Mestre Dinho'        },
+  linsimperial:    { carnavalesco:'Eduardo Mota',      mestre:'Mestre Vanderlei'    },
+  curicica:        { carnavalesco:'Sandra Torres',     mestre:'Mestre Zé do Baile'  },
+  engenho:         { carnavalesco:'Luiz Augusto',      mestre:'Mestre Pato'         },
+  arrastaocarioca: { carnavalesco:'Tânia Borges',      mestre:'Mestre Cléber'       },
+  sereno:          { carnavalesco:'Gabriel Souza',     mestre:'Mestre Kléber'       },
+  leaoquintino:    { carnavalesco:'Renato Lima',       mestre:'Mestre Bruno'        },
+  // ── Série Bronze — Diretor da Escola ────────────────────────
+  leaonovaiguacu:  { diretorEscola:'José Ferreira'       },
+  vizinha:         { diretorEscola:'Dona Lurdes Pereira' },
+  chatuba:         { diretorEscola:'Niltinho Chatuba'    },
+  pracadabandeira: { diretorEscola:'Alfredo Souza'       },
+  dende:           { diretorEscola:'Carlos Ilha'         },
+  sirideramos:     { diretorEscola:'Waldemar Ramos'      },
+  jacarepagua:     { diretorEscola:'Vera Jacaré'         },
+  imperionovaiguacu:{ diretorEscola:'Toninho Imperial'   },
+  rosadeouro:      { diretorEscola:'Dita Rosa'           },
+  cosmos:          { diretorEscola:'Astro Cosmos'        },
+  boida:           { diretorEscola:'Zé do Boi'           },
+  vicentedecarvalho:{ diretorEscola:'Paulo Vicente'      },
+  cabucu:          { diretorEscola:'Marli Cabuçu'        },
+  academicosdorecreio:{ diretorEscola:'Sérgio Recreio'   },
+  alegriadecopacabana:{ diretorEscola:'Rui Alegria'      },
+  imperadores:     { diretorEscola:'Oswaldo Rubro'       },
+  novoimperio:     { diretorEscola:'Gelso Novo'          },
+  cruzmaltina:     { diretorEscola:'Dirceu Cruz'         },
+  caprichosos:     { diretorEscola:'Capri Pilares'       },
+  villarica:       { diretorEscola:'Riquelme Villa'      },
+  dificileonome:   { diretorEscola:'Benedito Difícil'    },
+  casademalandro:  { diretorEscola:'Malandragem Geral'   },
+  // ── Grupo de Avaliação — Diretor da Escola ───────────────────
+  flordemina:      { diretorEscola:'Florzinha do Andaraí'},
+  vilakennedy:     { diretorEscola:'Presidente Kennedy'  },
+  barradatijuca:   { diretorEscola:'Barão da Tijuca'     },
+  concentraimperial:{ diretorEscola:'Coronel Imperial'   },
+  racarubronegra:  { diretorEscola:'Raça Vermelha'       },
+  bangay:          { diretorEscola:'Bangay da Silva'      },
+  aramericardo:    { diretorEscola:'Ricardo Arame'       },
+  imperioricardense:{ diretorEscola:'Imperador Ricardo'  },
+  gatodebonsucesso:{ diretorEscola:'Gato Bonsucesso'     },
+  jacarepaguaav:   { diretorEscola:'Gilmar Jacaré'       },
+  coroado:         { diretorEscola:'Marechal Coroado'    },
+  mocidadeunida:   { diretorEscola:'Dona Cidinha'        },
+  manguinhos:      { diretorEscola:'Zé Manguinhos'       },
+  mocidadeinhauma: { diretorEscola:'Inhaúma Presente'    },
+};
+
 const PROFESSIONALS_DATA = {
   carnavalesco: [
     {id:'cp1',name:'Paulo Barros',role:'carnavalesco',emoji:'🎨',creativity:98,discipline:72,experience:95,popularity:92,management:80,cost:1500000,style:'vanguardista'},
@@ -19989,7 +20071,7 @@ function _simularCampeaGrupo(group) {
     }
   }
 
-  // ── Profissionais do campeão — preferir rivalTeams, depois pool exclusivo ──
+  // ── Profissionais do campeão — usar SCHOOL_PROFESSIONALS primeiro ──
   const playerCarnavalesco = gameState.team?.carnavalesco?.name;
   const playerMestre       = gameState.team?.mestre?.name;
   const playerRainha       = gameState.rainha?.name;
@@ -20001,19 +20083,17 @@ function _simularCampeaGrupo(group) {
     Object.values(t).forEach(p=>{ if(p?.id) usedIds.add(p.id); });
   });
 
-  // Tentar usar equipe real do vencedor (se ela existir em rivalTeams)
-  const winnerTeam = gameState.rivalTeams?.[winner.id];
-  let randCarnav = winnerTeam?.carnavalesco?.name || null;
-  let randMestre = winnerTeam?.mestre?.name || null;
+  const schoolProf = SCHOOL_PROFESSIONALS[winner.id] || {};
+  const isBronzeOrAval = (group === 'bronze' || group === 'avaliacao');
 
-  // Fallback: pool excluindo usados
-  if(!randCarnav) {
-    const carnAvail = PROFESSIONALS_DATA.carnavalesco.filter(p=>p.name!==playerCarnavalesco && !usedIds.has(p.id));
-    randCarnav = carnAvail[Math.floor(Math.random()*carnAvail.length)]?.name || null;
-  }
-  if(!randMestre) {
-    const mestAvail = PROFESSIONALS_DATA.mestre.filter(p=>p.name!==playerMestre && !usedIds.has(p.id));
-    randMestre = mestAvail[Math.floor(Math.random()*mestAvail.length)]?.name || null;
+  let randCarnav = null, randMestre = null, randDiretor = null;
+
+  if(isBronzeOrAval) {
+    randDiretor = schoolProf.diretorEscola || null;
+  } else {
+    // Ouro / Prata: usar profissional fixo da escola, com fallback aleatório
+    randCarnav = schoolProf.carnavalesco || _randExcluding(PROFESSIONALS_DATA.carnavalesco, playerCarnavalesco);
+    randMestre = schoolProf.mestre || _randExcluding(PROFESSIONALS_DATA.mestre, playerMestre);
   }
   const rainhaPool = DB_FAMOSAS.filter(f=>f.name!==playerRainha);
   const randRainha = Math.random()>0.3 ? (rainhaPool[Math.floor(Math.random()*rainhaPool.length)]?.name || null) : null;
@@ -20024,6 +20104,7 @@ function _simularCampeaGrupo(group) {
     isPlayer: false,
     carnavalesco: randCarnav,
     mestreBateria: randMestre,
+    diretorEscola: randDiretor,
     rainha: randRainha,
     enredo: _gerarEnredoSim(winner.name),
   };
@@ -20282,8 +20363,8 @@ function _renderHistoricoCampeas() {
       <td><span style="font-size:.62rem;padding:.08rem .3rem;border-radius:3px;background:${gc}22;color:${gc};white-space:nowrap">${LEAGUE_NAMES[c.group]||c.group}</span></td>
       <td style="font-weight:700;color:${isP?'var(--gold-light)':'var(--text)'}">${c.school}${isP?' 🎭':''}${streakLabel}</td>
       <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--success);font-size:.88rem">${c.score?c.score.toFixed(1):'—'}</td>
-      <td style="font-size:.72rem;color:var(--text2)">${c.carnavalesco||'—'}</td>
-      <td style="font-size:.72rem;color:var(--text2)">${c.mestreBateria||'—'}</td>
+      <td style="font-size:.72rem;color:var(--text2)">${(c.group==='bronze'||c.group==='avaliacao') ? (c.diretorEscola||'—') : (c.carnavalesco||'—')}</td>
+      <td style="font-size:.72rem;color:var(--text2)">${(c.group==='bronze'||c.group==='avaliacao') ? '—' : (c.mestreBateria||'—')}</td>
       <td style="font-size:.72rem;color:var(--text2)">${c.rainha||'—'}</td>
       <td style="font-size:.72rem;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.enredo||'—'}</td>
     </tr>`;
@@ -20301,7 +20382,7 @@ function _renderHistoricoCampeas() {
           <th>${sortBtn('year_desc','Ano')}</th><th>Grupo</th>
           <th>${sortBtn('school','Campeã')}</th>
           <th>${sortBtn('score_desc','Nota')}</th>
-          <th>Carnavalesco</th><th>Mestre de Bateria</th><th>Rainha</th><th>Enredo</th>
+          <th>Carnavalesco / Diretor</th><th>Mestre de Bateria</th><th>Rainha</th><th>Enredo</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -20360,6 +20441,11 @@ function _calcConsecutivas(data) {
 function abrirDetalhesCampea(c) {
   if(typeof c === 'string') c = JSON.parse(c);
   const gc = {especial:'var(--gold)',ouro:'var(--accent)',prata:'var(--info)',bronze:'var(--warn)',avaliacao:'var(--text3)'}[c.group]||'var(--text2)';
+  const isBronzeAval = c.group === 'bronze' || c.group === 'avaliacao';
+  const profFields = isBronzeAval
+    ? [['🏛️ Diretor da Escola', c.diretorEscola], ['📜 Enredo', c.enredo]]
+    : [['🎨 Carnavalesco', c.carnavalesco], ['🥁 Mestre de Bateria', c.mestreBateria], ['👸 Rainha de Bateria', c.rainha], ['📜 Enredo', c.enredo]];
+
   openModal(`🏆 Campeã ${c.year} — ${LEAGUE_NAMES[c.group]||c.group}`, `
   <div style="text-align:center;margin-bottom:1rem">
     <div style="font-family:'Playfair Display',serif;font-style:italic;font-size:1.6rem;color:var(--gold);line-height:1">${c.school}</div>
@@ -20368,7 +20454,7 @@ function abrirDetalhesCampea(c) {
     ${c.isPlayer?'<div style="font-size:.72rem;color:var(--accent);margin-top:.3rem">🎭 Sua escola</div>':''}
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.8rem">
-    ${[['🎨 Carnavalesco',c.carnavalesco],['🥁 Mestre de Bateria',c.mestreBateria],['👸 Rainha de Bateria',c.rainha],['📜 Enredo',c.enredo]].map(([lbl,val])=>`
+    ${profFields.map(([lbl,val])=>`
     <div style="padding:.4rem .6rem;background:var(--panel2);border-radius:5px">
       <div style="font-size:.62rem;color:var(--text3)">${lbl}</div>
       <div style="font-weight:600;color:var(--text);margin-top:.15rem">${val||'—'}</div>
