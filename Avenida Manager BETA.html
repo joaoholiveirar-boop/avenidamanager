@@ -5474,6 +5474,9 @@ function initGameState(school, difficulty) {
     ligaElectionPending: false,
     escandalosLog: [],
     championsHistory: [],   // registro histórico de campeãs por ano e grupo
+    ligaRegras: [],         // regras aprovadas pela cúpula (permanentes)
+    conselhoDasCinco: null, // Conselho das Cinco escolas
+    globalCycles: {},       // ciclos de desempenho de todas as escolas
     ligaCupula: null,       // { presidente, conselheiros[], comissao[], representantes[] }
     ligaPautas: [],         // votações agendadas
     ligaPautasHistorico: [], // pautas encerradas
@@ -13713,8 +13716,8 @@ function renderLigaTab() {
   initLigaCupula();
   const sec = gameState._ligaSection || 'cupula';
 
-  const secNav = ['cupula','pautas','historico','jurados'].map(s => {
-    const labels = {cupula:'👥 Cúpula', pautas:'🗳️ Pautas', historico:'📋 Histórico', jurados:'⚖️ Jurados'};
+  const secNav = ['cupula','pautas','historico','jurados','conselho'].map(s => {
+    const labels = {cupula:'👥 Cúpula', pautas:'🗳️ Pautas', historico:'📋 Histórico', jurados:'⚖️ Jurados', conselho:'👑 Conselho das Cinco'};
     const active = sec === s;
     return `<button onclick="gameState._ligaSection='${s}';renderPolitics()" style="padding:.3rem .7rem;border-radius:4px;border:1px solid ${active?'var(--gold)':'var(--border)'};background:${active?'rgba(212,175,55,.12)':'var(--bg2)'};color:${active?'var(--gold)':'var(--text2)'};font-size:.75rem;cursor:pointer;font-family:inherit">${labels[s]}</button>`;
   }).join('');
@@ -13725,6 +13728,7 @@ function renderLigaTab() {
   else if(sec === 'pautas')   body += _renderSecPautas();
   else if(sec === 'historico') body += _renderSecHistorico();
   else if(sec === 'jurados')  body += _renderSecJurados();
+  else if(sec === 'conselho') body += _renderSecConselho();
   return body;
 }
 
@@ -13862,7 +13866,11 @@ function _renderSecJurados() {
         <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
           <span style="font-size:1.1rem">${queIcon[k]}</span>
           <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;flex:1">${queLabel[k]}</div>
-          ${bonus?`<span style="font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:${bonus.garantido10?'rgba(231,76,60,.2)':'rgba(155,89,182,.15)'};color:${bonus.garantido10?'var(--danger)':'var(--accent)'}">${bonus.garantido10?'🔴 NOTA 10 GARANTIDA':'🟣 PRESENTE: +'+bonus.bonus.toFixed(1)+' pts'}</span>`:''}
+          ${bonus && bonus.descoberto ?
+            `<span style="font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:rgba(231,76,60,.2);color:var(--danger);font-weight:700;animation:pulse 1.5s infinite">⚠️ TENTATIVA EXPOSTA — Penalidade ativa</span>` :
+            bonus ?
+            `<span style="font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:${bonus.garantido10?'rgba(231,76,60,.2)':'rgba(155,89,182,.15)'};color:${bonus.garantido10?'var(--danger)':'var(--accent)'}">${bonus.garantido10?'🔴 NOTA 10 GARANTIDA':'🟣 PRESENTE: +'+bonus.bonus.toFixed(1)+' pts'}</span>` :
+            ''}
           ${!locked&&!bonus?`<button class="btn btn-gray btn-sm" style="font-size:.68rem" onclick="abrirInfluenciaJurado('${k}')">⚖️ Influenciar</button>`:''}
           ${locked?`<span style="font-size:.65rem;color:var(--text3)">🔒 Requer relação ≥40 com Comissão</span>`:''}
         </div>
@@ -13932,54 +13940,664 @@ function confirmarInfluenciaJurado(queKey, tipo, valor, mId) {
   gameState.budget -= valor;
   gameState.expenses.politica = (gameState.expenses.politica||0) + valor;
 
-  // Chance de descoberta
+  // Chance de descoberta — maior com mais dinheiro envolvido e reputação alta (mais visível)
   const chanceDesc = clamp(0.05 + (valor/2000000)*0.45 + (gameState.reputation>70?0.15:0) - (relInt/100)*0.25, 0.04, 0.88);
   const descoberto = Math.random() < chanceDesc;
 
   if(!gameState.ligaJuradosBonuses) gameState.ligaJuradosBonuses = {};
-  if(tipo === 'presente') {
-    const bonusNota = 0.1 + (valor/500000)*0.2;
-    gameState.ligaJuradosBonuses[queKey] = {bonus: bonusNota, garantido10: false, descoberto};
-  } else {
-    gameState.ligaJuradosBonuses[queKey] = {bonus: 0, garantido10: true, descoberto};
-  }
+  const queLabel2 = {bateria:'Bateria',harmonia:'Harmonia',alegorias:'Alegorias',comissao:'Comissão de Frente',enredo:'Enredo',evolucao:'Evolução',fantasias:'Fantasias',casal:'Mestre-Sala e Porta-Band.',samba:'Samba-Enredo'};
+  const queNome = queLabel2[queKey]||queKey;
 
   if(descoberto) {
     const multa = valor * 2;
     gameState.budget -= multa;
-    gameState.reputation = clamp(gameState.reputation - 60, 0, 100);
-    gameState.community = clamp(gameState.community - 30, 0, 100);
+    gameState.reputation   = clamp(gameState.reputation   - 60, 0, 100);
+    gameState.community    = clamp(gameState.community    - 30, 0, 100);
     gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50) - 35, 0, 100);
+
+    // Penalidade na apuração: desconto de 0,3 pts no quesito + 0,2 pts no total
+    const penQuesito = 3;   // centésimos de nota por jurado → −0,3 no quesito
+    const penTotal   = 20;  // centésimos no total geral → −0,2
+
+    // Gravar no bonus com flag de descoberto E penalidade
+    gameState.ligaJuradosBonuses[queKey] = {
+      bonus: 0, garantido10: false,
+      descoberto: true,
+      penQuesito,
+      penTotal,
+    };
+
+    // Escândalo no log
     if(!gameState.escandalosLog) gameState.escandalosLog = [];
-    gameState.escandalosLog.push({icon:'🚨', texto:`Tentativa de corromper jurado de ${queKey} descoberta. Multa: R$ ${fmt(multa)}.`, severity:'critica', mes:MONTHS_DATA[gameState.month]?.name, ano:gameState.year});
-    addEvent(`🚨 ESCÂNDALO GRAVÍSSIMO: Corrupção de jurado de ${queKey} exposta! Multa R$ ${fmt(multa)}, reputação −60.`, 'bad');
+    gameState.escandalosLog.push({
+      icon:'🚨',
+      texto:`Tentativa de corromper jurado de ${queNome} descoberta. Multa: R$ ${fmt(multa)}.`,
+      severity:'critica',
+      mes: MONTHS_DATA[gameState.month]?.name,
+      ano: gameState.year,
+    });
+
+    // Notícia na imprensa — vaza para vários veículos
+    const manchetes = [
+      `"${gameState.school.name} tenta corromper jurado de ${queNome}, diz fonte da liga"`,
+      `"Escândalo no carnaval: tentativa de suborno exposta na Sapucaí"`,
+      `"Liga abre investigação contra ${gameState.school.name} por irregularidade na apuração"`,
+      `"Jurado de ${queNome} recusa proposta suspeita de dirigente da escola"`,
+    ];
+    const manchete = manchetes[Math.floor(Math.random()*manchetes.length)];
+    addEvent(`📰 MANCHETE: ${manchete}`, 'bad');
+    addEvent(`🚨 ESCÂNDALO: Corrupção de jurado de ${queNome} exposta! Multa R$ ${fmt(multa)} · Reputação −60 · Penalidade na apuração aplicada.`, 'bad');
+
+    // Press impact em cada veículo
+    (gameState.pressHistory = gameState.pressHistory||[]).push({
+      year: gameState.year, outlet:'Todos os Veículos',
+      headline: manchete, type:'escandalo',
+      impact:{reputation:-60, community:-30},
+    });
+
     closeModal();
-    openModal('🚨 Corrupção Descoberta!', `
-      <div style="text-align:center;padding:.5rem">
-        <div style="font-size:3rem;margin-bottom:.5rem">🚨</div>
-        <p style="color:var(--danger);font-weight:700">Tentativa de suborno de jurado foi descoberta!</p>
-        <div style="margin-top:.75rem;font-size:.82rem;display:flex;flex-direction:column;gap:.25rem">
-          <div style="color:var(--danger)">💰 Multa: R$ ${fmt(multa)}</div>
-          <div style="color:var(--danger)">⭐ Reputação −60</div>
-          <div style="color:var(--danger)">❤️ Comunidade −30</div>
-          <div style="color:var(--danger)">🏛️ Relação Liga −35</div>
-          <div style="color:var(--warn);margin-top:.3rem">⚠️ O bônus no quesito foi anulado.</div>
-        </div>
-      </div>
+    openModal('🚨 Tentativa Exposta!', `
+    <div style="text-align:center;margin-bottom:.75rem">
+      <div style="font-size:3rem;margin-bottom:.3rem">🚨</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:800;color:var(--danger)">TENTATIVA DESCOBERTA</div>
+      <div style="font-size:.78rem;color:var(--text2);margin-top:.3rem">Quesito: <strong>${queNome}</strong></div>
+    </div>
+    <div style="padding:.5rem .7rem;background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.3);border-radius:6px;margin-bottom:.65rem;font-size:.75rem;color:var(--danger)">
+      📰 <em>${manchete}</em>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;font-size:.8rem;margin-bottom:.5rem">
+      ${[
+        ['💰 Multa',                `−R$ ${fmt(multa)}`],
+        ['⭐ Reputação',            '−60'],
+        ['❤️ Comunidade',          '−30'],
+        ['🏛️ Relação Liga',        '−35'],
+        ['📉 Penalidade apuração', `−0,3 pts em ${queNome}`],
+        ['📉 Total geral',         '−0,2 pts'],
+      ].map(([lbl,val])=>`<div style="padding:.3rem .5rem;background:var(--panel2);border-radius:4px">
+        <div style="font-size:.62rem;color:var(--text3)">${lbl}</div>
+        <div style="font-weight:700;color:var(--danger)">${val}</div>
+      </div>`).join('')}
+    </div>
+    <div style="font-size:.72rem;color:var(--warn);text-align:center">⚠️ Uma etiqueta de alerta permanece no quesito durante toda a apuração.</div>
     `, [{text:'Aceitar Consequências', action:()=>{closeModal();renderPolitics();}, cls:'btn-danger'}]);
+
   } else {
-    const queLabel2 = {bateria:'Bateria',harmonia:'Harmonia',alegorias:'Alegorias',comissao:'Comissão de Frente',enredo:'Enredo',evolucao:'Evolução',fantasias:'Fantasias',casal:'Mestre-Sala e Porta-Bandeira',samba:'Samba-Enredo'};
-    const msg = tipo==='comprar' ? `Nota 10,0 garantida em ${queLabel2[queKey]||queKey}!` : `Bônus de +${(0.1+(valor/500000)*0.2).toFixed(1)} pts em ${queLabel2[queKey]||queKey}.`;
-    addEvent(`🤫 ${msg} (via intermediário)`, 'gold');
-    closeModal();
-    toast(msg, 'success');
+    // Sucesso — bônus aplicado normalmente
+    if(tipo === 'presente') {
+      const bonusNota = 0.1 + (valor/500000)*0.2;
+      gameState.ligaJuradosBonuses[queKey] = {bonus: bonusNota, garantido10: false, descoberto: false};
+      const msg = `Presente aceito! Bônus de +${bonusNota.toFixed(1)} pts em ${queNome}.`;
+      addEvent(`🤫 ${msg} (via intermediário discreto)`, 'gold');
+      closeModal();
+      toast(msg, 'success');
+    } else {
+      gameState.ligaJuradosBonuses[queKey] = {bonus: 0, garantido10: true, descoberto: false};
+      const msg = `Nota 10,0 garantida em ${queNome}!`;
+      addEvent(`🤫 ${msg}`, 'gold');
+      closeModal();
+      toast(msg, 'success');
+    }
     renderPolitics();
   }
 }
 
 // Limpa jurado bonuses ao resetar a temporada (já coberto pelo ligaJuradosBonuses:{} no reset)
 
-// ── Modal de membro ──────────────────────────────────────────
+// ============================================================
+// ==================== CONSELHO DAS CINCO ==================
+// Sistema de votações com efeitos reais no jogo
+// ============================================================
+
+// Escolas históricas que compõem o Conselho
+const CONSELHO_ESCOLAS_BASE = [
+  {id:'mangueira',  nome:'Mangueira',  emoji:'🟢', influencia:95, perfil:'conservador', rivalDe:[]},
+  {id:'portela',    nome:'Portela',    emoji:'🔵', influencia:92, perfil:'conservador', rivalDe:['mangueira']},
+  {id:'beijaflor',  nome:'Beija-Flor', emoji:'💙', influencia:90, perfil:'pragmatico',  rivalDe:[]},
+  {id:'salgueiro',  nome:'Salgueiro',  emoji:'🔴', influencia:85, perfil:'reformista',  rivalDe:[]},
+  {id:'imperatriz', nome:'Imperatriz', emoji:'⚪', influencia:82, perfil:'neutro',       rivalDe:[]},
+];
+
+// Pautas expandidas com efeitos reais
+const PAUTAS_COMPLETAS = [
+  // ── Regulamento ──────────────────────────────────────────────
+  {id:'p_mais_escolas',    titulo:'Ampliar Grupo Especial',         icon:'📈', cat:'regulamento',
+   desc:'Aumentar de 12 para 14 escolas no Especial. Acesso fica mais fácil.',
+   efeito:{tipo:'grupoEspecialSize', valor:14}, votos_necessarios:8, duração:'permanente',
+   proponentePerfil:'reformista', risco:'baixo'},
+  {id:'p_mais_jurados',    titulo:'4 Jurados em Todos os Grupos',   icon:'⚖️', cat:'regulamento',
+   desc:'Grupos prata e bronze passam a ter 4 jurados. Notas mais rigorosas.',
+   efeito:{tipo:'jurados_plus'}, votos_necessarios:7, duração:'permanente',
+   proponentePerfil:'conservador', risco:'baixo'},
+  {id:'p_rebaixamento',    titulo:'Dois Rebaixamentos no Especial', icon:'📉', cat:'regulamento',
+   desc:'Os dois últimos do Especial são rebaixados (era apenas 1). Pressão máxima.',
+   efeito:{tipo:'rebaixamento_duplo'}, votos_necessarios:8, duração:'permanente',
+   proponentePerfil:'conservador', risco:'medio'},
+  {id:'p_trava_abertura',  titulo:'Abolir Penalidade de Abertura',  icon:'🎺', cat:'regulamento',
+   desc:'Remove a penalidade de –0,1 para quem abre o desfile.',
+   efeito:{tipo:'sem_opener_penalty'}, votos_necessarios:9, duração:'permanente',
+   proponentePerfil:'reformista', risco:'baixo'},
+  {id:'p_prazo_samba',     titulo:'Prazo de Samba até Outubro',     icon:'🎵', cat:'regulamento',
+   desc:'Escolas podem encomendar samba até outubro (era agosto).',
+   efeito:{tipo:'samba_prazo_plus'}, votos_necessarios:6, duração:'permanente',
+   proponentePerfil:'pragmatico', risco:'baixo'},
+  // ── Finanças ─────────────────────────────────────────────────
+  {id:'p_subvencao',       titulo:'Aumento de Subvenção',           icon:'💰', cat:'financas',
+   desc:'Subvenção de todas as escolas sobe 20% nesta temporada.',
+   efeito:{tipo:'subvencao_plus', valor:0.2}, votos_necessarios:6, duração:'temporario',
+   proponentePerfil:'pragmatico', risco:'baixo'},
+  {id:'p_subvencao_corte', titulo:'Cortar Subvenção de Rival',      icon:'✂️', cat:'financas',
+   desc:'Reduz em 30% a subvenção de uma escola rival específica.',
+   efeito:{tipo:'cortar_subvencao_rival', valor:0.3}, votos_necessarios:7, duração:'temporario',
+   proponentePerfil:'conservador', risco:'alto'},
+  {id:'p_fundo_menor',     titulo:'Fundo para Escolas Menores',     icon:'🤝', cat:'financas',
+   desc:'Cria fundo de R$ 500k distribuído entre grupos inferiores.',
+   efeito:{tipo:'fundo_menores', valor:500000}, votos_necessarios:6, duração:'temporario',
+   proponentePerfil:'reformista', risco:'baixo'},
+  // ── Apuração ─────────────────────────────────────────────────
+  {id:'p_substituir_jurado',titulo:'Substituir Jurado de Quesito',  icon:'🔄', cat:'apuracao',
+   desc:'Troca um jurado por outro com perfil mais favorável à sua escola.',
+   efeito:{tipo:'substituir_jurado'}, votos_necessarios:10, duração:'temporario',
+   proponentePerfil:'pragmatico', risco:'alto'},
+  {id:'p_investigar_rival', titulo:'Investigar Escola Rival',       icon:'🔍', cat:'protecao',
+   desc:'Abre investigação contra rival: escândalo, multa e perda de reputação.',
+   efeito:{tipo:'investigar_rival'}, votos_necessarios:7, duração:'temporario',
+   proponentePerfil:'conservador', risco:'alto'},
+  {id:'p_proteger_escola',  titulo:'Proteger Escola de Rebaixamento',icon:'🛡️', cat:'protecao',
+   desc:'Se a escola-alvo cair, permanece no Especial nesta temporada.',
+   efeito:{tipo:'proteger_rebaixamento'}, votos_necessarios:8, duração:'temporario',
+   proponentePerfil:'pragmatico', risco:'medio'},
+];
+
+// Inicializa o Conselho das Cinco no gameState
+function initConselhoDasCinco() {
+  if(gameState.conselhoDasCinco) return;
+  const playerGroup = gameState.school?.group || 'especial';
+  const isPlayerEspecial = playerGroup === 'especial';
+
+  // Montar o conselho com escolas base + influências dinâmicas
+  const membros = CONSELHO_ESCOLAS_BASE.map(e => ({
+    ...e,
+    relacaoComJogador: 20 + Math.floor(Math.random()*40),
+    votoComprometido: null, // null | 'favor' | 'contra'
+    segredo: Math.random() > 0.6 ? _gerarSegredo(e.id) : null,
+  }));
+
+  // O jogador pode ou não ser membro, dependendo de sua escola
+  const playerSchoolId = gameState.school?.id || '';
+  const playerNoConselho = CONSELHO_ESCOLAS_BASE.some(e=>e.id===playerSchoolId);
+
+  gameState.conselhoDasCinco = {
+    membros,
+    playerNoConselho,
+    playerInfluencia: Math.round(
+      (getPisoBandeira(playerSchoolId, gameState.seasonHistory||[], playerGroup) > 0 ? 20 : 5) +
+      (gameState.reputation||50) * 0.3 +
+      (gameState.politicalRelations?.liga||50) * 0.2
+    ),
+    reunioesPendentes: [],
+    historicoVotacoes: [],
+    entrarPedidoPendente: false,
+  };
+
+  // Gerar reuniões para a temporada (meses 2, 5, 8 = Maio, Agosto, Novembro)
+  if(!gameState.ligaPautas?.length) _gerarPautasTemporada();
+}
+
+function _gerarSegredo(escolaId) {
+  const segredos = [
+    'Transação suspeita com empresário conhecido',
+    'Acordo secreto com emissora de TV',
+    'Notas compradas em temporada anterior',
+    'Conflito de interesse com patrocinador',
+    'Presidente contratou parentes em cargos-chave',
+  ];
+  return segredos[Math.floor(Math.random()*segredos.length)];
+}
+
+function _gerarPautasTemporada() {
+  const pool = [...PAUTAS_COMPLETAS].sort(()=>Math.random()-.5).slice(0,4);
+  const meses = [2, 5, 8, 10];
+  gameState.ligaPautas = pool.map((p,i)=>({
+    ...p, mes: meses[i], aprovada: null, votosAFavor:0, votosContra:0,
+    subornados:[], manipulada:false, alvoPauta:null,
+  }));
+}
+
+// ── Calcular influência dinâmica do jogador ─────────────────
+function calcPlayerInfluencia() {
+  const schoolId = gameState.school?.id||'';
+  const group    = gameState.school?.group||'especial';
+  const pesoBand = getPisoBandeira(schoolId, gameState.seasonHistory||[], group) > 0 ? 15 : 0;
+  const rep      = (gameState.reputation||50) * 0.4;
+  const pol      = (gameState.politicalRelations?.liga||50) * 0.3;
+  const titles   = (gameState.seasonHistory||[]).filter(h=>h.position===1).length * 5;
+  return Math.min(100, Math.round(pesoBand + rep + pol + titles));
+}
+
+// ── Simular Votação de Pauta ──────────────────────────────────
+function simularVotacaoPauta(pId) {
+  const p = (gameState.ligaPautas||[]).find(x=>x.id===pId);
+  if(!p) return;
+
+  initLigaCupula();
+  initConselhoDasCinco();
+
+  // Abrir modal de votação dramático
+  const playerInfluencia = calcPlayerInfluencia();
+  const conselho = gameState.conselhoDasCinco?.membros || [];
+
+  const html = `
+  <div style="text-align:center;margin-bottom:1rem">
+    <div style="font-size:2rem;margin-bottom:.3rem">${p.icon}</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.2rem">${p.titulo}</div>
+    <div style="font-size:.78rem;color:var(--text2);margin:.3rem 0">${p.desc}</div>
+    <span style="font-size:.65rem;padding:.15rem .45rem;border-radius:3px;background:rgba(212,175,55,.1);color:var(--gold)">Sua influência: ${playerInfluencia}</span>
+  </div>
+
+  <div style="margin-bottom:.85rem">
+    <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem">Conselho das Cinco — Posições</div>
+    ${conselho.map(m => {
+      const relColor = m.relacaoComJogador>=60?'var(--success)':m.relacaoComJogador>=35?'var(--warn)':'var(--danger)';
+      const apoios = (p._apoiosGarantidos||0)+(p._subornados||[]).length;
+      const isSubornado = (p._subornados||[]).includes(m.id);
+      const tendencia = isSubornado ? 'A FAVOR 💰' :
+        m.relacaoComJogador >= 65 ? 'Favorável' :
+        m.relacaoComJogador >= 40 ? 'Incerto' : 'Contra';
+      const tendColor = isSubornado?'var(--accent)':m.relacaoComJogador>=65?'var(--success)':m.relacaoComJogador>=40?'var(--warn)':'var(--danger)';
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem;background:var(--panel2);border-radius:5px;margin-bottom:.2rem">
+        <span style="font-size:1.1rem">${m.emoji}</span>
+        <div style="flex:1">
+          <div style="font-size:.8rem;font-weight:700">${m.nome}</div>
+          <div style="font-size:.62rem;color:var(--text3)">Influência ${m.influencia} · Rel. <span style="color:${relColor}">${m.relacaoComJogador}</span></div>
+        </div>
+        <span style="font-size:.68rem;padding:.1rem .3rem;border-radius:3px;background:${tendColor}22;color:${tendColor}">${tendencia}</span>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <div style="padding:.5rem .75rem;background:rgba(52,152,219,.07);border:1px solid rgba(52,152,219,.25);border-radius:6px;font-size:.78rem;color:var(--text2);margin-bottom:.75rem">
+    Apoios garantidos: <strong>${(p._apoiosGarantidos||0)+(p._subornados||[]).length}</strong> de ${p.votos_necessarios} necessários
+  </div>
+
+  <div style="font-size:.72rem;color:var(--text3);margin-bottom:.4rem">Seu voto:</div>
+  <div style="display:flex;gap:.5rem;justify-content:center">
+    <button class="btn btn-green btn-sm" onclick="_votar('${pId}','favor')">✅ A Favor</button>
+    <button class="btn btn-gray btn-sm" onclick="_votar('${pId}','abster')">🤐 Abster</button>
+    <button class="btn btn-danger btn-sm" onclick="_votar('${pId}','contra')">❌ Contra</button>
+  </div>`;
+
+  openModal(`🗳️ Votação da Cúpula — ${p.titulo}`, html, [{text:'Cancelar', action:closeModal, cls:'btn-gray'}]);
+}
+
+function _votar(pId, voto) {
+  const p = (gameState.ligaPautas||[]).find(x=>x.id===pId);
+  if(!p) return;
+  closeModal();
+
+  const conselho = gameState.conselhoDasCinco?.membros || [];
+  const playerInfluencia = calcPlayerInfluencia();
+
+  // Calcular votos de cada membro do conselho
+  let votosAFavor = voto === 'favor' ? playerInfluencia : 0;
+  let votosContra = voto === 'contra' ? playerInfluencia : 0;
+  let logVotos = [];
+
+  conselho.forEach(m => {
+    const isSubornado = (p._subornados||[]).includes(m.id);
+    const apoiouAntes = (p._apoiosGarantidos||0) > 0 &&
+      (gameState.ligaInteracoes||[]).some(i=>i.mId===('rep_'+m.id.replace('_','')) && i.acao==='solicitar_apoio');
+    let votoMembro;
+    if(isSubornado) {
+      votoMembro = 'favor';
+    } else {
+      const chanceF = clamp((m.relacaoComJogador/100)*0.65 + (voto==='favor'?0.15:-0.1) + (apoiouAntes?0.2:0), 0.05, 0.95);
+      votoMembro = Math.random() < chanceF ? 'favor' : 'contra';
+    }
+    if(votoMembro === 'favor') votosAFavor += m.influencia;
+    else votosContra += m.influencia;
+    logVotos.push({nome:m.nome, voto:votoMembro, influencia:m.influencia});
+  });
+
+  // Membros gerais da cúpula (conselheiros + representantes)
+  const outrMembros = getAllCuplaMembers().filter(m=>!m.cargo?.includes('Presidente')&&!conselho.some(c=>c.nome===m.nome));
+  outrMembros.forEach(m=>{
+    const chanceF = clamp((m.relacao||40)/100*0.5 + 0.2, 0.1, 0.9);
+    if(Math.random() < chanceF) votosAFavor += 3;
+    else votosContra += 3;
+  });
+
+  const totalVotos = votosAFavor + votosContra;
+  p.votosAFavor = votosAFavor;
+  p.votosContra = votosContra;
+  p.aprovada = votosAFavor > votosContra;
+  p.ano = gameState.year;
+  p._votoJogador = voto;
+
+  // Aplicar efeitos
+  if(p.aprovada) {
+    aplicarEfeitoPauta(p);
+  }
+
+  // Mover para histórico
+  gameState.ligaPautasHistorico = gameState.ligaPautasHistorico||[];
+  gameState.ligaPautasHistorico.push({...p, logVotos});
+  gameState.ligaPautas = (gameState.ligaPautas||[]).filter(x=>x.id!==pId);
+
+  // Salvar em ligaRegras se permanente
+  if(p.aprovada && p.duração === 'permanente') {
+    gameState.ligaRegras = gameState.ligaRegras||[];
+    if(!gameState.ligaRegras.some(r=>r.tipo===p.efeito?.tipo)) {
+      gameState.ligaRegras.push({tipo:p.efeito?.tipo, aplicadaDesde:gameState.year, pautaId:p.id});
+    }
+  }
+
+  // Relações mudam conforme resultado
+  if(gameState.conselhoDasCinco) {
+    gameState.conselhoDasCinco.membros.forEach(m=>{
+      const delta = logVotos.find(v=>v.nome===m.nome)?.voto === voto ? +3 : -2;
+      m.relacaoComJogador = clamp((m.relacaoComJogador||40)+delta, 0, 100);
+    });
+  }
+
+  // Efeitos nas relações políticas
+  if(p.aprovada) {
+    gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50)+5, 0, 100);
+    gameState.politics = clamp(gameState.politics+4, 0, 100);
+    addEvent(`✅ Cúpula aprovou: "${p.titulo}". A decisão entra em vigor agora.`, 'gold');
+  } else {
+    gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50)-2, 0, 100);
+    addEvent(`❌ Cúpula rejeitou: "${p.titulo}" (${votosAFavor} × ${votosContra}).`, 'bad');
+  }
+
+  // Modal de resultado com log de votos
+  openModal(`${p.icon} Resultado da Votação`, `
+  <div style="text-align:center;margin-bottom:1rem">
+    <div style="font-size:2.5rem">${p.aprovada?'✅':'❌'}</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:700;color:${p.aprovada?'var(--success)':'var(--danger)'}">
+      ${p.aprovada?'APROVADA':'REJEITADA'}
+    </div>
+    <div style="font-size:.82rem;color:var(--text2);margin-top:.3rem">${p.titulo}</div>
+    <div style="margin:.5rem 0;font-size:.78rem">
+      <span style="color:var(--success)">✅ ${votosAFavor} pts a favor</span>
+      &nbsp;×&nbsp;
+      <span style="color:var(--danger)">❌ ${votosContra} pts contra</span>
+    </div>
+  </div>
+  <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Votos do Conselho</div>
+  <div style="display:flex;flex-direction:column;gap:.2rem;max-height:180px;overflow-y:auto">
+    ${logVotos.map(v=>`<div style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;padding:.2rem .4rem;background:var(--panel2);border-radius:4px">
+      <span style="color:${v.voto==='favor'?'var(--success)':'var(--danger)'}">${v.voto==='favor'?'✅':'❌'}</span>
+      <span style="flex:1">${v.nome}</span>
+      <span style="color:var(--text3)">${v.influencia} pts</span>
+    </div>`).join('')}
+  </div>
+  ${p.aprovada && p.efeito ? `<div style="margin-top:.65rem;padding:.4rem .6rem;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.2);border-radius:5px;font-size:.75rem;color:var(--gold)">
+    ⚡ Efeito aplicado: ${_descEfeitoAplicado(p.efeito)}
+  </div>` : ''}
+  `, [{text:'OK', action:()=>{closeModal();renderPolitics();}, cls:p.aprovada?'btn-green':'btn-danger'}]);
+}
+
+// ── Aplicar efeitos reais das votações ───────────────────────
+function aplicarEfeitoPauta(p) {
+  const ef = p.efeito;
+  if(!ef) return;
+  switch(ef.tipo) {
+    case 'sem_opener_penalty':
+      gameState.openerPenaltyDisabled = true;
+      break;
+    case 'subvencao_plus':
+      gameState.budget += Math.round((gameState.income?.prefeitura||500000) * (ef.valor||0.2));
+      gameState.income.prefeitura = Math.round((gameState.income.prefeitura||500000) * (1+(ef.valor||0.2)));
+      break;
+    case 'rebaixamento_duplo':
+      gameState.ligaRegras = gameState.ligaRegras||[];
+      if(!gameState.ligaRegras.some(r=>r.tipo==='rebaixamento_duplo'))
+        gameState.ligaRegras.push({tipo:'rebaixamento_duplo', aplicadaDesde:gameState.year});
+      break;
+    case 'jurados_plus':
+      // Atualiza GROUP_JUDGING_RULES para grupos menores
+      if(GROUP_JUDGING_RULES.prata) GROUP_JUDGING_RULES.prata.jurados = 4;
+      if(GROUP_JUDGING_RULES.bronze) GROUP_JUDGING_RULES.bronze.jurados = 4;
+      break;
+    case 'grupoEspecialSize':
+      gameState.ligaRegras = gameState.ligaRegras||[];
+      gameState.ligaRegras.push({tipo:'grupoEspecialSize', valor:ef.valor, aplicadaDesde:gameState.year});
+      break;
+    case 'samba_prazo_plus':
+      gameState._sambaPrazoExtendido = true;
+      break;
+    case 'cortar_subvencao_rival': {
+      const alvo = p.alvoPauta || (gameState.rivals||[])[Math.floor(Math.random()*Math.max(1,gameState.rivals?.length||1))];
+      if(alvo) { addEvent(`✂️ Subvenção de ${alvo.name||alvo} cortada em ${Math.round((ef.valor||0.3)*100)}%.`, 'warn'); }
+      break;
+    }
+    case 'fundo_menores':
+      gameState.budget += (ef.valor||500000);
+      gameState.income.eventos = (gameState.income.eventos||0) + (ef.valor||500000);
+      break;
+    case 'substituir_jurado': {
+      // Troca o perfil do primeiro jurado de bateria para 'generoso'
+      const profiles = getOrCreateJuradoProfiles();
+      if(profiles.bateria) profiles.bateria[0] = 'generoso';
+      addEvent('🔄 Jurado de bateria substituído por perfil mais favorável.', 'gold');
+      break;
+    }
+    case 'investigar_rival': {
+      const rival = (gameState.rivals||[])[Math.floor(Math.random()*Math.max(1,gameState.rivals?.length||1))];
+      if(rival) {
+        gameState.escandalosLog = gameState.escandalosLog||[];
+        gameState.escandalosLog.push({icon:'🔍', texto:`Investigação aberta contra ${rival.name}.`, severity:'alta', mes:MONTHS_DATA[gameState.month]?.name, ano:gameState.year});
+        addEvent(`🔍 Investigação aberta contra ${rival.name}! Reputação afetada.`, 'warn');
+      }
+      break;
+    }
+    case 'proteger_rebaixamento':
+      gameState.ligaRegras = gameState.ligaRegras||[];
+      gameState.ligaRegras.push({tipo:'proteger_rebaixamento', escola:gameState.school?.name, aplicadaDesde:gameState.year});
+      break;
+    default:
+      break;
+  }
+}
+
+function _descEfeitoAplicado(ef) {
+  const map = {
+    sem_opener_penalty:'Penalidade de abertura removida para esta temporada.',
+    subvencao_plus:'Subvenção aumentada em 20%. Orçamento reforçado.',
+    rebaixamento_duplo:'Dois últimos do Especial agora são rebaixados.',
+    jurados_plus:'Grupos Prata e Bronze passam a 4 jurados.',
+    grupoEspecialSize:'Grupo Especial ampliado para 14 escolas.',
+    samba_prazo_plus:'Prazo de encomenda de samba estendido até outubro.',
+    cortar_subvencao_rival:'Subvenção de escola rival reduzida.',
+    fundo_menores:'Fundo de R$ 500k distribuído entre grupos menores.',
+    substituir_jurado:'Jurado de bateria substituído por perfil generoso.',
+    investigar_rival:'Investigação aberta contra escola rival.',
+    proteger_rebaixamento:'Sua escola protegida contra rebaixamento esta temporada.',
+  };
+  return map[ef.tipo] || 'Regra aplicada ao jogo.';
+}
+
+// ── Verificar e aplicar regras da Liga no início da temporada ─
+function aplicarLigaRegras() {
+  const regras = gameState.ligaRegras||[];
+  regras.forEach(r => {
+    if(r.tipo === 'rebaixamento_duplo') {
+      // Vai ser lido em showFinalResults — flag já fica no array
+    }
+    if(r.tipo === 'proteger_rebaixamento' && r.escola === gameState.school?.name) {
+      gameState._protegidoRebaixamento = true;
+    }
+  });
+}
+
+// ── Render seção Conselho das Cinco ──────────────────────────
+function _renderSecConselho() {
+  initConselhoDasCinco();
+  const conselho = gameState.conselhoDasCinco?.membros || [];
+  const playerNoConselho = gameState.conselhoDasCinco?.playerNoConselho || false;
+  const playerInfluencia = calcPlayerInfluencia();
+
+  const statusBar = `
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;padding:.5rem .75rem;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.18);border-radius:6px;margin-bottom:.85rem;font-size:.78rem">
+    <span>👑 Conselho das Cinco</span>
+    <span>💪 Sua influência: <strong style="color:var(--gold)">${playerInfluencia}</strong></span>
+    <span style="padding:.05rem .35rem;border-radius:3px;background:${playerNoConselho?'rgba(46,204,113,.15)':'rgba(231,76,60,.12)'};color:${playerNoConselho?'var(--success)':'var(--danger)'}">
+      ${playerNoConselho?'✅ Membro':'❌ Não-membro'}
+    </span>
+  </div>`;
+
+  const membrosHtml = conselho.map(m => {
+    const relColor = m.relacaoComJogador>=60?'var(--success)':m.relacaoComJogador>=35?'var(--warn)':'var(--danger)';
+    return `<div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:.7rem .9rem;cursor:pointer;transition:border-color .2s"
+      onclick="abrirAcoesConselho('${m.id}')"
+      onmouseover="this.style.borderColor='var(--gold)'"
+      onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+        <span style="font-size:1.6rem">${m.emoji}</span>
+        <div style="flex:1">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.95rem">${m.nome}</div>
+          <div style="font-size:.62rem;color:var(--text3)">${PERFIL_LABEL[m.perfil]||m.perfil} · Influência ${m.influencia}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.3rem">
+        <span style="font-size:.62rem;color:var(--text3)">Relação com você</span>
+        <div style="flex:1;background:var(--bg);border-radius:2px;height:5px;overflow:hidden"><div style="width:${m.relacaoComJogador}%;height:100%;background:${relColor}"></div></div>
+        <span style="font-size:.65rem;color:${relColor}">${m.relacaoComJogador}</span>
+      </div>
+      ${m.segredo?`<div style="font-size:.6rem;color:var(--accent);background:rgba(155,89,182,.1);border-radius:3px;padding:.1rem .3rem">🤫 Segredo disponível</div>`:''}
+    </div>`;
+  }).join('');
+
+  const entrarHtml = !playerNoConselho ? `
+  <div style="margin-top:1rem;padding:.75rem;background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:7px">
+    <div style="font-size:.82rem;font-weight:700;color:var(--danger);margin-bottom:.3rem">⚠️ Você não é membro do Conselho</div>
+    <div style="font-size:.75rem;color:var(--text2);margin-bottom:.5rem">Sem assento no Conselho, você é vulnerável a decisões desfavoráveis. Tente entrar:</div>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="tentarEntrarConselho('lobby')">💬 Lobby (R$ 500k)</button>
+      <button class="btn btn-blue btn-sm" onclick="tentarEntrarConselho('alianca')">🤝 Propor Aliança</button>
+      <button class="btn btn-danger btn-sm" onclick="tentarEntrarConselho('suborno')">💸 Suborno (R$ 2M)</button>
+    </div>
+  </div>` : '';
+
+  return statusBar +
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.5rem">${membrosHtml}</div>` +
+    entrarHtml;
+}
+
+function abrirAcoesConselho(escolaId) {
+  initConselhoDasCinco();
+  const m = (gameState.conselhoDasCinco?.membros||[]).find(x=>x.id===escolaId);
+  if(!m) return;
+  const relColor = m.relacaoComJogador>=60?'var(--success)':m.relacaoComJogador>=35?'var(--warn)':'var(--danger)';
+
+  openModal(`${m.emoji} ${m.nome} — Conselho das Cinco`, `
+  <div style="display:flex;gap:.75rem;align-items:center;margin-bottom:1rem">
+    <span style="font-size:2.5rem">${m.emoji}</span>
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:var(--gold)">${m.nome}</div>
+      <div style="font-size:.72rem;color:var(--text3)">${PERFIL_LABEL[m.perfil]} · Influência ${m.influencia}</div>
+      <div style="font-size:.75rem;color:${relColor};margin-top:.15rem">Relação: ${m.relacaoComJogador}/100</div>
+    </div>
+  </div>
+  ${m.segredo?`<div style="padding:.4rem .6rem;background:rgba(155,89,182,.1);border:1px solid rgba(155,89,182,.3);border-radius:5px;font-size:.75rem;color:var(--accent);margin-bottom:.75rem">🤫 Segredo: ${m.segredo}</div>`:''}
+  <div style="display:flex;flex-direction:column;gap:.3rem">
+    ${[
+      {acao:'negociar',   custo:0,       label:'💬 Negociar',         desc:'+5 relação, grátis'},
+      {acao:'presentear', custo:100000,  label:'🎁 Presentear',        desc:'+15 relação, R$ 100k'},
+      {acao:'alianca',    custo:0,       label:'🤝 Propor Aliança',    desc:'Votar junto nas pautas'},
+      {acao:'chantagear', custo:0,       label:'🔒 Chantagear',        desc:'Só se tiver segredo'},
+      {acao:'subornar',   custo:800000,  label:'💸 Subornar',          desc:'+voto garantido, R$ 800k, alto risco'},
+    ].map(a => {
+      const disabled = a.acao==='chantagear' && !m.segredo;
+      const canAfford = !a.custo || gameState.budget >= a.custo;
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:var(--panel2);border:1px solid var(--border);border-radius:5px;opacity:${disabled?0.4:1}">
+        <div style="flex:1"><div style="font-size:.82rem;font-weight:600">${a.label}</div><div style="font-size:.67rem;color:var(--text3)">${a.desc}</div></div>
+        <button class="btn btn-sm ${a.acao==='subornar'?'btn-danger':'btn-outline'}" style="font-size:.7rem" ${disabled?'disabled':''} onclick="executarAcaoConselho('${escolaId}','${a.acao}',${a.custo})">${a.custo?'R$ '+fmt(a.custo):'Grátis'} →</button>
+      </div>`;
+    }).join('')}
+  </div>
+  `, [{text:'Fechar', action:closeModal, cls:'btn-gray'}]);
+}
+
+function executarAcaoConselho(escolaId, acao, custo) {
+  initConselhoDasCinco();
+  const m = (gameState.conselhoDasCinco?.membros||[]).find(x=>x.id===escolaId);
+  if(!m) return;
+  if(custo > 0 && gameState.budget < custo) { toast('Orçamento insuficiente!','warn'); return; }
+  if(custo > 0) { gameState.budget -= custo; gameState.expenses.politica = (gameState.expenses.politica||0)+custo; }
+
+  let msg = '', relDelta = 0, tipo = 'info';
+  switch(acao) {
+    case 'negociar':
+      relDelta = 5; msg = `Conversa produtiva com ${m.nome}. Relação +5.`; tipo='success'; break;
+    case 'presentear':
+      relDelta = 15; msg = `Presente aceito por ${m.nome}. Relação +15.`; tipo='success'; break;
+    case 'alianca':
+      relDelta = 20;
+      // Marcar na pauta pendente como apoio garantido
+      const pauta = (gameState.ligaPautas||[]).find(p=>p.aprovada===null);
+      if(pauta) pauta._apoiosGarantidos = (pauta._apoiosGarantidos||0)+1;
+      msg = `Aliança firmada com ${m.nome}! Votará com você na próxima pauta.`; tipo='success'; break;
+    case 'chantagear':
+      if(!m.segredo) { toast('Não há segredo para usar.','warn'); return; }
+      relDelta = 30;
+      msg = `${m.nome} aceitou sua chantagem. Relação forçada +30.`;
+      m.segredo = null; tipo='warn';
+      gameState.reputation = clamp(gameState.reputation-5, 0, 100);
+      addEvent(`🔒 Chantagem usada contra ${m.nome}. Reputação -5.`, 'warn'); break;
+    case 'subornar': {
+      const chanceAceit = clamp(m.relacaoComJogador/100*0.5 + 0.3, 0.2, 0.85);
+      if(Math.random() < chanceAceit) {
+        relDelta = 25;
+        const pauta2 = (gameState.ligaPautas||[]).find(p=>p.aprovada===null);
+        if(pauta2) { pauta2._subornados = pauta2._subornados||[]; pauta2._subornados.push(escolaId); }
+        msg = `${m.nome} aceitou o suborno. Voto garantido!`; tipo='success';
+        addEvent(`💸 Suborno aceito por ${m.nome}. Voto comprometido.`, 'gold');
+        if(Math.random() < 0.25) {
+          gameState.reputation = clamp(gameState.reputation-20, 0, 100);
+          toast('⚠️ O suborno foi descoberto! Reputação -20', 'warn');
+          addEvent(`🚨 Suborno a membro do Conselho descoberto!`, 'bad');
+        }
+      } else {
+        relDelta = -15;
+        gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50)-8, 0, 100);
+        msg = `${m.nome} recusou e ficou indignado. Relação -15.`; tipo='warn';
+        addEvent(`❌ Suborno recusado por ${m.nome}.`, 'bad');
+      }
+      break;
+    }
+  }
+  m.relacaoComJogador = clamp((m.relacaoComJogador||40)+relDelta, 0, 100);
+  closeModal();
+  toast(msg, tipo);
+  renderPolitics();
+}
+
+function tentarEntrarConselho(via) {
+  const custos = {lobby:500000, alianca:0, suborno:2000000};
+  const custo = custos[via]||0;
+  if(custo && gameState.budget < custo) { toast('Sem orçamento!','warn'); return; }
+  const chances = {lobby:0.4, alianca:0.55, suborno:0.75};
+  const chance = chances[via]||0.3;
+  if(custo) { gameState.budget -= custo; gameState.expenses.politica = (gameState.expenses.politica||0)+custo; }
+  if(Math.random() < chance) {
+    gameState.conselhoDasCinco.playerNoConselho = true;
+    gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50)+15, 0, 100);
+    gameState.politics = clamp(gameState.politics+10, 0, 100);
+    addEvent(`🏛️ Sua escola foi aceita no Conselho das Cinco! Influência política aumentada.`, 'gold');
+    toast('🏛️ Bem-vindo ao Conselho!', 'gold');
+  } else {
+    addEvent(`❌ Tentativa de entrar no Conselho falhou via ${via}.`, 'bad');
+    toast('Recusado pelo Conselho.', 'warn');
+    if(via==='suborno' && Math.random()<0.3) {
+      gameState.reputation = clamp(gameState.reputation-15, 0, 100);
+      addEvent('🚨 Tentativa de suborno ao Conselho vazou!', 'bad');
+    }
+  }
+  renderPolitics();
+}
+
+// ── Modal de membro da Liga (Cúpula) ─────────────────────────
 function abrirMembroLiga(mId) {
   initLigaCupula();
   const m = getCuplaMember(mId);
@@ -17427,9 +18045,13 @@ function calculateFinalNotes() {
   // Jurados influenciados via Liga (presente ou suborno)
   const jBonuses = gameState.ligaJuradosBonuses || {};
   for(const [queKey, jb] of Object.entries(jBonuses)) {
-    if(jb.descoberto) continue;
+    if(jb.descoberto) {
+      // Penalidade: tentativa exposta reduz qualidade do quesito
+      if(jb.penQuesito) raw[queKey] = clamp((raw[queKey]||70) - jb.penQuesito, 0, 100);
+      continue;
+    }
     if(jb.garantido10) {
-      raw[queKey] = 100; // garante nota máxima no quesito
+      raw[queKey] = 100;
     } else if(jb.bonus) {
       raw[queKey] = clamp((raw[queKey]||70) + Math.round(jb.bonus * 12), 0, 100);
     }
@@ -17486,7 +18108,14 @@ function calculateFinalNotes() {
   }
   const noteKeys9 = Object.keys(gameState.finalNotes).filter(k=>k!=='_total');
   const totalInt9 = noteKeys9.reduce((s,k)=>s+Math.round((gameState.finalNotes[k]||0)*10), 0);
-  gameState.finalNotes._total = totalInt9 / 10;
+  let totalFinal = totalInt9 / 10;
+
+  // Penalidade extra no total por tentativas de corrupção expostas
+  const jbAll = gameState.ligaJuradosBonuses||{};
+  for(const jb of Object.values(jbAll)) {
+    if(jb.descoberto && jb.penTotal) totalFinal -= jb.penTotal / 100;
+  }
+  gameState.finalNotes._total = Math.round(totalFinal * 10) / 10;
 }
 
 // Gera totais para rivais baseados na posição histórica esperada,
@@ -17530,29 +18159,27 @@ function simulateRivalScores() {
   // ── 3. Ordenar pelo total bruto (desc) ────────────────────
   allEntries.sort((a,b) => b.total - a.total);
 
-  // ── 4. Calcular targets (centésimos) ──────────────────────
-  // Campeão recebe aleatório entre top-5 e top (ex.: 2695–2700)
-  const topCent   = (gRules.top - 5) + Math.floor(Math.random() * 6); // top-5 to top inclusive
-  const botCent   = gRules.bottom;
+  // ── 4. Calcular targets (escola_total × 10) ───────────────
+  const topCent   = (gRules.top - 5) + Math.floor(Math.random() * 6); // 2695–2700
+  // Bottom aleatório entre 265.0 e 266.0 (×10 = 2650–2660)
+  const botCent   = Math.max(gRules.bottom, 2650 + Math.floor(Math.random() * 11));
   const step      = (topCent - botCent) / Math.max(N - 1, 1);
   const targets   = [];
   for(let i = 0; i < N; i++) {
     let t = Math.round(topCent - i * step);
-    // Garantir distinção consecutiva
     if(i > 0 && t >= targets[i-1]) t = targets[i-1] - 1;
-    // Nunca abaixo de bottom
     t = Math.max(t, botCent);
     targets.push(t);
   }
 
   // ── 5. Aplicar equalização a cada escola ──────────────────
-  const queKeys  = APURACAO_QUESITOS.map(q=>q.k);
-  const minQCent = gRules.descarta
-    ? (gRules.jurados - 1) * 960          // 3 jurados × 9.6 = 2880 (especial/ouro)
-    : gRules.jurados * 960;               // 2 jurados × 9.6 = 1920 (avaliação)
-  const maxQCent = gRules.descarta
-    ? (gRules.jurados - 1) * 1000         // 3 × 10.0 = 3000
-    : gRules.jurados * 1000;              // 2 × 10.0 = 2000
+  const queKeys = APURACAO_QUESITOS.map(q=>q.k);
+  // Limites por quesito em unidades de nota×10 (e.g. 9.6×10=96, 10.0×10=100)
+  // oldQ = Math.round(note * 10) → 29.8 * 10 = 298 ✓
+  // minQCent/maxQCent devem estar na mesma escala
+  const keepJurados = gRules.descarta ? gRules.jurados - 1 : gRules.jurados;
+  const minQCent = keepJurados * 96;   // 3×96=288 (29.8 min) ou 2×96=192 (19.2 min)
+  const maxQCent = keepJurados * 100;  // 3×100=300 (30.0 max) ou 2×100=200 (20.0 max)
 
   allEntries.forEach((e, idx) => {
     const newTotalCent = targets[idx];
@@ -17653,6 +18280,19 @@ function goToApuracao() {
   showScreen('screen-apuracao');
   document.getElementById('continueApuracaoBtn').classList.remove('hidden');
   document.getElementById('finalResultsBtn').classList.add('hidden');
+
+  // Registrar campeãs já neste momento (antes de showFinalResults)
+  // para garantir registro mesmo que o jogador pule a tela de resultados
+  setTimeout(() => {
+    if(gameState.finalNotes && gameState.championsHistory !== undefined) {
+      const allSch = [
+        {name: gameState.school.name, note: gameState.finalNotes?._total||0, isPlayer:true},
+        ...(gameState.rivals||[]).map(r=>({name:r.name, note:r._simulatedTotal||0, isPlayer:false}))
+      ].sort((a,b)=>b.note-a.note);
+      registrarCampeas(allSch, gameState.school.group);
+    }
+  }, 0);
+
   renderApuracaoQuesito();
 }
 
@@ -17869,12 +18509,17 @@ function showFinalResults() {
   const groups = ['avaliacao','bronze','prata','ouro','especial'];
   const currentGroupIdx = groups.indexOf(group);
 
+  // Aplicar regras aprovadas pela Liga
+  aplicarLigaRegras();
+
   // Group-specific relegation rules
   const isRelegated = (()=>{
-    if(group==='especial') return playerPos === n;  // Last place
-    if(group==='ouro')     return playerPos >= n-1; // Last 2
-    if(group==='prata')    return playerPos >= n-1; // Last 2
-    if(group==='bronze')   return playerPos === n;  // Last
+    if(gameState._protegidoRebaixamento) return false; // protegido pelo Conselho
+    const duasRebaixadas = (gameState.ligaRegras||[]).some(r=>r.tipo==='rebaixamento_duplo');
+    if(group==='especial') return duasRebaixadas ? playerPos >= n-1 : playerPos === n;
+    if(group==='ouro')     return playerPos >= n-1;
+    if(group==='prata')    return playerPos >= n-1;
+    if(group==='bronze')   return playerPos === n;
     return false;
   })();
 
@@ -18300,12 +18945,27 @@ function startNextSeason() {
   const history = [...gameState.seasonHistory];
   const currentYear = gameState.year; // ← preserva antes do reset
 
+  // ── Garantir registro de campeãs ANTES do reset ────────────
+  // Se showFinalResults não foi chamado (ex.: jogador pulou tela), registrar agora
+  if(gameState.finalNotes && !gameState.championsHistory?.some(c=>c.year===gameState.year && c.group===gameState.school.group)) {
+    const allSch = [
+      {name: gameState.school.name, note: gameState.finalNotes?._total||0, isPlayer:true},
+      ...(gameState.rivals||[]).map(r=>({name:r.name, note:r._simulatedTotal||0, isPlayer:false}))
+    ].sort((a,b)=>b.note-a.note);
+    registrarCampeas(allSch, gameState.school.group);
+  }
+
   // Preserve sorteio-lock data before state reset
   // Só carrega se o sorteio ainda NÃO foi realizado nesta temporada (travas não consumidas)
   const _sorteioJaFeito = !!gameState.paradeOrder;
   window._carry_10th  = _sorteioJaFeito ? null : (gameState.prevSeason10th  || null);
   window._carry_11th  = _sorteioJaFeito ? null : (gameState.prevSeason11th  || null);
   window._carry_ouro  = _sorteioJaFeito ? null : (gameState.ouroChampion    || null);
+
+  // Carregar dados a preservar entre temporadas
+  const oldChampionsHistory = [...(gameState.championsHistory||[])];
+  const oldGlobalCycles     = {...(gameState.globalCycles||{})};
+  const oldLigaRegras       = [...(gameState.ligaRegras||[])];
 
   // Re-initialize for new season — PRESERVE BUDGET (continuous cash)
   const oldBudget = gameState.budget; // carry forward!
@@ -18342,6 +19002,11 @@ function startNextSeason() {
   gameState.ouroChampion    = typeof window._carry_ouro  !== 'undefined' ? window._carry_ouro  : null;
   window._carry_10th = window._carry_11th = window._carry_ouro = undefined;
   gameState.seasonHistory = oldHistory;
+  // Persistência entre temporadas: histórico de campeãs, ciclos globais e regras da liga
+  gameState.championsHistory = oldChampionsHistory;
+  gameState.globalCycles     = oldGlobalCycles;
+  // ligaRegras: manter apenas regras permanentes; regras temporárias expiram
+  gameState.ligaRegras = oldLigaRegras.filter(r => !r.temporario);
   // Carry forward half of active sponsors (some renew)
   gameState.activeSponsors = oldSponsors.filter(()=>Math.random()>0.4);
   gameState.income.patrocinioPrivado += gameState.activeSponsors.reduce((s,sp)=>s+Math.floor(sp.value*0.3),0);
@@ -18446,9 +19111,11 @@ function startNextSeason() {
   gameState.juradoProfiles = null;
   // Cúpula da Liga: regenera a cada temporada
   gameState.ligaCupula = null;
+  gameState.conselhoDasCinco = null;
   gameState.ligaPautas = [];
   gameState.ligaInteracoes = [];
   gameState.ligaJuradosBonuses = {};
+  // ligaRegras persiste entre temporadas (regras permanentes)
 
   // Apply economic multiplier for this year
   const eco = getEconomyData(gameState.year);
@@ -18511,8 +19178,9 @@ const HISTORICAL_CHAMPIONS = [
 
 function registrarCampeas(allSchools, playerGroup) {
   if(!gameState.championsHistory) gameState.championsHistory = [];
+  if(!gameState.globalCycles) gameState.globalCycles = {};
 
-  // Pré-popula histórico real na primeira chamada de registrarCampeas
+  // Pré-popula histórico real na primeira chamada
   if(gameState.championsHistory.length === 0) {
     const startYear = gameState.year;
     HISTORICAL_CHAMPIONS
@@ -18520,39 +19188,95 @@ function registrarCampeas(allSchools, playerGroup) {
       .forEach(h => { if(!gameState.championsHistory.some(c=>c.year===h.year&&c.group===h.group)) gameState.championsHistory.push({...h}); });
   }
 
-  // Registrar campeão do grupo do jogador (allSchools já ordenado)
+  // ── Registrar campeão do grupo do jogador ──────────────────
   const playerChampion = allSchools[0];
-  const playerEntry = {
-    year: gameState.year,
-    group: playerGroup,
-    school: playerChampion.name,
-    score: playerChampion.note,
-    isPlayer: playerChampion.isPlayer,
-    carnavalesco: gameState.team?.carnavalesco?.name || null,
-    mestreBateria: gameState.team?.mestre?.name || null,
-    rainha: gameState.rainha?.name || null,
-    enredo: gameState.enredoTitle || (gameState.enredo ? ENREDO_TYPES?.find(e=>e.id===gameState.enredo)?.name : null) || null,
-  };
-  // Evitar duplicata
   if(!gameState.championsHistory.some(c=>c.year===gameState.year && c.group===playerGroup)) {
-    gameState.championsHistory.push(playerEntry);
+    gameState.championsHistory.push({
+      year: gameState.year,
+      group: playerGroup,
+      school: playerChampion.name,
+      score: playerChampion.note,
+      isPlayer: playerChampion.isPlayer,
+      carnavalesco: gameState.team?.carnavalesco?.name || null,
+      mestreBateria: gameState.team?.mestre?.name || null,
+      rainha: gameState.rainha?.name || null,
+      enredo: gameState.enredoTitle || (gameState.enredo ? ENREDO_TYPES?.find(e=>e.id===gameState.enredo)?.name : null) || null,
+    });
   }
 
-  // Registrar campeão simulado de outros grupos (rivais promovidos/rebaixados têm grupos diferentes)
-  // Geramos entradas genéricas para grupos sem dados
+  // ── Simular campeões dos outros grupos ─────────────────────
   const allGroups = ['especial','ouro','prata','bronze','avaliacao'];
   allGroups.filter(g => g !== playerGroup).forEach(g => {
     if(gameState.championsHistory.some(c=>c.year===gameState.year && c.group===g)) return;
-    // Selecionar rival desse grupo
-    const riv = (gameState.rivals||[]).filter(r=>r.group===g);
-    if(!riv.length) return;
-    const champ = riv.sort((a,b)=>(b._simulatedTotal||0)-(a._simulatedTotal||0))[0];
-    gameState.championsHistory.push({
-      year: gameState.year, group: g,
-      school: champ.name, score: champ._simulatedTotal||268.0,
-      isPlayer: false, carnavalesco:null, mestreBateria:null, rainha:null, enredo:null,
-    });
+    const champ = _simularCampeaGrupo(g);
+    if(champ) gameState.championsHistory.push({year:gameState.year, group:g, ...champ});
   });
+
+  // ── Atualizar ciclos globais de todas as escolas ───────────
+  Object.values(SCHOOLS_DATA).flat().forEach(s => {
+    if(!gameState.globalCycles[s.id]) {
+      gameState.globalCycles[s.id] = {
+        phase: Math.random()<0.3?'peak':Math.random()<0.5?'decline':'rebuilding',
+        yearsInPhase: Math.floor(Math.random()*4),
+        maxYearsInPhase: 3+Math.floor(Math.random()*7),
+      };
+    } else {
+      const cy = gameState.globalCycles[s.id];
+      cy.yearsInPhase++;
+      if(cy.yearsInPhase >= cy.maxYearsInPhase) {
+        cy.yearsInPhase = 0;
+        cy.maxYearsInPhase = 3+Math.floor(Math.random()*7);
+        cy.phase = cy.phase==='peak'?'decline':cy.phase==='decline'?'rebuilding':'peak';
+      }
+    }
+  });
+}
+
+function _simularCampeaGrupo(group) {
+  const schools = SCHOOLS_DATA[group];
+  if(!schools || !schools.length) return null;
+  const jRules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
+
+  const results = schools.map(s => {
+    const cy = gameState.globalCycles?.[s.id];
+    const cycleMod = cy?.phase==='peak'?8:cy?.phase==='decline'?-8:0;
+    const baseQ = clamp((s.tradition+s.community+(s.barracão||80)+s.creativity+s.org)/5 + cycleMod, 40, 98);
+    const q = clamp(baseQ+(Math.random()-.5)*12, 40, 100);
+    let totalCent = 0;
+    for(let qi=0; qi<9; qi++) {
+      const pisoCent = getPisoBandeira(s.id, [], group);
+      const note = judgeNote(q, 'tecnico', null, pisoCent);
+      const kept = jRules.descarta ? jRules.jurados-1 : jRules.jurados;
+      totalCent += Math.round(note * 10) * kept;
+    }
+    return {s, totalCent};
+  }).sort((a,b)=>b.totalCent-a.totalCent);
+
+  const winner = results[0].s;
+  const score = clamp(Math.round(results[0].totalCent/10)/10, 250, 270);
+
+  // Gerar profissionais aleatórios — excluindo os da escola do jogador no ano atual
+  const playerCarnavalesco = gameState.team?.carnavalesco?.name;
+  const playerMestre       = gameState.team?.mestre?.name;
+  const playerRainha       = gameState.rainha?.name;
+
+  const carnAvail = PROFESSIONALS_DATA.carnavalesco.filter(p=>p.name!==playerCarnavalesco);
+  const mestAvail = PROFESSIONALS_DATA.mestre.filter(p=>p.name!==playerMestre);
+  const rainhaPool = DB_FAMOSAS.filter(f=>f.name!==playerRainha);
+
+  const randCarnav = carnAvail[Math.floor(Math.random()*carnAvail.length)]?.name || null;
+  const randMestre = mestAvail[Math.floor(Math.random()*mestAvail.length)]?.name || null;
+  const randRainha = Math.random()>0.3 ? (rainhaPool[Math.floor(Math.random()*rainhaPool.length)]?.name || null) : null;
+
+  return {
+    school: winner.name,
+    score,
+    isPlayer: false,
+    carnavalesco: randCarnav,
+    mestreBateria: randMestre,
+    rainha: randRainha,
+    enredo: null,
+  };
 }
 
 function renderHistorico() {
@@ -18622,73 +19346,265 @@ function _renderHistoricoEscola() {
 
 function _renderHistoricoCampeas() {
   if(!gameState.championsHistory) gameState.championsHistory = [];
-  const all = [...gameState.championsHistory].filter(c=>c.school).sort((a,b)=>b.year-a.year||(a.group>b.group?1:-1));
+  const allData = [...gameState.championsHistory].filter(c=>c.school);
 
-  // Filtros
-  const fGrp  = gameState._champFilterGrp  || 'todos';
-  const fBusca = gameState._champFilterBusca || '';
-
-  const grpOpts = ['todos','especial','ouro','prata','bronze','avaliacao'];
-  const grpFilter = `<div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
-    ${grpOpts.map(g=>`<button onclick="gameState._champFilterGrp='${g}';renderHistorico()" style="padding:.22rem .55rem;border-radius:4px;border:1px solid ${fGrp===g?'var(--gold)':'var(--border)'};background:${fGrp===g?'rgba(212,175,55,.12)':'var(--panel2)'};color:${fGrp===g?'var(--gold)':'var(--text2)'};font-size:.7rem;cursor:pointer;font-family:inherit">${g==='todos'?'Todos':LEAGUE_NAMES[g]||g}</button>`).join('')}
-    <input oninput="gameState._champFilterBusca=this.value;renderHistorico()" value="${fBusca}" placeholder="🔍 Buscar escola..." style="padding:.2rem .5rem;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:.72rem;font-family:inherit;min-width:140px">
-  </div>`;
-
-  const filtered = all.filter(c =>
-    (fGrp === 'todos' || c.group === fGrp) &&
-    (!fBusca || c.school.toLowerCase().includes(fBusca.toLowerCase()))
-  );
-
-  if(!filtered.length) return grpFilter + `<div style="text-align:center;padding:2rem;color:var(--text3)">Nenhum registro encontrado.</div>`;
-
-  // Contagem de títulos por escola
-  const titleCount = {};
-  filtered.forEach(c => { titleCount[c.school] = (titleCount[c.school]||0) + 1; });
+  const fGrp    = gameState._champFilterGrp  || 'todos';
+  const fBusca  = gameState._champFilterBusca || '';
+  const fAnoMin = gameState._champFilterAnoMin || 0;
+  const fAnoMax = gameState._champFilterAnoMax || 9999;
+  const fSort   = gameState._champSort || 'year_desc';
+  const fView   = gameState._champView  || 'tabela';
 
   const grpColor = {especial:'var(--gold)',ouro:'var(--accent)',prata:'var(--info)',bronze:'var(--warn)',avaliacao:'var(--text3)'};
 
-  const rows = filtered.map(c => {
+  // ── Filtros ──────────────────────────────────────────────────
+  const filtered = allData.filter(c =>
+    (fGrp==='todos' || c.group===fGrp) &&
+    (!fBusca || c.school.toLowerCase().includes(fBusca.toLowerCase())) &&
+    c.year >= fAnoMin && c.year <= fAnoMax
+  );
+
+  const grpOpts = ['todos','especial','ouro','prata','bronze','avaliacao'];
+  const filtersHtml = `
+  <div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    ${grpOpts.map(g=>`<button onclick="gameState._champFilterGrp='${g}';renderHistorico()" style="padding:.22rem .55rem;border-radius:4px;border:1px solid ${fGrp===g?'var(--gold)':'var(--border)'};background:${fGrp===g?'rgba(212,175,55,.12)':'var(--panel2)'};color:${fGrp===g?'var(--gold)':'var(--text2)'};font-size:.7rem;cursor:pointer;font-family:inherit">${g==='todos'?'Todos':LEAGUE_NAMES[g]||g}</button>`).join('')}
+    <input oninput="gameState._champFilterBusca=this.value;renderHistorico()" value="${fBusca}" placeholder="🔍 Escola..." style="padding:.2rem .45rem;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:.72rem;font-family:inherit;min-width:110px">
+    <input type="number" oninput="gameState._champFilterAnoMin=+this.value||0;renderHistorico()" value="${fAnoMin||''}" placeholder="De" style="padding:.2rem .35rem;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:.72rem;font-family:inherit;width:58px">
+    <input type="number" oninput="gameState._champFilterAnoMax=+this.value||9999;renderHistorico()" value="${fAnoMax===9999?'':fAnoMax}" placeholder="Até" style="padding:.2rem .35rem;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:.72rem;font-family:inherit;width:58px">
+  </div>
+  <div style="display:flex;gap:.3rem;margin-bottom:.75rem">
+    ${['tabela','graficos','stats'].map(v=>{
+      const lbl = {tabela:'📋 Tabela', graficos:'📊 Gráficos', stats:'📈 Estatísticas'}[v];
+      const active = fView===v;
+      return `<button onclick="gameState._champView='${v}';renderHistorico()" style="padding:.25rem .6rem;border-radius:4px;border:1px solid ${active?'var(--gold)':'var(--border)'};background:${active?'rgba(212,175,55,.12)':'var(--panel2)'};color:${active?'var(--gold)':'var(--text2)'};font-size:.72rem;cursor:pointer;font-family:inherit">${lbl}</button>`;
+    }).join('')}
+  </div>`;
+
+  if(!filtered.length) return filtersHtml + `<div style="text-align:center;padding:2rem;color:var(--text3)">Nenhum registro encontrado.</div>`;
+
+  // ── Calcular contagens e sequências ─────────────────────────
+  // Títulos por escola (no filtro atual)
+  const titleCount = {};
+  filtered.forEach(c => { titleCount[c.school]=(titleCount[c.school]||0)+1; });
+
+  // Sequências consecutivas (todos os dados, não apenas filtrados)
+  const streaksBySchool = _calcConsecutivasMap(allData);
+
+  // ── VISÃO: GRÁFICOS ──────────────────────────────────────────
+  if(fView === 'graficos') {
+    const barChart = (data, title, maxBars=12) => {
+      const top = Object.entries(data).sort((a,b)=>b[1]-a[1]).slice(0,maxBars);
+      if(!top.length) return '';
+      const maxVal = top[0][1];
+      return `
+      <div class="panel" style="margin-bottom:.75rem">
+        <div class="panel-header"><span class="panel-title">${title}</span></div>
+        <div class="panel-body" style="padding:.65rem .85rem">
+          ${top.map(([nm,ct],i)=>{
+            const pct = Math.round(ct/maxVal*100);
+            const isP = nm===gameState.school?.name;
+            const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+            return `<div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.25rem">
+              <div style="min-width:150px;font-size:.72rem;font-weight:${isP?700:400};color:${isP?'var(--gold-light)':'var(--text2)'};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${medal} ${nm}${isP?' 🎭':''}</div>
+              <div style="flex:1;background:var(--bg2);border-radius:2px;height:13px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${isP?'linear-gradient(90deg,var(--gold),var(--gold-light))':'var(--success)'};border-radius:2px"></div>
+              </div>
+              <div style="min-width:22px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.85rem;color:${isP?'var(--gold)':'var(--text2)'}">${ct}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    };
+
+    // Contar carnavalescos
+    const carnCount = {};
+    filtered.filter(c=>c.carnavalesco).forEach(c=>{carnCount[c.carnavalesco]=(carnCount[c.carnavalesco]||0)+1;});
+    // Mestres
+    const mestCount = {};
+    filtered.filter(c=>c.mestreBateria).forEach(c=>{mestCount[c.mestreBateria]=(mestCount[c.mestreBateria]||0)+1;});
+    // Rainhas
+    const rainCount = {};
+    filtered.filter(c=>c.rainha).forEach(c=>{rainCount[c.rainha]=(rainCount[c.rainha]||0)+1;});
+
+    return filtersHtml +
+      barChart(titleCount,         '🏆 Escolas Campeãs') +
+      barChart(carnCount,          '🎨 Carnavalescos Campeões') +
+      barChart(mestCount,          '🥁 Mestres de Bateria Campeões') +
+      barChart(rainCount,          '👸 Rainhas de Bateria Campeãs');
+  }
+
+  // ── VISÃO: ESTATÍSTICAS ──────────────────────────────────────
+  if(fView === 'stats') {
+    const topScores = [...filtered].filter(c=>c.score).sort((a,b)=>b.score-a.score).slice(0,8);
+    const consecutivas = _calcConsecutivas(filtered);
+
+    // Títulos por grupo
+    const byGrp = {};
+    filtered.forEach(c=>{
+      byGrp[c.group]=byGrp[c.group]||{};
+      byGrp[c.group][c.school]=(byGrp[c.group][c.school]||0)+1;
+    });
+
+    // Títulos por década
+    const byDecade = {};
+    filtered.forEach(c=>{
+      const d=Math.floor(c.year/10)*10;
+      byDecade[d]=byDecade[d]||{};
+      byDecade[d][c.school]=(byDecade[d][c.school]||0)+1;
+    });
+
+    return filtersHtml + `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.7rem">
+      <div class="panel">
+        <div class="panel-header" style="padding:.4rem .6rem"><span class="panel-title" style="font-size:.75rem">🏅 Maiores Notas</span></div>
+        <div class="panel-body" style="padding:.45rem .65rem">
+          ${topScores.map((c,i)=>`<div style="display:flex;gap:.3rem;font-size:.72rem;margin-bottom:.2rem">
+            <span style="color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-weight:700;min-width:14px">${i+1}°</span>
+            <span style="color:var(--success);font-weight:700;min-width:40px">${c.score.toFixed(1)}</span>
+            <span style="color:var(--text2)">${c.school} (${c.year})</span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header" style="padding:.4rem .6rem"><span class="panel-title" style="font-size:.75rem">🔁 Mais Consecutivos</span></div>
+        <div class="panel-body" style="padding:.45rem .65rem">
+          ${consecutivas.slice(0,7).map(x=>`<div style="display:flex;gap:.3rem;font-size:.72rem;margin-bottom:.2rem">
+            <span style="color:var(--gold);font-weight:700;min-width:24px">${x.streak}×</span>
+            <span style="color:var(--text2)">${x.school}</span>
+            <span style="color:var(--text3);font-size:.65rem">(${x.from}–${x.to})</span>
+          </div>`).join('') || '<div style="font-size:.7rem;color:var(--text3)">Nenhum ainda</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:.7rem">
+      <div class="panel-header" style="padding:.4rem .6rem"><span class="panel-title" style="font-size:.75rem">🏟️ Por Grupo</span></div>
+      <div class="panel-body" style="padding:.45rem .65rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.5rem">
+        ${['especial','ouro','prata','bronze','avaliacao'].map(g=>{
+          const gd = Object.entries(byGrp[g]||{}).sort((a,b)=>b[1]-a[1]).slice(0,4);
+          const gc = grpColor[g]||'var(--text2)';
+          return gd.length ? `<div>
+            <div style="font-size:.62rem;color:${gc};text-transform:uppercase;letter-spacing:.07em;margin-bottom:.25rem">${LEAGUE_NAMES[g]||g}</div>
+            ${gd.map(([sc,ct])=>`<div style="font-size:.7rem;display:flex;gap:.25rem;margin-bottom:.1rem">
+              <span style="color:${gc};font-weight:700;min-width:20px">${ct}×</span>
+              <span style="color:var(--text2)">${sc}</span>
+            </div>`).join('')}
+          </div>` : '';
+        }).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header" style="padding:.4rem .6rem"><span class="panel-title" style="font-size:.75rem">📅 Por Década</span></div>
+      <div class="panel-body" style="padding:.45rem .65rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.5rem">
+        ${Object.entries(byDecade).sort((a,b)=>b[0]-a[0]).map(([dec,m])=>`
+        <div>
+          <div style="font-size:.65rem;color:var(--gold);font-weight:700;margin-bottom:.2rem">${dec}s</div>
+          ${Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([sc,ct])=>`<div style="font-size:.68rem;display:flex;gap:.25rem;margin-bottom:.1rem">
+            <span style="color:var(--gold);font-weight:700;min-width:18px">${ct}×</span>
+            <span style="color:var(--text2)">${sc}</span>
+          </div>`).join('')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── VISÃO: TABELA ────────────────────────────────────────────
+  const sorted = [...filtered].sort((a,b)=>{
+    if(fSort==='year_asc')   return a.year-b.year;
+    if(fSort==='score_desc') return (b.score||0)-(a.score||0);
+    if(fSort==='school')     return a.school.localeCompare(b.school);
+    return b.year-a.year || (a.group>b.group?1:-1);
+  });
+
+  const sortBtn = (col, lbl) => {
+    const active = fSort===col;
+    return `<span onclick="gameState._champSort='${col}';renderHistorico()" style="cursor:pointer;color:${active?'var(--gold)':'var(--text3)'};white-space:nowrap">${lbl}${active?' ▼':''}</span>`;
+  };
+
+  const rows = sorted.map(c => {
     const gc = grpColor[c.group]||'var(--text2)';
-    return `<tr onclick="abrirDetalhesCampea(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(212,175,55,.04)'" onmouseout="this.style.background=''">
-      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--gold);font-size:.95rem">${c.year}</td>
-      <td><span style="font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:${gc}22;color:${gc};white-space:nowrap">${LEAGUE_NAMES[c.group]||c.group}</span></td>
-      <td style="font-weight:700;color:${c.isPlayer?'var(--gold-light)':'var(--text)'}">${c.school}${c.isPlayer?' 🎭':''} ${titleCount[c.school]>1?`<sup style="color:var(--gold);font-size:.6rem">×${titleCount[c.school]}</sup>`:''}</td>
-      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.95rem;color:var(--success)">${c.score?c.score.toFixed(1):'—'}</td>
-      <td style="font-size:.75rem;color:var(--text2)">${c.carnavalesco||'—'}</td>
-      <td style="font-size:.75rem;color:var(--text2)">${c.mestreBateria||'—'}</td>
-      <td style="font-size:.75rem;color:var(--text2)">${c.rainha||'—'}</td>
-      <td style="font-size:.75rem;color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.enredo||'—'}</td>
+    const isP = c.isPlayer;
+    // Calcular sequência desta escola neste grupo
+    const streak = streaksBySchool[c.school+'|'+c.group];
+    const streakLabel = streak>=3 ? `<span style="font-size:.6rem;padding:.08rem .3rem;border-radius:3px;background:rgba(212,175,55,.15);color:var(--gold);margin-left:.25rem">${streak}× consecutivo</span>` :
+                        streak===2 ? `<span style="font-size:.6rem;padding:.08rem .3rem;border-radius:3px;background:rgba(46,204,113,.1);color:var(--success);margin-left:.25rem">Bicampeã</span>` : '';
+    return `<tr onclick="abrirDetalhesCampea(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="cursor:pointer" onmouseover="this.style.background='rgba(212,175,55,.04)'" onmouseout="this.style.background=''">
+      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--gold);font-size:.9rem">${c.year}</td>
+      <td><span style="font-size:.62rem;padding:.08rem .3rem;border-radius:3px;background:${gc}22;color:${gc};white-space:nowrap">${LEAGUE_NAMES[c.group]||c.group}</span></td>
+      <td style="font-weight:700;color:${isP?'var(--gold-light)':'var(--text)'}">${c.school}${isP?' 🎭':''}${streakLabel}</td>
+      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--success);font-size:.88rem">${c.score?c.score.toFixed(1):'—'}</td>
+      <td style="font-size:.72rem;color:var(--text2)">${c.carnavalesco||'—'}</td>
+      <td style="font-size:.72rem;color:var(--text2)">${c.mestreBateria||'—'}</td>
+      <td style="font-size:.72rem;color:var(--text2)">${c.rainha||'—'}</td>
+      <td style="font-size:.72rem;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.enredo||'—'}</td>
     </tr>`;
   }).join('');
 
-  // Top campeãs (ranking)
-  const ranking = Object.entries(titleCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const rankingHtml = `
-  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem">
-    ${ranking.map(([sc,ct],i)=>`
-    <div style="padding:.3rem .65rem;background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.2);border-radius:6px;font-size:.72rem">
-      <span style="color:var(--gold);font-weight:700">${['🥇','🥈','🥉','4°','5°'][i]}</span>
-      <span style="color:var(--text2);margin-left:.3rem">${sc}</span>
-      <span style="color:var(--gold);font-weight:700;margin-left:.4rem">${ct}×</span>
-    </div>`).join('')}
-  </div>`;
-
-  return grpFilter + rankingHtml + `
+  return filtersHtml + `
   <div class="panel">
     <div class="panel-header">
       <span class="panel-title">🏆 Livro das Campeãs</span>
-      <span style="font-size:.72rem;color:var(--text3)">${filtered.length} registro(s) · Clique para detalhes</span>
+      <span style="font-size:.72rem;color:var(--text3)">${sorted.length} registros</span>
     </div>
     <div class="panel-body" style="padding:0;overflow-x:auto">
       <table class="table">
         <thead><tr>
-          <th>Ano</th><th>Grupo</th><th>Campeã</th><th>Nota</th>
-          <th>Carnavalesco</th><th>Mestre</th><th>Rainha</th><th>Enredo</th>
+          <th>${sortBtn('year_desc','Ano')}</th><th>Grupo</th>
+          <th>${sortBtn('school','Campeã')}</th>
+          <th>${sortBtn('score_desc','Nota')}</th>
+          <th>Carnavalesco</th><th>Mestre de Bateria</th><th>Rainha</th><th>Enredo</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
   </div>`;
+}
+
+// Retorna mapa escola|grupo → comprimento da maior sequência atual (ou total)
+function _calcConsecutivasMap(data) {
+  const byKey = {};
+  data.forEach(c => {
+    const k = c.school+'|'+c.group;
+    byKey[k] = byKey[k]||[];
+    byKey[k].push(c.year);
+  });
+  const map = {};
+  Object.entries(byKey).forEach(([k,years]) => {
+    const sorted = [...new Set(years)].sort((a,b)=>a-b);
+    let best=1, cur=1;
+    for(let i=1;i<sorted.length;i++) cur = sorted[i]===sorted[i-1]+1 ? ++cur : 1;
+    best = Math.max(best, cur);
+    // Also check streaks
+    cur=1;
+    for(let i=1;i<sorted.length;i++) { if(sorted[i]===sorted[i-1]+1) cur++; else cur=1; best=Math.max(best,cur); }
+    map[k] = best >= 2 ? best : 0;
+  });
+  return map;
+}
+
+
+function _calcConsecutivas(data) {
+  // Encontrar sequências de títulos consecutivos por escola e grupo
+  const bySchoolGroup = {};
+  data.forEach(c => {
+    const key = c.school+'|'+c.group;
+    bySchoolGroup[key] = bySchoolGroup[key]||[];
+    bySchoolGroup[key].push(c.year);
+  });
+  const streaks = [];
+  Object.entries(bySchoolGroup).forEach(([key,years]) => {
+    const [school] = key.split('|');
+    const sorted = [...new Set(years)].sort((a,b)=>a-b);
+    let streak=1, from=sorted[0];
+    for(let i=1;i<sorted.length;i++) {
+      if(sorted[i]===sorted[i-1]+1) { streak++; }
+      else {
+        if(streak>=2) streaks.push({school, streak, from, to:sorted[i-1]});
+        streak=1; from=sorted[i];
+      }
+    }
+    if(streak>=2) streaks.push({school, streak, from, to:sorted[sorted.length-1]});
+  });
+  return streaks.sort((a,b)=>b.streak-a.streak||b.to-a.to);
 }
 
 function abrirDetalhesCampea(c) {
