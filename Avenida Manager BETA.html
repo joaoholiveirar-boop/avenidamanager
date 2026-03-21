@@ -686,28 +686,194 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 .relation-fill{height:100%;border-radius:10px;transition:width .5s}
 
 /* PARADE SCREEN */
+/* ══ PARADE SCREEN ════════════════════════════════════════════ */
 #screen-parade{
-  flex-direction:column;
-  background:radial-gradient(ellipse at 50% 20%,#1a0a2e 0%,var(--bg) 60%);
+  flex-direction:column;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 0%, #150825 0%, #08080f 65%);
 }
-.parade-canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-#paradeCanvas{border:2px solid var(--gold);border-radius:4px;max-width:100%;max-height:100%}
-.parade-hud{
-  position:absolute;top:1rem;left:1rem;right:1rem;
-  display:flex;gap:1rem;justify-content:space-between;pointer-events:none;
+
+/* Header HUD */
+#prd-header{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;
+  padding:.5rem 1rem;flex-shrink:0;
+  background:linear-gradient(90deg,rgba(8,8,15,.98),rgba(18,8,42,.95));
+  border-bottom:1px solid rgba(212,175,55,.25);
 }
-.hud-panel{
-  background:rgba(8,8,15,.85);border:1px solid var(--border);border-radius:6px;
-  padding:.5rem .75rem;backdrop-filter:blur(4px);
+#prd-title-block{ min-width:0; }
+#prd-school-name{
+  font-family:'Playfair Display',serif;font-style:italic;font-weight:700;
+  font-size:clamp(.85rem,2vw,1.1rem);color:var(--gold);line-height:1.1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.hud-timer{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.5rem;color:var(--gold)}
-.hud-label{font-size:.65rem;color:var(--text3);text-transform:uppercase}
-.parade-log{
-  height:120px;overflow-y:auto;background:rgba(8,8,15,.9);border-top:1px solid var(--border);
-  padding:.75rem 1rem;flex-shrink:0;
+#prd-subtitle{ font-size:.62rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase }
+
+#prd-metrics{ display:flex;gap:.6rem;align-items:center;flex-wrap:wrap }
+
+.prd-metric{
+  display:flex;flex-direction:column;gap:.1rem;
+  padding:.3rem .55rem;border-radius:6px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);min-width:70px;
 }
-.parade-log-item{font-size:.8rem;color:var(--text2);padding:.2rem 0;border-bottom:1px solid rgba(42,42,69,.3);display:flex;gap:.5rem}
-.parade-log-item .time{color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-weight:600;flex-shrink:0}
+.prd-metric-val{
+  font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.15rem;
+  color:var(--gold);line-height:1;
+}
+.prd-metric-lbl{ font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em }
+
+.prd-bar-wrap{
+  height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-bottom:.1rem;
+  min-width:80px;
+}
+.prd-bar-inner{ height:100%;border-radius:4px;transition:width .4s ease }
+
+.prd-speed-group{ display:flex;gap:.2rem;align-items:center }
+.prd-spd{
+  padding:.2rem .45rem;border-radius:4px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--text3);font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;font-size:.75rem;cursor:pointer;transition:all .15s;
+}
+.prd-spd.active{ background:rgba(212,175,55,.18);border-color:var(--gold);color:var(--gold) }
+.prd-spd:hover:not(.active){ border-color:var(--gold);color:var(--text) }
+
+/* Phase strip */
+#paradePhaseBar{
+  display:flex;background:var(--bg);border-bottom:1px solid var(--border);
+  overflow-x:auto;flex-shrink:0;padding:0 .4rem;gap:.15rem;height:30px;align-items:center;
+  scrollbar-width:none;
+}
+#paradePhaseBar::-webkit-scrollbar{ display:none }
+
+/* Body */
+#prd-body{
+  flex:1;display:flex;overflow:hidden;min-height:0;
+}
+
+/* Main area: canvas + log */
+#prd-main{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;
+}
+#prd-canvas-wrap{
+  flex:1;position:relative;overflow:hidden;background:#06040e;
+  display:flex;align-items:center;justify-content:center;
+}
+#paradeCanvas{
+  width:100%;height:100%;object-fit:fill;display:block;
+}
+#prd-confetti{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;opacity:.85;
+}
+#prd-phase-banner{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:'Playfair Display',serif;font-style:italic;font-weight:700;
+  font-size:clamp(1rem,3vw,1.8rem);color:var(--gold);
+  text-shadow:0 0 30px rgba(212,175,55,.8),0 2px 8px rgba(0,0,0,.9);
+  pointer-events:none;opacity:0;transition:opacity .5s;white-space:nowrap;
+  letter-spacing:.05em;
+}
+#paradePopup{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(8,8,15,.92);border:1px solid var(--gold);border-radius:8px;
+  padding:.4rem .85rem;font-size:.85rem;color:var(--gold);
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;
+  pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap;z-index:10;
+  box-shadow:0 0 20px rgba(212,175,55,.3);
+}
+
+/* Event log */
+#paradeLog{
+  height:105px;overflow-y:auto;flex-shrink:0;
+  background:rgba(6,4,14,.92);border-top:1px solid rgba(212,175,55,.15);
+  padding:.4rem .7rem;display:flex;flex-direction:column;gap:.1rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.prd-log-entry{
+  display:flex;gap:.4rem;align-items:flex-start;padding:.15rem 0;
+  font-size:.74rem;animation:logSlideIn .3s ease both;
+  border-bottom:1px solid rgba(255,255,255,.04);
+}
+@keyframes logSlideIn{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.prd-log-time{
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.68rem;
+  color:var(--gold);flex-shrink:0;min-width:32px;
+}
+.prd-log-good{ color:#5ddc8a }
+.prd-log-bad { color:#e74c6f }
+.prd-log-neutral{ color:var(--text2) }
+
+/* Score sidebar */
+#prd-scores{
+  width:240px;flex-shrink:0;
+  background:rgba(8,8,15,.97);border-left:1px solid rgba(212,175,55,.2);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#prd-scores-title{
+  padding:.55rem .75rem;border-bottom:1px solid rgba(212,175,55,.2);
+  font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.8rem;
+  color:var(--gold);letter-spacing:.12em;text-transform:uppercase;flex-shrink:0;
+}
+#paradeLiveScores{
+  flex:1;overflow-y:auto;padding:.4rem .65rem;
+  display:flex;flex-direction:column;gap:.3rem;
+}
+.prd-score-row{
+  display:flex;align-items:center;gap:.4rem;
+}
+.prd-score-icon{ font-size:.85rem;flex-shrink:0 }
+.prd-score-info{ flex:1;min-width:0 }
+.prd-score-lbl{ font-size:.6rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.prd-score-track{
+  background:rgba(255,255,255,.07);border-radius:2px;height:4px;overflow:hidden;margin-top:2px;
+}
+.prd-score-fill{
+  height:100%;border-radius:2px;
+  background:linear-gradient(90deg,#8b6914,var(--gold-light));
+  transition:width .7s ease;
+}
+.prd-score-val{
+  font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.95rem;
+  color:var(--text3);min-width:30px;text-align:right;transition:color .3s;
+}
+.prd-score-val.revealed{
+  color:var(--gold);text-shadow:0 0 12px rgba(212,175,55,.7);
+  animation:scoreFlip .5s ease;
+}
+@keyframes scoreFlip{
+  0%{transform:scaleY(0);opacity:0}
+  50%{transform:scaleY(1.2)}
+  100%{transform:scaleY(1);opacity:1}
+}
+
+#prd-scores-footer{
+  border-top:1px solid rgba(212,175,55,.2);padding:.55rem .75rem;flex-shrink:0;
+  background:rgba(212,175,55,.04);
+}
+#prd-total-label{ font-size:.6rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase }
+#paradeTotalScore{
+  font-family:'Playfair Display',serif;font-weight:700;font-size:1.8rem;
+  color:var(--gold);line-height:1.1;
+}
+#paradeScoreStatus{ font-size:.65rem;color:var(--text3);margin-top:.1rem }
+
+/* Footer */
+#prd-footer{
+  flex-shrink:0;background:rgba(8,8,15,.98);
+  border-top:1px solid rgba(212,175,55,.2);
+}
+#prd-progress-wrap{
+  height:3px;background:rgba(255,255,255,.06);overflow:hidden;
+}
+#paradeProgress{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--gold),var(--gold-light));
+  transition:width .3s ease;
+}
+#prd-footer-row{
+  display:flex;align-items:center;gap:.75rem;padding:.5rem 1rem;flex-wrap:wrap;
+}
 .parade-log-item.good{color:var(--success)}
 .parade-log-item.bad{color:var(--danger)}
 
@@ -956,7 +1122,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ==================== LOADING ==================== -->
-<div class="loading-overlay" id="loadingOverlay">
+<div class="loading-overlay" id="loadingOverlay" style="display:none">
   <div class="loading-spinner"></div>
   <div style="color:var(--text3);font-family:'Barlow Condensed',sans-serif;font-size:1rem;letter-spacing:.2em">CARREGANDO...</div>
 </div>
@@ -1202,89 +1368,96 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 </div>
 
 <!-- ==================== SCREEN: PARADE ==================== -->
-<div class="screen" id="screen-parade" style="flex-direction:column;background:radial-gradient(ellipse at 50% 0%,#1a0820 0%,var(--bg) 70%)">
+<div class="screen" id="screen-parade">
 
-  <!-- HEADER -->
-  <div style="padding:.65rem 1.25rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--bg),#12082a);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:.75rem;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:.75rem">
-      <span style="font-size:1.4rem">🎊</span>
-      <div>
-        <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--gold);font-style:italic;line-height:1.1">Noite do Desfile — Sambódromo Marquês de Sapucaí</div>
-        <div id="paradeSchoolName" style="color:var(--text2);font-size:.78rem;margin-top:.1rem"></div>
-      </div>
+  <!-- ══ HEADER HUD ══════════════════════════════════════════ -->
+  <div id="prd-header">
+    <div id="prd-title-block">
+      <div id="prd-school-name">—</div>
+      <div id="prd-subtitle">Sambódromo Marquês de Sapucaí</div>
     </div>
-    <!-- HUD chips -->
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-      <div class="hud-panel" style="padding:.35rem .7rem;text-align:center;min-width:60px">
-        <div class="hud-label">Tempo</div>
-        <div class="hud-timer" id="paradeTimer" style="font-size:1.2rem">00:00</div>
+    <!-- metrics row -->
+    <div id="prd-metrics">
+      <div class="prd-metric" id="prd-m-timer">
+        <div class="prd-metric-val" id="paradeTimer">00:00</div>
+        <div class="prd-metric-lbl">TEMPO</div>
       </div>
-      <div class="hud-panel" style="padding:.35rem .7rem;text-align:center;min-width:80px">
-        <div class="hud-label">Energia</div>
-        <div class="hud-timer" id="paradeEnergy" style="font-size:1.1rem;color:var(--success)">100%</div>
-      </div>
-      <div class="hud-panel" style="padding:.35rem .7rem;text-align:center;min-width:80px">
-        <div class="hud-label">Público</div>
-        <div class="hud-timer" id="paradePublico" style="font-size:1.1rem;color:var(--info)">0%</div>
-      </div>
-      <div class="hud-panel" style="padding:.35rem .7rem;text-align:center;min-width:90px" id="paradeHypePanel">
-        <div class="hud-label">Hype</div>
-        <div class="hud-timer" id="paradeHype" style="font-size:1.1rem;color:var(--warn)">🔥 0%</div>
-      </div>
-      <!-- Speed control -->
-      <div style="display:flex;gap:.25rem;align-items:center" id="paradeSpeedPanel">
-        <span style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Velocidade</span>
-        <button class="btn btn-gray btn-sm parade-speed-btn active" id="spd1" onclick="setParadeSpeed(1)" style="padding:.25rem .5rem;font-size:.75rem;min-width:32px">1×</button>
-        <button class="btn btn-gray btn-sm parade-speed-btn" id="spd2" onclick="setParadeSpeed(2)" style="padding:.25rem .5rem;font-size:.75rem;min-width:32px">2×</button>
-        <button class="btn btn-gray btn-sm parade-speed-btn" id="spd4" onclick="setParadeSpeed(4)" style="padding:.25rem .5rem;font-size:.75rem;min-width:32px">4×</button>
-        <button class="btn btn-gray btn-sm parade-speed-btn" id="spd10" onclick="setParadeSpeed(10)" style="padding:.25rem .5rem;font-size:.75rem;min-width:32px">10×</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- PHASE PROGRESS BAR -->
-  <div id="paradePhaseBar" style="display:flex;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;padding:0 .5rem;gap:.2rem;height:32px;align-items:center"></div>
-
-  <!-- MAIN BODY: canvas + side panel -->
-  <div style="flex:1;display:flex;overflow:hidden;min-height:0">
-
-    <!-- LEFT: canvas + log -->
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;padding:.5rem">
-        <canvas id="paradeCanvas" width="800" height="240" style="border:2px solid var(--gold);border-radius:6px;max-width:100%;max-height:100%;box-shadow:0 0 30px rgba(212,175,55,.15)"></canvas>
-        <!-- floating event popup -->
-        <div id="paradePopup" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(8,8,15,.92);border:1px solid var(--gold);border-radius:8px;padding:.5rem 1rem;font-size:.85rem;color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap;z-index:10"></div>
-      </div>
-      <!-- Current phase label -->
-      <div id="paradeCurrentPhase" style="text-align:center;padding:.3rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;color:var(--text2);letter-spacing:.05em;flex-shrink:0;background:rgba(8,8,15,.7)">Aguardando início...</div>
-      <!-- Event log -->
-      <div id="paradeLog" style="height:110px;overflow-y:auto;background:rgba(8,8,15,.85);border-top:1px solid var(--border);padding:.5rem .75rem;flex-shrink:0">
-        <div style="color:var(--text3);font-size:.78rem">A escola aguarda na concentração. A multidão já enche a Sapucaí...</div>
-      </div>
-    </div>
-
-    <!-- RIGHT: live score panel -->
-    <div style="width:260px;background:var(--bg);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden">
-      <div style="padding:.6rem .75rem;border-bottom:1px solid var(--border);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em">⭐ Placar ao Vivo</div>
-      <div id="paradeLiveScores" style="flex:1;overflow-y:auto;padding:.5rem .75rem;display:flex;flex-direction:column;gap:.35rem"></div>
-      <div style="border-top:1px solid var(--border);padding:.6rem .75rem">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.25rem">
-          <span style="font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Total Parcial</span>
-          <span id="paradeTotalScore" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.4rem;color:var(--gold)">—</span>
+      <div class="prd-metric">
+        <div class="prd-bar-wrap">
+          <div class="prd-bar-inner" id="prd-energy-bar" style="width:100%;background:linear-gradient(90deg,#27ae60,#2ecc71)"></div>
         </div>
-        <div style="font-size:.7rem;color:var(--text3)" id="paradeScoreStatus">Aguardando quesitos...</div>
+        <div class="prd-metric-lbl">⚡ <span id="paradeEnergy">100%</span> ENERGIA</div>
+      </div>
+      <div class="prd-metric">
+        <div class="prd-bar-wrap">
+          <div class="prd-bar-inner" id="prd-publico-bar" style="width:0%;background:linear-gradient(90deg,#2980b9,#3498db)"></div>
+        </div>
+        <div class="prd-metric-lbl">👥 <span id="paradePublico">0%</span> PÚBLICO</div>
+      </div>
+      <div class="prd-metric" id="prd-hype-metric">
+        <div class="prd-metric-val" id="paradeHype" style="color:var(--warn)">0</div>
+        <div class="prd-metric-lbl">🔥 HYPE</div>
+      </div>
+      <!-- speed -->
+      <div class="prd-speed-group">
+        <span class="prd-metric-lbl">VEL</span>
+        <button class="prd-spd active" id="spd1"  onclick="setParadeSpeed(1)">1×</button>
+        <button class="prd-spd" id="spd2"  onclick="setParadeSpeed(2)">2×</button>
+        <button class="prd-spd" id="spd4"  onclick="setParadeSpeed(4)">4×</button>
+        <button class="prd-spd" id="spd10" onclick="setParadeSpeed(10)">10×</button>
       </div>
     </div>
   </div>
 
-  <!-- FOOTER -->
-  <div style="padding:.6rem 1rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--bg);gap:.75rem;flex-wrap:wrap">
-    <div id="paradeFooterInfo" style="font-size:.8rem;color:var(--text3);flex:1">Pronto para entrar na avenida!</div>
-    <div style="display:flex;gap:.75rem">
-      <button class="btn btn-gold" id="startParadeBtn" onclick="startParade()">🎊 Iniciar Desfile</button>
-      <button class="btn btn-gray hidden" id="skipParadeBtn" onclick="skipToResults()">⏭ Pular para Resultado</button>
+  <!-- ══ PHASE STRIP ══════════════════════════════════════════ -->
+  <div id="paradePhaseBar"></div>
+
+  <!-- ══ BODY ════════════════════════════════════════════════ -->
+  <div id="prd-body">
+
+    <!-- Canvas + log -->
+    <div id="prd-main">
+      <!-- canvas area -->
+      <div id="prd-canvas-wrap">
+        <canvas id="paradeCanvas" width="900" height="260"></canvas>
+        <!-- phase slide-in banner -->
+        <div id="prd-phase-banner"></div>
+        <!-- floating popup -->
+        <div id="paradePopup"></div>
+        <!-- confetti layer -->
+        <canvas id="prd-confetti" width="900" height="260"></canvas>
+      </div>
+      <!-- event log -->
+      <div id="paradeLog"></div>
+    </div>
+
+    <!-- Live score sidebar -->
+    <div id="prd-scores">
+      <div id="prd-scores-title">⭐ PLACAR AO VIVO</div>
+      <div id="paradeLiveScores"></div>
+      <div id="prd-scores-footer">
+        <div id="prd-total-label">PROJEÇÃO TOTAL</div>
+        <div id="paradeTotalScore">—</div>
+        <div id="paradeScoreStatus">Aguardando quesitos...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ FOOTER ══════════════════════════════════════════════ -->
+  <div id="prd-footer">
+    <!-- progress bar -->
+    <div id="prd-progress-wrap"><div id="paradeProgress"></div></div>
+    <div id="prd-footer-row">
+      <div id="paradeFooterInfo" style="font-size:.78rem;color:var(--text3);flex:1">Pronto para entrar na avenida!</div>
+      <div id="paradeCurrentPhase" style="font-size:.78rem;color:var(--text2);flex:1;text-align:center">Aguardando início...</div>
+      <div style="display:flex;gap:.5rem;flex:1;justify-content:flex-end">
+        <button class="btn btn-gold" id="startParadeBtn" onclick="startParade()">🎊 Iniciar Desfile</button>
+        <button class="btn btn-gray hidden" id="skipParadeBtn" onclick="skipToResults()">⏭ Pular</button>
+      </div>
     </div>
   </div>
+
 </div>
 
 <!-- ==================== SCREEN: APURAÇÃO ==================== -->
@@ -3500,16 +3673,16 @@ function skipPandemiaYear() {
 
 
 const PRESS_OUTLETS = [
-  {id:'srzd',      name:'SRzd',                   type:'site_carnaval', emoji:'🌐', baseChance:0.75, audience:85},
-  {id:'sitecarnavalesco', name:'Site Carnavalesco', type:'site_carnaval', emoji:'🎭', baseChance:0.70, audience:70},
-  {id:'falagalera', name:'Fala Galera',             type:'site_carnaval', emoji:'📢', baseChance:0.68, audience:65},
-  {id:'radioarq',  name:'Rádio Arquibancada',       type:'site_carnaval', emoji:'📻', baseChance:0.72, audience:60},
-  {id:'maiscarnaval', name:'Mais Carnaval',         type:'site_carnaval', emoji:'🎊', baseChance:0.65, audience:55},
-  {id:'sapuquei',  name:'Sapuquei',                 type:'site_carnaval', emoji:'💃', baseChance:0.70, audience:60},
-  {id:'extra',     name:'Extra',                    type:'jornal_popular', emoji:'📰', baseChance:0.38, audience:150},
-  {id:'odia',      name:'O Dia',                    type:'jornal_popular', emoji:'📰', baseChance:0.35, audience:130},
-  {id:'globo',     name:'O Globo',                  type:'grande_jornal',  emoji:'🗞️', baseChance:0.18, audience:400},
-  {id:'tvglobo',   name:'TV Globo',                 type:'televisao',      emoji:'📺', baseChance:0.04, audience:2000},
+  {id:'srzd',      name:'SRzd',                   type:'site_carnaval', emoji:'🌐', baseChance:0.75, audience:250},
+  {id:'sitecarnavalesco', name:'Site Carnavalesco', type:'site_carnaval', emoji:'🎭', baseChance:0.70, audience:300},
+  {id:'falagalera', name:'Fala Galera',             type:'site_carnaval', emoji:'📢', baseChance:0.68, audience:200},
+  {id:'radioarq',  name:'Rádio Arquibancada',       type:'site_carnaval', emoji:'📻', baseChance:0.72, audience:500},
+  {id:'maiscarnaval', name:'Mais Carnaval',         type:'site_carnaval', emoji:'🎊', baseChance:0.65, audience:150},
+  {id:'sapuquei',  name:'Sapuquei',                 type:'site_carnaval', emoji:'💃', baseChance:0.70, audience:100},
+  {id:'extra',     name:'Extra',                    type:'jornal_popular', emoji:'📰', baseChance:0.38, audience:1200},
+  {id:'odia',      name:'O Dia',                    type:'jornal_popular', emoji:'📰', baseChance:0.35, audience:1000},
+  {id:'globo',     name:'O Globo',                  type:'grande_jornal',  emoji:'🗞️', baseChance:0.18, audience:2000},
+  {id:'tvglobo',   name:'TV Globo',                 type:'televisao',      emoji:'📺', baseChance:0.04, audience:20000},
 ];
 
 const GOSSIP_COLUMNISTS = [
@@ -5300,6 +5473,12 @@ function initGameState(school, difficulty) {
     ligaMeetingsHistory: [],
     ligaElectionPending: false,
     escandalosLog: [],
+    championsHistory: [],   // registro histórico de campeãs por ano e grupo
+    ligaCupula: null,       // { presidente, conselheiros[], comissao[], representantes[] }
+    ligaPautas: [],         // votações agendadas
+    ligaPautasHistorico: [], // pautas encerradas
+    ligaInteracoes: [],     // log de ações com membros
+    ligaJuradosBonuses: {}, // {queKey: {bonus, garantido10, descoberto}}
 
     // Press interviews done
     interviewsDone: 0,
@@ -5419,10 +5598,12 @@ function initGameState(school, difficulty) {
     rainhaContrato: 1,     // anos de contrato restantes
     rei: null,             // Rei de Bateria (opcional)
     musaComunidade: null,  // Musa honorária da comunidade
+    timeMusas: null,       // Time de Musas: { quantidade, origem, investimento, custoTotal, custoMensal }
     rainhaEscandalos: [],  // histórico de escândalos desta rainha
     rainhaAwardsThisYear: [], // prêmios de imprensa desta rainha
     rainhaNotoriedade: 0,  // mídia acumulada por esta rainha (0-100)
     eventoRainhaGratis: null, // evento raro: famosa quer desfilar grátis
+    juradoProfiles: null,     // perfis dos jurados desta temporada (gerado 1x por ano)
   };
 }
 
@@ -6256,6 +6437,12 @@ function advanceMonth() {
   // Monthly income payments (new scheduled system)
   processMonthlyIncome(gameState.month);
 
+  // Time de Musas — custo mensal de manutenção
+  if(gameState.timeMusas && gameState.timeMusas.custoMensal > 0) {
+    gameState.budget -= gameState.timeMusas.custoMensal;
+    gameState.expenses.alegorias = (gameState.expenses.alegorias||0) + gameState.timeMusas.custoMensal;
+  }
+
   gameState.politicalActionsThisMonth = 0;
   addEvent(`${m.name} chegou. ${m.tasks[0]}.`,'info');
   renderSidebar();
@@ -6459,6 +6646,18 @@ function renderDashboardAlerts() {
   if(gameState.paradeOrder && month >= 1 && month <= 11) {
     alerts.push({type:'gold', icon:'🎲', text:`Sua escola desfila <strong>${gameState.paradeDay}</strong>, na <strong>${gameState.paradeOrder}ª posição</strong> da noite.`,
       action:``, actionLabel:''});
+  }
+
+  // No rainha after July
+  if(!gameState.rainha && !concursoRainhaState && gameState.month >= 4) {
+    alerts.push({type:'warn', icon:'👸', text:'Escola ainda sem Rainha de Bateria! Impacta bateria e mídia na avenida.',
+      action:`showTab('rainha')`, actionLabel:'Escolher Rainha'});
+  }
+
+  // Time de musas lembrete (após julho, sem time montado)
+  if(!gameState.timeMusas && gameState.month >= 5) {
+    alerts.push({type:'info', icon:'💃', text:'Considere montar um <strong>Time de Musas</strong> para ampliar bônus em Alegorias e Fantasias.',
+      action:`showTab('rainha')`, actionLabel:'Montar Time'});
   }
 
   if(!alerts.length) return '';
@@ -7817,6 +8016,27 @@ function checkSambaEncomendaReady() {
 // Old alias kept for compatibility
 function confirmarEncomenda(cost, composers) { confirmarEncomendaFinal(); }
 
+function abandonarDisputaEncomendar() {
+  if(gameState.month > 5) {
+    toast('Prazo de encomenda encerrado. Finalize a disputa pública.', 'warn');
+    return;
+  }
+  openModal('📋 Encomendar Samba?', `
+    <p style="color:var(--text2)">Deseja cancelar a disputa pública e <strong style="color:var(--gold)">encomendar um samba</strong> diretamente?</p>
+    <p style="margin-top:.5rem;color:var(--text3);font-size:.82rem">Os sambas inscritos serão descartados. O samba encomendado ficará pronto no próximo mês.</p>
+  `, [
+    { text: 'Sim, encomendar', action: () => {
+        gameState.sambaCandidates = [];
+        gameState.sambaGerado = false;
+        gameState.sambaRound = 'inscricao';
+        closeModal();
+        encomendarSamba();
+        renderSamba();
+      }, cls: 'btn-gold' },
+    { text: 'Cancelar', action: closeModal, cls: 'btn-gray' },
+  ]);
+}
+
 function escolherSamba(id) {
   const s = gameState.sambaCandidates.find(x=>x.id===id);
   if(!s || !s.alive) return;
@@ -8012,7 +8232,9 @@ function renderSamba() {
            </div>
            <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center">
              <button class="btn btn-gold" onclick="generateSambaCandidates();renderSamba()">📝 Abrir Disputa Pública</button>
-             <button class="btn btn-outline" onclick="encomendarSamba()">📋 Encomendar Samba</button>
+             ${gameState.month <= 5
+               ? `<button class="btn btn-outline" onclick="encomendarSamba()">📋 Encomendar Samba</button>`
+               : `<span style="font-size:.75rem;color:var(--text3);align-self:center">⚠️ Prazo de encomenda encerrado (até Agosto)</span>`}
            </div>`
         : `<p style="color:var(--text2)">Defina o enredo antes de abrir as inscrições de samba.</p>
            <button class="btn btn-gold" onclick="showTab('enredo')">📜 Definir Enredo</button>`
@@ -8059,8 +8281,16 @@ function renderSamba() {
     <div style="display:flex;gap:.5rem;flex-wrap:wrap">
       ${phase==='final'?`<button class="btn btn-gold btn-sm" onclick="mostrarFinalSamba()">🏆 Escolher Campeão</button>`
         :canAdvance?`<button class="btn btn-blue btn-sm" onclick="advanceSambaPhase()">⏭ ${phaseInfo.next} →</button>`:''}
+      ${phase !== 'done' && gameState.month <= 5
+        ? `<button class="btn btn-gray btn-sm" onclick="abandonarDisputaEncomendar()" title="Cancela a disputa pública e abre o modal de encomenda">📋 Encomendar em vez disso</button>`
+        : ''}
     </div>
   </div>
+  ${phase !== 'done' && gameState.month >= 6
+    ? `<div style="padding:.5rem .75rem;background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.3);border-radius:6px;font-size:.78rem;color:var(--danger);margin-bottom:.75rem">
+        ⚠️ Prazo de encomenda encerrado (setembro+). Conclua a disputa pública para definir o samba.
+       </div>`
+    : ''}
 
   <!-- Sambas vivos -->
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:.85rem;margin-bottom:${dead.length?'1.5rem':'0'}">
@@ -11475,6 +11705,7 @@ function renderRainha() {
   }
 
   body += renderReiDaBateria(rei);
+  body += renderTimeMusas();
   body += renderMusaComunidade();
 
   if(rainha && (gameState.rainhaEscandalos||[]).length > 0) {
@@ -12070,7 +12301,218 @@ function dispensarMusa() {
 }
 
 // ============================================================
-// MÍDIA E ESCÂNDALOS
+// TIME DE MUSAS
+// ============================================================
+function calcMusasBonus(tm) {
+  if(!tm) return {alegorias:0, fantasias:0};
+  const mult = tm.origem==='profissional' ? 1.5 : 1.0;
+  return {
+    alegorias: Math.min(15, Math.round(tm.quantidade * 0.8 * mult)),
+    fantasias: Math.min(10, Math.round(tm.quantidade * 0.5 * mult)),
+  };
+}
+
+function calcMusasCustoMensal(qtd, origem, investimento) {
+  const BASE_FANTASIA = {baixo:8000, medio:14000, alto:20000};
+  const BASE_CACHE = origem==='profissional' ? {baixo:5000, medio:12000, alto:25000} : {baixo:0,medio:0,alto:0};
+  const fantasia = BASE_FANTASIA[investimento] || 14000;
+  const cache = BASE_CACHE[investimento] || 0;
+  return Math.round(qtd * (fantasia/12 + cache/12));
+}
+
+function renderTimeMusas() {
+  const tm = gameState.timeMusas;
+  if(tm) {
+    const bonus = calcMusasBonus(tm);
+    const origemLabel = tm.origem==='profissional' ? '⭐ Profissionais' : '🌸 Comunidade';
+    const invLabel = {baixo:'Básico',medio:'Médio',alto:'Luxo'}[tm.investimento]||'Médio';
+    return `
+    <div class="panel" style="margin-top:1rem">
+      <div class="panel-header" style="background:linear-gradient(90deg,rgba(155,89,182,.08),transparent)">
+        <span class="panel-title">💃 Time de Musas</span>
+        <span style="font-size:.72rem;padding:.2rem .6rem;border-radius:10px;background:rgba(155,89,182,.15);color:var(--accent);border:1px solid rgba(155,89,182,.4)">${tm.quantidade} musas · ${origemLabel}</span>
+      </div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.5rem;margin-bottom:.85rem">
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:.5rem .65rem;text-align:center">
+            <div style="font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Musas</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent)">${tm.quantidade}</div>
+          </div>
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:.5rem .65rem;text-align:center">
+            <div style="font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Nível Figurino</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:var(--gold)">${invLabel}</div>
+          </div>
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:.5rem .65rem;text-align:center">
+            <div style="font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Custo Mensal</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:700;color:var(--warn)">R$ ${fmt(tm.custoMensal)}</div>
+          </div>
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:.5rem .65rem;text-align:center">
+            <div style="font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Bônus Avenida</div>
+            <div style="font-size:.78rem;color:var(--success);font-weight:700">🎭 +${bonus.alegorias} &nbsp; 👗 +${bonus.fantasias}</div>
+          </div>
+        </div>
+        <div style="font-size:.78rem;color:var(--text3);margin-bottom:.65rem">
+          Origem: <strong style="color:var(--text2)">${origemLabel}</strong> &nbsp;·&nbsp; Investimento: <strong style="color:var(--text2)">${invLabel}</strong>
+          ${tm.origem==='comunidade'?'&nbsp;·&nbsp;<span style="color:var(--success)">❤️ +Comunidade</span>':''}
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-blue btn-sm" onclick="configurarTimeMusas()">⚙️ Reconfigurar</button>
+          <button class="btn btn-danger btn-sm" onclick="dispensarTimeMusas()">❌ Dispensar Time</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="panel" style="margin-top:1rem">
+    <div class="panel-header"><span class="panel-title">💃 Time de Musas <span style="font-size:.7rem;color:var(--text3)">(opcional)</span></span></div>
+    <div class="panel-body">
+      <div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <p style="color:var(--text2);font-size:.83rem">Entre 4 e 20 musas que desfilam ao lado da bateria e nos carros alegóricos. Ampliam os bônus em <strong style="color:var(--gold)">Alegorias</strong> e <strong style="color:var(--gold)">Fantasias</strong>.</p>
+          <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap;font-size:.72rem">
+            <span style="padding:.15rem .4rem;border-radius:3px;background:rgba(155,89,182,.15);color:var(--accent)">🎭 Bônus Alegorias</span>
+            <span style="padding:.15rem .4rem;border-radius:3px;background:rgba(155,89,182,.15);color:var(--accent)">👗 Bônus Fantasias</span>
+            <span style="padding:.15rem .4rem;border-radius:3px;background:rgba(39,174,96,.15);color:var(--success)">❤️ Engajamento comunidade</span>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="white-space:nowrap" onclick="configurarTimeMusas()">💃 Montar Time</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function configurarTimeMusas() {
+  const tm = gameState.timeMusas;
+  const qtdAtual = tm ? tm.quantidade : 8;
+  const origemAtual = tm ? tm.origem : 'comunidade';
+  const invAtual = tm ? tm.investimento : 'medio';
+
+  const preview = (qtd, orig, inv) => {
+    const b = calcMusasBonus({quantidade:qtd, origem:orig, investimento:inv});
+    const cm = calcMusasCustoMensal(qtd, orig, inv);
+    const invLabel = {baixo:'Básico R$ 8k/musa',medio:'Médio R$ 14k/musa',alto:'Luxo R$ 20k/musa'}[inv];
+    return `<div id="musas-preview" style="padding:.65rem;background:rgba(155,89,182,.08);border:1px solid rgba(155,89,182,.3);border-radius:6px;font-size:.8rem;margin-top:.5rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
+        <div>💃 Musas: <strong style="color:var(--accent)">${qtd}</strong></div>
+        <div>💰 Custo mensal: <strong style="color:var(--warn)">R$ ${fmt(cm)}</strong></div>
+        <div>🎭 Bônus Alegorias: <strong style="color:var(--success)">+${b.alegorias}</strong></div>
+        <div>👗 Bônus Fantasias: <strong style="color:var(--success)">+${b.fantasias}</strong></div>
+      </div>
+      <div style="margin-top:.3rem;font-size:.72rem;color:var(--text3)">Figurino: ${invLabel} · ${orig==='profissional'?'Profissionais: bônus ×1,5':'Comunidade: +Engajamento'}</div>
+    </div>`;
+  };
+
+  const html = `
+  <div style="display:flex;flex-direction:column;gap:.85rem">
+    <div>
+      <label style="font-size:.78rem;color:var(--text3);display:block;margin-bottom:.3rem">Número de musas (4 a 20)</label>
+      <input type="range" id="musas-qtd" min="4" max="20" value="${qtdAtual}" step="1"
+        style="width:100%;accent-color:var(--accent)"
+        oninput="document.getElementById('musas-qtd-val').textContent=this.value; atualizarPreviewMusas()">
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text3);margin-top:.2rem">
+        <span>4 musas</span><span id="musas-qtd-val" style="color:var(--accent);font-weight:700">${qtdAtual}</span><span>20 musas</span>
+      </div>
+    </div>
+    <div>
+      <label style="font-size:.78rem;color:var(--text3);display:block;margin-bottom:.3rem">Origem das musas</label>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        ${['comunidade','profissional'].map(o=>`
+        <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;padding:.4rem .7rem;border-radius:5px;border:1px solid var(--border);flex:1;min-width:130px;${origemAtual===o?'border-color:var(--accent);background:rgba(155,89,182,.1)':''}">
+          <input type="radio" name="musas-origem" value="${o}" ${origemAtual===o?'checked':''} onchange="atualizarPreviewMusas()" style="accent-color:var(--accent)">
+          <span style="font-size:.83rem">${o==='comunidade'?'🌸 Da Comunidade':'⭐ Profissionais'}</span>
+        </label>`).join('')}
+      </div>
+    </div>
+    <div>
+      <label style="font-size:.78rem;color:var(--text3);display:block;margin-bottom:.3rem">Nível de investimento em figurino</label>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        ${['baixo','medio','alto'].map(i=>`
+        <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;padding:.4rem .7rem;border-radius:5px;border:1px solid var(--border);flex:1;min-width:100px;${invAtual===i?'border-color:var(--gold);background:rgba(212,175,55,.08)':''}">
+          <input type="radio" name="musas-inv" value="${i}" ${invAtual===i?'checked':''} onchange="atualizarPreviewMusas()" style="accent-color:var(--gold)">
+          <span style="font-size:.83rem">${{baixo:'Básico',medio:'Médio',alto:'Luxo'}[i]}</span>
+        </label>`).join('')}
+      </div>
+    </div>
+    <div id="musas-preview-wrap">${preview(qtdAtual, origemAtual, invAtual)}</div>
+  </div>`;
+
+  openModal('💃 Configurar Time de Musas', html, [
+    {text:'Confirmar', action: confirmarTimeMusas, cls:'btn-gold'},
+    {text:'Cancelar', action: closeModal, cls:'btn-gray'},
+  ]);
+}
+
+function atualizarPreviewMusas() {
+  const qtd = parseInt(document.getElementById('musas-qtd')?.value||8);
+  const orig = document.querySelector('input[name="musas-origem"]:checked')?.value||'comunidade';
+  const inv = document.querySelector('input[name="musas-inv"]:checked')?.value||'medio';
+  const b = calcMusasBonus({quantidade:qtd, origem:orig, investimento:inv});
+  const cm = calcMusasCustoMensal(qtd, orig, inv);
+  const invLabel = {baixo:'Básico R$ 8k/musa',medio:'Médio R$ 14k/musa',alto:'Luxo R$ 20k/musa'}[inv];
+  const wrap = document.getElementById('musas-preview-wrap');
+  if(wrap) wrap.innerHTML = `<div style="padding:.65rem;background:rgba(155,89,182,.08);border:1px solid rgba(155,89,182,.3);border-radius:6px;font-size:.8rem;margin-top:.5rem">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
+      <div>💃 Musas: <strong style="color:var(--accent)">${qtd}</strong></div>
+      <div>💰 Custo mensal: <strong style="color:var(--warn)">R$ ${fmt(cm)}</strong></div>
+      <div>🎭 Bônus Alegorias: <strong style="color:var(--success)">+${b.alegorias}</strong></div>
+      <div>👗 Bônus Fantasias: <strong style="color:var(--success)">+${b.fantasias}</strong></div>
+    </div>
+    <div style="margin-top:.3rem;font-size:.72rem;color:var(--text3)">Figurino: ${invLabel} · ${orig==='profissional'?'Profissionais: bônus ×1,5':'Comunidade: +Engajamento'}</div>
+  </div>`;
+}
+
+function confirmarTimeMusas() {
+  const qtd = parseInt(document.getElementById('musas-qtd')?.value||8);
+  const orig = document.querySelector('input[name="musas-origem"]:checked')?.value||'comunidade';
+  const inv = document.querySelector('input[name="musas-inv"]:checked')?.value||'medio';
+
+  const custoInicial = {baixo:8000,medio:14000,alto:20000}[inv] * qtd
+    + (orig==='profissional' ? {baixo:5000,medio:12000,alto:25000}[inv]*qtd : 0);
+  const custoMensal = calcMusasCustoMensal(qtd, orig, inv);
+
+  if(gameState.budget < custoInicial) {
+    toast('Orçamento insuficiente para montar o time de musas!','warn');
+    return;
+  }
+
+  const isReconfiguring = !!gameState.timeMusas;
+  gameState.budget -= custoInicial;
+  gameState.expenses.alegorias = (gameState.expenses.alegorias||0) + custoInicial;
+
+  gameState.timeMusas = {quantidade:qtd, origem:orig, investimento:inv, custoMensal, custoInicial};
+
+  if(orig==='comunidade') {
+    gameState.community = clamp(gameState.community + Math.round(qtd*0.4), 0, 100);
+  }
+
+  const bonus = calcMusasBonus(gameState.timeMusas);
+  gameState.scores.alegorias = clamp(gameState.scores.alegorias + bonus.alegorias*0.5, 0, 100);
+  gameState.scores.fantasias = clamp(gameState.scores.fantasias + bonus.fantasias*0.5, 0, 100);
+
+  const invLabel = {baixo:'básico',medio:'médio',alto:'luxo'}[inv];
+  addEvent(`💃 Time de ${qtd} musas ${orig==='comunidade'?'da comunidade':'profissionais'} montado! Figurino ${invLabel}. Custo inicial: R$ ${fmt(custoInicial)}.`,'gold');
+  toast(`Time de musas ${isReconfiguring?'reconfigurado':'montado'}!`,'success');
+  closeModal(); renderRainha();
+}
+
+function dispensarTimeMusas() {
+  if(!gameState.timeMusas) return;
+  openModal('Dispensar Time de Musas?','<p style="color:var(--text2)">Dispensar o time de musas reduz os bônus de Alegorias e Fantasias. Confirmar?</p>',[
+    {text:'Dispensar', action:()=>{
+      const tm = gameState.timeMusas;
+      const bonus = calcMusasBonus(tm);
+      gameState.scores.alegorias = clamp(gameState.scores.alegorias - bonus.alegorias*0.5, 0, 100);
+      gameState.scores.fantasias = clamp(gameState.scores.fantasias - bonus.fantasias*0.5, 0, 100);
+      if(tm.origem==='comunidade') gameState.community = clamp(gameState.community-5, 0, 100);
+      gameState.timeMusas = null;
+      addEvent('💃 Time de musas dispensado.','bad');
+      toast('Time de musas dispensado.','info');
+      closeModal(); renderRainha();
+    }, cls:'btn-danger'},
+    {text:'Cancelar', action:closeModal, cls:'btn-gray'},
+  ]);
+}
+
 // ============================================================
 function gerarEventoImprensaRainha() {
   const r = gameState.rainha;
@@ -12993,6 +13435,7 @@ function renderPolitics() {
   // ── Sub-tab nav ─────────────────────────────────────────────
   const tabs = [
     ['relacoes','🏛️ Relações'],['reunioes','📅 Reuniões'],['blocos','🤝 Blocos'],
+    ['liga','⚖️ Liga'],
     ['acoes','⚡ Ações'],['eleicao','🗳️ Eleição'],['escandalos','💥 Escândalos'],
   ];
   const tabNav = `<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -13123,6 +13566,8 @@ function renderPolitics() {
       }).join('')}
     </div>`;
 
+  } else if(subTab==='liga') {
+    content = renderLigaTab();
   } else if(subTab==='eleicao') {
     const hist = (gameState.seasonHistory||[]).filter(h=>h.ligaEleicao).slice(-5);
     content = `
@@ -13187,6 +13632,558 @@ function renderPolitics() {
   ${tabNav}
   <div>${content}</div>`;
 }
+
+// ============================================================
+// ==================== LIGA — SISTEMA DA CÚPULA =============
+// ============================================================
+
+const CUPULA_PRESIDENTES = [
+  {id:'muniz',    nome:'Roberto Muniz',      emoji:'🎩', cargo:'Presidente',        perfil:'pragmatico',  corruptivel:true,  desc:'Veterano do carnaval, joga dos dois lados.'},
+  {id:'ferreira', nome:'Cláudia Ferreira',   emoji:'👩‍⚖️',cargo:'Presidente',        perfil:'reformista',  corruptivel:false, desc:'Transparente e difícil de subornar.'},
+  {id:'salave',   nome:'Marcos Salave',      emoji:'🧔', cargo:'Presidente',        perfil:'conservador', corruptivel:true,  desc:'Defende as escolas históricas acima de tudo.'},
+  {id:'costa',    nome:'Beatriz Costa',      emoji:'👩‍💼',cargo:'Presidente',        perfil:'pragmatico',  corruptivel:true,  desc:'Focada em resultados, aberta a negociações.'},
+];
+
+const CUPULA_CONSELHEIROS = [
+  {id:'c1', nome:'Antônio Vieira',    emoji:'👴', cargo:'Conselheiro Técnico', perfil:'conservador', corruptivel:false, desc:'Ex-carnavalesco renomado, rígido com as regras.'},
+  {id:'c2', nome:'Priya Ramalho',     emoji:'👩', cargo:'Conselheiro Técnico', perfil:'reformista',  corruptivel:false, desc:'Quer modernizar os critérios de julgamento.'},
+  {id:'c3', nome:'Jorge Sampaio',     emoji:'👨‍💼',cargo:'Conselheiro Técnico', perfil:'pragmatico',  corruptivel:true,  desc:'Advogado. Apoia quem lhe apresenta mais vantagens.'},
+  {id:'c4', nome:'Lúcia Drummond',    emoji:'👩‍🏫',cargo:'Conselheiro Técnico', perfil:'conservador', corruptivel:false, desc:'Historiadora do carnaval, defende a tradição.'},
+  {id:'c5', nome:'Felipe Monteiro',   emoji:'🧑‍💼',cargo:'Conselheiro Técnico', perfil:'reformista',  corruptivel:true,  desc:'Empresário do setor, pensa em expansão.'},
+];
+
+const CUPULA_COMISSAO = [
+  {id:'k1', nome:'Sandra Leal',       emoji:'🎭', cargo:'Comissão de Carnaval', perfil:'tecnico',      corruptivel:true,  desc:'Avalia qualidade artística. Jurada frequente.'},
+  {id:'k2', nome:'Paulo Esteves',     emoji:'🎪', cargo:'Comissão de Carnaval', perfil:'conservador',  corruptivel:false, desc:'Mestre-sala veterano. Integridade inabalável.'},
+  {id:'k3', nome:'Carla Nunes',       emoji:'🌟', cargo:'Comissão de Carnaval', perfil:'pragmatico',   corruptivel:true,  desc:'Ex-rainha de bateria. Aberta a conversas.'},
+];
+
+const PAUTAS_POOL = [
+  {id:'p_mais_escolas',   titulo:'Ampliar Grupo Especial',           desc:'Aumentar de 12 para 14 escolas no Especial.',   icon:'📈', efeito:{grupo:'especial', tipo:'acesso_facil'}, votos_necessarios:8},
+  {id:'p_mais_jurados',   titulo:'4 Jurados em Todos os Grupos',     desc:'Grupos prata e bronze passam a ter 4 jurados.',  icon:'⚖️', efeito:{tipo:'jurados_plus'}, votos_necessarios:7},
+  {id:'p_subvencao',      titulo:'Aumento de Subvenção',             desc:'Subvenção das escolas sobe 20% este ano.',       icon:'💰', efeito:{tipo:'subvencao_plus', valor:0.2}, votos_necessarios:6},
+  {id:'p_desempate',      titulo:'Novo Critério de Desempate',       desc:'Desempate passa a ser pela nota de alegorias.',  icon:'🎪', efeito:{tipo:'desempate_aleg'}, votos_necessarios:7},
+  {id:'p_trava_abertura', titulo:'Rever Trava de Abertura',          desc:'Cancela a penalidade para quem abre o desfile.', icon:'🎺', efeito:{tipo:'sem_opener_penalty'}, votos_necessarios:9},
+  {id:'p_rebaixamento',   titulo:'Dois Rebaixamentos',               desc:'Dois últimos do Especial são rebaixados.',       icon:'📉', efeito:{tipo:'rebaixamento_duplo'}, votos_necessarios:8},
+  {id:'p_prazo_samba',    titulo:'Prazo de Samba até Outubro',       desc:'Escolas podem encomendar samba até outubro.',    icon:'🎵', efeito:{tipo:'samba_prazo_plus'}, votos_necessarios:6},
+];
+
+const PERFIL_LABEL = {conservador:'Conservador', reformista:'Reformista', pragmatico:'Pragmático', tecnico:'Técnico'};
+const PERFIL_COLOR = {conservador:'var(--warn)', reformista:'var(--info)', pragmatico:'var(--accent)', tecnico:'var(--success)'};
+
+// Inicializa a cúpula da Liga (chamado no início de cada temporada)
+function initLigaCupula() {
+  if(gameState.ligaCupula) return;
+  const pres = CUPULA_PRESIDENTES.find(p=>p.id===gameState.ligaPresidenteId) || CUPULA_PRESIDENTES[Math.floor(Math.random()*CUPULA_PRESIDENTES.length)];
+  const conselheiros = [...CUPULA_CONSELHEIROS].sort(()=>Math.random()-.5).slice(0,5).map(c=>({...c, relacao: 35+Math.floor(Math.random()*35)}));
+  const comissao = [...CUPULA_COMISSAO].map(c=>({...c, relacao: 30+Math.floor(Math.random()*40)}));
+  const representantes = (gameState.rivals||[]).slice(0,8).map(r=>({
+    id:'rep_'+r.id, nome: r.name+' (rep.)', emoji:'🏟️',
+    cargo:'Representante', perfil:'pragmatico', corruptivel: Math.random()>0.4,
+    relacao: 20+Math.floor(Math.random()*50), escola: r.name,
+  }));
+  gameState.ligaCupula = { presidente:{...pres, relacao:35+Math.floor(Math.random()*35)}, conselheiros, comissao, representantes };
+
+  // Gerar 2-3 pautas aleatórias para a temporada
+  if(!gameState.ligaPautas?.length) {
+    const pool = [...PAUTAS_POOL].sort(()=>Math.random()-.5).slice(0,3);
+    const meses = [2, 5, 8]; // Maio, Agosto, Novembro
+    gameState.ligaPautas = pool.map((p,i)=>({
+      ...p, mes: meses[i], aprovada: null, votosAFavor:0, votosContra:0,
+      subornados:[], manipulada: false,
+    }));
+  }
+}
+
+function getAllCuplaMembers() {
+  const c = gameState.ligaCupula;
+  if(!c) return [];
+  return [c.presidente, ...c.conselheiros, ...c.comissao, ...c.representantes];
+}
+
+function getCuplaMember(id) { return getAllCuplaMembers().find(m=>m.id===id); }
+
+function setCuplaRelacao(id, delta) {
+  const m = getCuplaMember(id);
+  if(m) m.relacao = clamp((m.relacao||40)+delta, 0, 100);
+}
+
+// ── Render Liga Tab (unificada) ──────────────────────────────
+function renderLigaTab() {
+  initLigaCupula();
+  const sec = gameState._ligaSection || 'cupula';
+
+  const secNav = ['cupula','pautas','historico','jurados'].map(s => {
+    const labels = {cupula:'👥 Cúpula', pautas:'🗳️ Pautas', historico:'📋 Histórico', jurados:'⚖️ Jurados'};
+    const active = sec === s;
+    return `<button onclick="gameState._ligaSection='${s}';renderPolitics()" style="padding:.3rem .7rem;border-radius:4px;border:1px solid ${active?'var(--gold)':'var(--border)'};background:${active?'rgba(212,175,55,.12)':'var(--bg2)'};color:${active?'var(--gold)':'var(--text2)'};font-size:.75rem;cursor:pointer;font-family:inherit">${labels[s]}</button>`;
+  }).join('');
+
+  let body = `<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.85rem">${secNav}</div>`;
+
+  if(sec === 'cupula')    body += _renderSecCupula();
+  else if(sec === 'pautas')   body += _renderSecPautas();
+  else if(sec === 'historico') body += _renderSecHistorico();
+  else if(sec === 'jurados')  body += _renderSecJurados();
+  return body;
+}
+
+// ── Seção: Cúpula ────────────────────────────────────────────
+function _renderSecCupula() {
+  const c = gameState.ligaCupula;
+  const all = getAllCuplaMembers();
+  const avgRel = all.length ? Math.round(all.reduce((s,m)=>s+m.relacao,0)/all.length) : 0;
+  const relColor = avgRel>=65?'var(--success)':avgRel>=40?'var(--gold)':'var(--danger)';
+
+  const card = (m) => {
+    const rc = m.relacao>=65?'var(--success)':m.relacao>=40?'var(--gold)':'var(--danger)';
+    const pc = PERFIL_COLOR[m.perfil]||'var(--text2)';
+    const hasSub = (gameState.ligaInteracoes||[]).some(i=>i.mId===m.id && i.acao==='subornar' && !i.descoberto);
+    return `<div onclick="abrirMembroLiga('${m.id}')" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.3rem">
+        <span style="font-size:1.5rem;flex-shrink:0">${m.emoji}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.nome}${hasSub?' 🤫':''}</div>
+          <div style="font-size:.6rem;color:var(--text3)">${m.cargo}${m.escola?' · '+m.escola:''}</div>
+        </div>
+        <span style="font-size:.6rem;padding:.1rem .28rem;border-radius:3px;background:${pc}22;color:${pc};white-space:nowrap">${PERFIL_LABEL[m.perfil]||m.perfil}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.3rem">
+        <div style="flex:1;background:var(--bg);border-radius:2px;height:4px;overflow:hidden"><div style="width:${m.relacao}%;height:100%;background:${rc}"></div></div>
+        <span style="font-size:.62rem;color:${rc};min-width:20px;text-align:right">${m.relacao}</span>
+      </div>
+    </div>`;
+  };
+
+  const grp = (title, members, icon) => !members.length ? '' : `
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:.3rem">${icon} ${title}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:.35rem">
+        ${members.map(card).join('')}
+      </div>
+    </div>`;
+
+  return `
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;padding:.45rem .7rem;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.18);border-radius:6px;margin-bottom:.75rem;font-size:.78rem">
+    <span>👥 <strong>${all.length}</strong> membros</span>
+    <span>🤝 Relação média: <strong style="color:${relColor}">${avgRel}</strong></span>
+    <span style="color:var(--text3);font-size:.72rem">Clique para interagir</span>
+  </div>
+  ${grp('Presidência', [c.presidente], '👑')}
+  ${grp('Conselho Técnico', c.conselheiros, '🏛️')}
+  ${grp('Comissão de Carnaval', c.comissao, '🎭')}
+  ${grp('Representantes', c.representantes, '🏟️')}`;
+}
+
+// ── Seção: Pautas ────────────────────────────────────────────
+function _renderSecPautas() {
+  const pautas = (gameState.ligaPautas||[]).filter(p=>p.aprovada===null);
+  if(!pautas.length) return `<div style="text-align:center;padding:2rem;color:var(--text3)">🕊️ Nenhuma pauta pendente esta temporada.</div>`;
+
+  return pautas.map(p => {
+    const mesNome = MONTHS_DATA[p.mes]?.name||'?';
+    const passado = gameState.month > p.mes;
+    const apoios = (p._apoiosGarantidos||0) + (p._subornados||[]).length;
+    const progW = Math.min(100, Math.round(apoios / p.votos_necessarios * 100));
+    const progColor = apoios >= p.votos_necessarios ? 'var(--success)' : apoios > 0 ? 'var(--gold)' : 'var(--border)';
+    return `
+    <div style="background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:.8rem 1rem;margin-bottom:.5rem">
+      <div style="display:flex;align-items:flex-start;gap:.65rem;flex-wrap:wrap">
+        <span style="font-size:1.6rem">${p.icon}</span>
+        <div style="flex:1;min-width:180px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem">${p.titulo}</div>
+          <div style="font-size:.78rem;color:var(--text2);margin:.2rem 0 .4rem">${p.desc}</div>
+          <div style="display:flex;gap:.35rem;flex-wrap:wrap;font-size:.65rem;margin-bottom:.4rem">
+            <span style="padding:.1rem .35rem;background:var(--bg2);border-radius:3px;color:var(--text3)">📅 ${mesNome}</span>
+            <span style="padding:.1rem .35rem;background:var(--bg2);border-radius:3px;color:var(--text3)">🗳️ Necessita ${p.votos_necessarios} votos</span>
+            ${apoios>0?`<span style="padding:.1rem .35rem;background:rgba(46,204,113,.1);border-radius:3px;color:var(--success)">✅ ${apoios} garantido(s)</span>`:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:.4rem;font-size:.68rem;color:var(--text3)">
+            <span>Apoios: ${apoios}/${p.votos_necessarios}</span>
+            <div style="flex:1;background:var(--bg);border-radius:2px;height:5px;overflow:hidden">
+              <div style="width:${progW}%;height:100%;background:${progColor};transition:width .3s"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.3rem;align-items:flex-end">
+          ${!passado?`<button class="btn btn-outline btn-sm" style="font-size:.72rem;white-space:nowrap" onclick="gameState._ligaSection='cupula';renderPolitics()">👥 Conquistar Apoios</button>`:''}
+          ${passado?`<button class="btn btn-gold btn-sm" style="font-size:.72rem" onclick="simularVotacaoPauta('${p.id}')">⚡ Votar Agora</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Seção: Histórico ─────────────────────────────────────────
+function _renderSecHistorico() {
+  const hist = gameState.ligaPautasHistorico||[];
+  if(!hist.length) return `<div style="text-align:center;padding:2rem;color:var(--text3)">📋 Sem votações encerradas.</div>`;
+  return `
+  <div style="display:flex;flex-direction:column;gap:.4rem">
+    ${[...hist].reverse().map(p=>`
+    <div style="background:var(--panel2);border:1px solid ${p.aprovada?'rgba(46,204,113,.3)':'rgba(231,76,60,.25)'};border-radius:7px;padding:.6rem .85rem">
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+        <span style="font-size:1.1rem">${p.icon}</span>
+        <div style="flex:1">
+          <div style="font-size:.85rem;font-weight:700">${p.titulo}</div>
+          <div style="font-size:.7rem;color:var(--text3)">${MONTHS_DATA[p.mes]?.name||'?'} ${p.ano||''} · ${p.votosAFavor||0} a favor · ${p.votosContra||0} contra</div>
+        </div>
+        <span style="font-size:.72rem;padding:.15rem .5rem;border-radius:4px;background:${p.aprovada?'rgba(46,204,113,.15)':'rgba(231,76,60,.12)'};color:${p.aprovada?'var(--success)':'var(--danger)'}">${p.aprovada?'✅ APROVADA':'❌ REJEITADA'}</span>
+      </div>
+      ${p.manipulada?`<div style="font-size:.65rem;color:var(--accent);margin-top:.2rem">🤫 Votação influenciada</div>`:''}
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── Seção: Jurados ───────────────────────────────────────────
+function _renderSecJurados() {
+  const jb = gameState.ligaJuradosBonuses||{};
+  // Comissão como intermediários
+  const comissao = gameState.ligaCupula?.comissao||[];
+  const hasComissao = comissao.some(m=>m.relacao>=40);
+  const maxRelComissao = comissao.reduce((mx,m)=>Math.max(mx,m.relacao||0), 0);
+
+  const queKeys = ['bateria','harmonia','alegorias','comissao','enredo','evolucao','fantasias','casal','samba'];
+  const queLabel = {bateria:'Bateria',harmonia:'Harmonia',alegorias:'Alegorias e Adereços',comissao:'Comissão de Frente',enredo:'Enredo',evolucao:'Evolução',fantasias:'Fantasias',casal:'Mestre-Sala e Porta-Bandeira',samba:'Samba-Enredo'};
+  const queIcon  = {bateria:'🥁',harmonia:'🎯',alegorias:'🎪',comissao:'💃',enredo:'📜',evolucao:'🚀',fantasias:'👗',casal:'👑',samba:'🎵'};
+
+  return `
+  <div style="padding:.5rem .75rem;background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.25);border-radius:6px;font-size:.78rem;color:var(--text2);margin-bottom:.75rem">
+    ⚠️ <strong style="color:var(--danger)">Área de alto risco.</strong> Influenciar jurados é ilegal e pode resultar em desclassificação, rebaixamento e multa pesada.
+    ${!hasComissao?`<br><span style="color:var(--text3);font-size:.72rem">💡 Melhore sua relação com a Comissão de Carnaval (aba Cúpula) para desbloquear acesso aos jurados.</span>`:''}
+  </div>
+  <div style="display:flex;flex-direction:column;gap:.5rem">
+    ${queKeys.map(k=>{
+      const names = (JURADOS[k]||[]).slice(0,4);
+      const bonus = jb[k];
+      const locked = maxRelComissao < 40;
+      return `
+      <div style="background:var(--panel2);border:1px solid ${bonus?'rgba(155,89,182,.4)':'var(--border)'};border-radius:8px;padding:.65rem .9rem">
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
+          <span style="font-size:1.1rem">${queIcon[k]}</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;flex:1">${queLabel[k]}</div>
+          ${bonus?`<span style="font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:${bonus.garantido10?'rgba(231,76,60,.2)':'rgba(155,89,182,.15)'};color:${bonus.garantido10?'var(--danger)':'var(--accent)'}">${bonus.garantido10?'🔴 NOTA 10 GARANTIDA':'🟣 PRESENTE: +'+bonus.bonus.toFixed(1)+' pts'}</span>`:''}
+          ${!locked&&!bonus?`<button class="btn btn-gray btn-sm" style="font-size:.68rem" onclick="abrirInfluenciaJurado('${k}')">⚖️ Influenciar</button>`:''}
+          ${locked?`<span style="font-size:.65rem;color:var(--text3)">🔒 Requer relação ≥40 com Comissão</span>`:''}
+        </div>
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+          ${names.map((n,i)=>{
+            const profArr = getOrCreateJuradoProfiles()[k]||[];
+            const prof = profArr[i]||'tecnico';
+            const pc = PERFIL_COLOR[prof]||'var(--text2)';
+            return `<span style="font-size:.65rem;padding:.15rem .4rem;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text2)">${queIcon[k]} ${n} <span style="color:${pc}">(${PERFIL_LABEL[prof]||prof})</span></span>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function abrirInfluenciaJurado(queKey) {
+  initLigaCupula();
+  const comissao = gameState.ligaCupula?.comissao||[];
+  const melhorMembro = [...comissao].sort((a,b)=>b.relacao-a.relacao)[0];
+  if(!melhorMembro || melhorMembro.relacao < 40) {
+    toast('Melhore a relação com a Comissão de Carnaval primeiro.','warn'); return;
+  }
+  const queLabel = {bateria:'Bateria',harmonia:'Harmonia',alegorias:'Alegorias',comissao:'Comissão de Frente',enredo:'Enredo',evolucao:'Evolução',fantasias:'Fantasias',casal:'Mestre-Sala e Porta-Bandeira',samba:'Samba-Enredo'};
+  const intermediario = melhorMembro.nome;
+  const relInt = melhorMembro.relacao;
+
+  const chanceDesc = (valor, tipo) => {
+    const base = 0.05 + (valor/2000000)*0.4 + (gameState.reputation>70?0.15:0) - (relInt/100)*0.2;
+    return Math.round(clamp(base, 0.05, 0.85)*100);
+  };
+
+  const html = `
+  <p style="color:var(--text2);margin-bottom:.5rem">Intermediário: <strong style="color:var(--gold)">${intermediario}</strong> (relação ${relInt})</p>
+  <p style="font-size:.78rem;color:var(--text3);margin-bottom:.85rem">Uma ação neste quesito influencia as notas dos jurados de <strong>${queLabel[queKey]||queKey}</strong>.</p>
+  <div style="display:flex;flex-direction:column;gap:.4rem">
+    ${[
+      {tipo:'presente', label:'🎁 Oferecer Presente', range:'R$ 50k–500k', desc:'Aumenta nota em +0,1 a +0,3 pts. Risco moderado.', valores:[50000,150000,300000,500000]},
+      {tipo:'comprar',  label:'💸 Comprar Jurado',   range:'R$ 500k–2M',  desc:'Garante nota 10,0 no quesito. Risco altíssimo.', valores:[500000,1000000,1500000,2000000]},
+    ].map(op=>`
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:.6rem .8rem">
+        <div style="font-weight:700;font-size:.85rem;margin-bottom:.2rem">${op.label} <span style="font-size:.68rem;color:var(--text3)">(${op.range})</span></div>
+        <div style="font-size:.72rem;color:var(--text2);margin-bottom:.4rem">${op.desc}</div>
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+          ${op.valores.map(v=>{
+            const risco = chanceDesc(v, op.tipo);
+            const rColor = risco>60?'var(--danger)':risco>35?'var(--warn)':'var(--success)';
+            return `<button class="btn btn-sm" style="font-size:.68rem;background:var(--panel);border:1px solid var(--border);color:var(--text2)" onclick="confirmarInfluenciaJurado('${queKey}','${op.tipo}',${v},'${melhorMembro.id}')">
+              R$ ${fmt(v)} <span style="color:${rColor}">⚠️${risco}%</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>`).join('')}
+  </div>
+  <div style="margin-top:.65rem;font-size:.68rem;color:var(--danger);background:rgba(231,76,60,.06);border:1px solid rgba(231,76,60,.2);border-radius:5px;padding:.4rem .6rem">
+    🚨 Se descoberto: desclassificação + multa × 2 + rebaixamento possível + reputação −60
+  </div>`;
+
+  openModal(`⚖️ Influenciar Jurados — ${queLabel[queKey]||queKey}`, html, [{text:'Cancelar', action:closeModal, cls:'btn-gray'}]);
+}
+
+function confirmarInfluenciaJurado(queKey, tipo, valor, mId) {
+  if(gameState.budget < valor) { toast('Orçamento insuficiente!','warn'); return; }
+  const m = getCuplaMember(mId);
+  const relInt = m?.relacao||40;
+
+  gameState.budget -= valor;
+  gameState.expenses.politica = (gameState.expenses.politica||0) + valor;
+
+  // Chance de descoberta
+  const chanceDesc = clamp(0.05 + (valor/2000000)*0.45 + (gameState.reputation>70?0.15:0) - (relInt/100)*0.25, 0.04, 0.88);
+  const descoberto = Math.random() < chanceDesc;
+
+  if(!gameState.ligaJuradosBonuses) gameState.ligaJuradosBonuses = {};
+  if(tipo === 'presente') {
+    const bonusNota = 0.1 + (valor/500000)*0.2;
+    gameState.ligaJuradosBonuses[queKey] = {bonus: bonusNota, garantido10: false, descoberto};
+  } else {
+    gameState.ligaJuradosBonuses[queKey] = {bonus: 0, garantido10: true, descoberto};
+  }
+
+  if(descoberto) {
+    const multa = valor * 2;
+    gameState.budget -= multa;
+    gameState.reputation = clamp(gameState.reputation - 60, 0, 100);
+    gameState.community = clamp(gameState.community - 30, 0, 100);
+    gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50) - 35, 0, 100);
+    if(!gameState.escandalosLog) gameState.escandalosLog = [];
+    gameState.escandalosLog.push({icon:'🚨', texto:`Tentativa de corromper jurado de ${queKey} descoberta. Multa: R$ ${fmt(multa)}.`, severity:'critica', mes:MONTHS_DATA[gameState.month]?.name, ano:gameState.year});
+    addEvent(`🚨 ESCÂNDALO GRAVÍSSIMO: Corrupção de jurado de ${queKey} exposta! Multa R$ ${fmt(multa)}, reputação −60.`, 'bad');
+    closeModal();
+    openModal('🚨 Corrupção Descoberta!', `
+      <div style="text-align:center;padding:.5rem">
+        <div style="font-size:3rem;margin-bottom:.5rem">🚨</div>
+        <p style="color:var(--danger);font-weight:700">Tentativa de suborno de jurado foi descoberta!</p>
+        <div style="margin-top:.75rem;font-size:.82rem;display:flex;flex-direction:column;gap:.25rem">
+          <div style="color:var(--danger)">💰 Multa: R$ ${fmt(multa)}</div>
+          <div style="color:var(--danger)">⭐ Reputação −60</div>
+          <div style="color:var(--danger)">❤️ Comunidade −30</div>
+          <div style="color:var(--danger)">🏛️ Relação Liga −35</div>
+          <div style="color:var(--warn);margin-top:.3rem">⚠️ O bônus no quesito foi anulado.</div>
+        </div>
+      </div>
+    `, [{text:'Aceitar Consequências', action:()=>{closeModal();renderPolitics();}, cls:'btn-danger'}]);
+  } else {
+    const queLabel2 = {bateria:'Bateria',harmonia:'Harmonia',alegorias:'Alegorias',comissao:'Comissão de Frente',enredo:'Enredo',evolucao:'Evolução',fantasias:'Fantasias',casal:'Mestre-Sala e Porta-Bandeira',samba:'Samba-Enredo'};
+    const msg = tipo==='comprar' ? `Nota 10,0 garantida em ${queLabel2[queKey]||queKey}!` : `Bônus de +${(0.1+(valor/500000)*0.2).toFixed(1)} pts em ${queLabel2[queKey]||queKey}.`;
+    addEvent(`🤫 ${msg} (via intermediário)`, 'gold');
+    closeModal();
+    toast(msg, 'success');
+    renderPolitics();
+  }
+}
+
+// Limpa jurado bonuses ao resetar a temporada (já coberto pelo ligaJuradosBonuses:{} no reset)
+
+// ── Modal de membro ──────────────────────────────────────────
+function abrirMembroLiga(mId) {
+  initLigaCupula();
+  const m = getCuplaMember(mId);
+  if(!m) return;
+  const relColor = m.relacao>=65?'var(--success)':m.relacao>=40?'var(--gold)':'var(--danger)';
+  const perfColor = PERFIL_COLOR[m.perfil]||'var(--text2)';
+  const interacoes = (gameState.ligaInteracoes||[]).filter(i=>i.mId===mId).slice(-5);
+
+  const aceitSuborno = m.corruptivel && m.relacao >= 20;
+  const chanceSuborno = m.corruptivel ? Math.round(clamp((m.relacao/100)*0.6 + (m.perfil==='pragmatico'?0.2:0) - (m.perfil==='reformista'?0.3:0), 0.05, 0.95)*100) : 0;
+
+  const html = `
+  <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap">
+    <span style="font-size:3rem">${m.emoji}</span>
+    <div style="flex:1">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.3rem;color:var(--gold)">${m.nome}</div>
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.2rem">${m.cargo}</div>
+      <div style="font-size:.8rem;color:var(--text2)">${m.desc}</div>
+      <span style="font-size:.65rem;padding:.1rem .4rem;border-radius:3px;background:${perfColor}22;color:${perfColor};margin-top:.3rem;display:inline-block">${PERFIL_LABEL[m.perfil]}</span>
+      ${m.corruptivel?'<span style="font-size:.65rem;padding:.1rem .4rem;border-radius:3px;background:rgba(155,89,182,.15);color:var(--accent);margin-left:.3rem">⚠️ Corruptível</span>':'<span style="font-size:.65rem;padding:.1rem .4rem;border-radius:3px;background:rgba(46,204,113,.1);color:var(--success);margin-left:.3rem">✅ Íntegro</span>'}
+    </div>
+  </div>
+  <div style="margin-bottom:1rem">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+      <span style="font-size:.72rem;color:var(--text3)">Relação com sua escola</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.1rem;color:${relColor};margin-left:auto">${m.relacao}/100</span>
+    </div>
+    <div style="background:var(--bg);border-radius:3px;height:8px;overflow:hidden">
+      <div style="width:${m.relacao}%;height:100%;background:${relColor};transition:width .4s"></div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:${interacoes.length?'.75rem':'0'}">
+    <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.1rem">Ações disponíveis</div>
+    ${[
+      {acao:'conversar', label:'💬 Conversar', desc:'Melhora relação (+5). Gratuito.', custo:0, cClass:'btn-outline'},
+      {acao:'convidar', label:'🥂 Convidar para Evento', desc:'Melhora relação (+15). R$ 50.000.', custo:50000, cClass:'btn-blue'},
+      {acao:'presentear', label:'🎁 Oferecer Presente', desc:'Melhora relação (+22). R$ 150.000. Risco médio.', custo:150000, cClass:'btn-blue'},
+      {acao:'solicitar_apoio', label:'🗳️ Solicitar Apoio em Pauta', desc:'Pede voto numa pauta. Chance = relação%.', custo:0, cClass:'btn-outline'},
+      ...(aceitSuborno?[{acao:'subornar', label:'💸 Subornar', desc:`Compra apoio garantido. R$ 300.000–2.000.000. Chance aceitar: ${chanceSuborno}%. Alto risco.`, custo:300000, cClass:'btn-danger'}]:[]),
+    ].map(a=>`
+      <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;background:var(--panel2);border:1px solid var(--border);border-radius:6px">
+        <div style="flex:1">
+          <div style="font-size:.82rem;font-weight:600;color:var(--text)">${a.label}</div>
+          <div style="font-size:.68rem;color:var(--text3)">${a.desc}</div>
+        </div>
+        <button class="btn ${a.cClass} btn-sm" style="white-space:nowrap;font-size:.72rem" onclick="executarAcaoLiga('${mId}','${a.acao}',${a.custo})">${a.custo>0?'R$ '+fmt(a.custo):'Grátis'} →</button>
+      </div>`).join('')}
+  </div>
+  ${interacoes.length?`
+  <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Histórico recente</div>
+  <div style="display:flex;flex-direction:column;gap:.2rem">
+    ${interacoes.map(i=>`<div style="font-size:.72rem;padding:.2rem .5rem;background:var(--bg2);border-radius:4px;color:var(--text2)">${i.icon} ${i.texto}</div>`).join('')}
+  </div>`:''}
+  `;
+
+  openModal(`${m.emoji} ${m.nome}`, html, [{text:'Fechar', action:closeModal, cls:'btn-gray'}]);
+}
+
+// ── Executar Ação ────────────────────────────────────────────
+function executarAcaoLiga(mId, acao, custoBase) {
+  initLigaCupula();
+  const m = getCuplaMember(mId);
+  if(!m) return;
+
+  if(acao === 'subornar') {
+    // Modal de valor do suborno
+    openModal('💸 Definir Valor do Suborno', `
+      <p style="color:var(--text2);margin-bottom:.75rem">Qual o valor a oferecer para <strong style="color:var(--gold)">${m.nome}</strong>?</p>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        ${[[300000,'Baixo — R$ 300k (risco menor, aceitação menor)'],[700000,'Médio — R$ 700k (equilíbrio)'],[1500000,'Alto — R$ 1,5M (quase certo, muito suspeito)'],[2000000,'Máximo — R$ 2M (garantido, enorme risco)']].map(([v,l])=>`
+          <div onclick="confirmarSuborno('${mId}',${v})" style="cursor:pointer;padding:.5rem .75rem;background:var(--panel2);border:1px solid var(--border);border-radius:6px;font-size:.82rem" onmouseover="this.style.borderColor='var(--danger)'" onmouseout="this.style.borderColor='var(--border)'">${l}</div>`).join('')}
+      </div>
+    `, [{text:'Cancelar', action:closeModal, cls:'btn-gray'}]);
+    return;
+  }
+
+  if(gameState.budget < custoBase) { toast('Orçamento insuficiente!', 'warn'); return; }
+
+  let relDelta = 0, icon = '💬', texto = '';
+
+  if(acao === 'conversar') {
+    relDelta = 5 + Math.floor(Math.random()*4);
+    icon = '💬'; texto = `Conversa produtiva. Relação +${relDelta}.`;
+    gameState.politics = clamp(gameState.politics+1, 0, 100);
+  } else if(acao === 'convidar') {
+    gameState.budget -= custoBase;
+    relDelta = 12 + Math.floor(Math.random()*8);
+    icon = '🥂'; texto = `Convidado para evento. Relação +${relDelta}.`;
+    if(Math.random() < 0.15) { // recusa
+      relDelta = -5; texto = `Recusou o convite. Relação -5.`;
+    }
+    gameState.expenses.politica = (gameState.expenses.politica||0) + custoBase;
+  } else if(acao === 'presentear') {
+    gameState.budget -= custoBase;
+    relDelta = 18 + Math.floor(Math.random()*8);
+    icon = '🎁'; texto = `Presente aceito. Relação +${relDelta}.`;
+    if(!m.corruptivel && Math.random() < 0.3) {
+      // Escândalo leve
+      relDelta = -10;
+      texto = `Recusou o presente e ficou ofendido! Relação -10.`;
+      gameState.reputation = clamp(gameState.reputation - 5, 0, 100);
+      addEvent(`⚠️ ${m.nome} recusou presente da escola — possível escândalo.`, 'warn');
+    }
+    gameState.expenses.politica = (gameState.expenses.politica||0) + custoBase;
+  } else if(acao === 'solicitar_apoio') {
+    icon = '🗳️';
+    const pautas = (gameState.ligaPautas||[]).filter(p=>p.aprovada===null);
+    if(!pautas.length) { toast('Não há pautas pendentes para solicitar apoio.', 'info'); closeModal(); return; }
+    // Marca apoio do membro na primeira pauta pendente
+    const pauta = pautas[0];
+    const chance = (m.relacao / 100) * 0.75 + 0.1;
+    if(Math.random() < chance) {
+      pauta._apoiosGarantidos = (pauta._apoiosGarantidos||0) + 1;
+      texto = `Apoio garantido na pauta "${pauta.titulo}".`;
+    } else {
+      texto = `Negou apoio na pauta "${pauta.titulo}".`;
+      relDelta = -2;
+    }
+  }
+
+  setCuplaRelacao(mId, relDelta);
+
+  if(!gameState.ligaInteracoes) gameState.ligaInteracoes = [];
+  gameState.ligaInteracoes.push({mId, acao, icon, texto, mes: MONTHS_DATA[gameState.month]?.name});
+
+  closeModal();
+  toast(texto, relDelta >= 0 ? 'success' : 'warn');
+  renderPolitics();
+}
+
+function confirmarSuborno(mId, valor) {
+  const m = getCuplaMember(mId);
+  if(!m) return;
+  if(gameState.budget < valor) { toast('Sem orçamento!', 'warn'); return; }
+
+  const aceitChance = clamp((m.relacao/100)*0.5 + (m.corruptivel?0.35:-0.4) + (m.perfil==='pragmatico'?0.15:0) - (valor/2000000)*0.2, 0.05, 0.92);
+  const descobertaChance = clamp(0.05 + (valor/2000000)*0.35 + (gameState.reputation>70?0.1:0), 0.05, 0.70);
+
+  const aceito = Math.random() < aceitChance;
+  gameState.budget -= valor;
+  gameState.expenses.politica = (gameState.expenses.politica||0) + valor;
+
+  if(aceito) {
+    setCuplaRelacao(mId, 30);
+    const pauta = (gameState.ligaPautas||[]).find(p=>p.aprovada===null);
+    if(pauta) {
+      pauta._subornados = pauta._subornados||[];
+      pauta._subornados.push(mId);
+      pauta.manipulada = true;
+    }
+    if(!gameState.ligaInteracoes) gameState.ligaInteracoes = [];
+    gameState.ligaInteracoes.push({mId, acao:'subornar', icon:'🤫', texto:`Suborno aceito (R$ ${fmt(valor)}). Apoio garantido.`, mes:MONTHS_DATA[gameState.month]?.name, descoberto:false});
+    addEvent(`🤫 ${m.nome} aceitou o suborno de R$ ${fmt(valor)}. Apoio garantido.`, 'gold');
+
+    // Risco de descoberta
+    if(Math.random() < descobertaChance) {
+      setTimeout(()=>descobrirEscandalo(mId, valor), 500);
+    } else {
+      closeModal();
+      toast(`${m.nome} aceitou. Apoio garantido!`, 'success');
+      renderPolitics();
+    }
+  } else {
+    setCuplaRelacao(mId, -15);
+    if(!gameState.ligaInteracoes) gameState.ligaInteracoes = [];
+    gameState.ligaInteracoes.push({mId, acao:'subornar', icon:'❌', texto:`Suborno RECUSADO (R$ ${fmt(valor)}). Relação -15.`, mes:MONTHS_DATA[gameState.month]?.name});
+    addEvent(`❌ ${m.nome} recusou o suborno de R$ ${fmt(valor)}. Relação com a cúpula afetada.`, 'bad');
+    gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50)-8, 0, 100);
+    // Chance de escândalo mesmo na recusa
+    if(Math.random() < 0.3) setTimeout(()=>descobrirEscandalo(mId, valor), 500);
+    else { closeModal(); toast(`${m.nome} recusou o suborno.`, 'warn'); renderPolitics(); }
+  }
+}
+
+function descobrirEscandalo(mId, valor) {
+  const m = getCuplaMember(mId);
+  const multa = valor * 2;
+  gameState.budget -= multa;
+  gameState.reputation = clamp(gameState.reputation - 40, 0, 100);
+  gameState.community = clamp(gameState.community - 20, 0, 100);
+  gameState.politicalRelations.liga = clamp((gameState.politicalRelations.liga||50) - 30, 0, 100);
+
+  if(!gameState.escandalosLog) gameState.escandalosLog = [];
+  gameState.escandalosLog.push({icon:'💸', texto:`Tentativa de suborno de ${m?.nome||'conselheiro'} exposta pela imprensa. Multa: R$ ${fmt(multa)}.`, severity:'critica', mes:MONTHS_DATA[gameState.month]?.name, ano:gameState.year});
+  addEvent(`🚨 ESCÂNDALO: Suborno de R$ ${fmt(valor)} para ${m?.nome} descoberto! Multa de R$ ${fmt(multa)}. Reputação -40.`, 'bad');
+
+  closeModal();
+  openModal('🚨 Escândalo de Corrupção!', `
+    <div style="text-align:center;padding:.5rem 0">
+      <div style="font-size:3rem;margin-bottom:.5rem">🚨</div>
+      <p style="color:var(--danger);font-weight:700;font-size:1rem">Suborno descoberto!</p>
+      <p style="color:var(--text2);margin-top:.5rem">A tentativa de corromper <strong>${m?.nome}</strong> vazou para a imprensa.</p>
+      <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.3rem;font-size:.82rem">
+        <div style="color:var(--danger)">💰 Multa: R$ ${fmt(multa)}</div>
+        <div style="color:var(--danger)">⭐ Reputação −40</div>
+        <div style="color:var(--danger)">❤️ Comunidade −20</div>
+        <div style="color:var(--danger)">🏛️ Relação com a Liga −30</div>
+      </div>
+    </div>
+  `, [{text:'Aceitar Consequências', action:()=>{ closeModal(); renderPolitics(); }, cls:'btn-danger'}]);
+}
+
+// ── Render Pautas Tab ────────────────────────────────────────
+// ============================================================
 
 function confirmarBloco(blocoId) {
   const b = BLOCOS_POLITICOS[blocoId];
@@ -14246,7 +15243,7 @@ function renderPress() {
               <span style="font-size:1rem">${o.emoji}</span>
               <div style="flex:1">
                 <div style="font-size:.78rem;font-weight:600">${o.name}</div>
-                <div style="font-size:.62rem;color:var(--text3)">${typeLabel} · ${(o.audience/1000).toFixed(0)}k audiência</div>
+                <div style="font-size:.62rem;color:var(--text3)">${typeLabel} · ${o.audience >= 1000 ? (o.audience/1000).toFixed(0)+'M' : o.audience+'k'} audiência</div>
                 <div style="height:3px;background:var(--bg);border-radius:2px;margin-top:.2rem;overflow:hidden"><div style="width:${chance}%;height:100%;background:${barC};border-radius:2px"></div></div>
               </div>
               <div style="text-align:right;min-width:36px">
@@ -15348,10 +16345,8 @@ function setParadeSpeed(s) {
 }
 
 function startParadeScreen() {
-  // ── Clear ALL stale state from previous season ──────────────
   if(paradeInterval)   { clearInterval(paradeInterval);   paradeInterval   = null; }
   if(paradeEndTimeout) { clearTimeout(paradeEndTimeout);  paradeEndTimeout = null; }
-  // Reset all parade globals completely
   paradeTime        = 0;
   paradePhase       = 0;
   paradeSpeed       = 1;
@@ -15361,60 +16356,67 @@ function startParadeScreen() {
   paradeTotalRevealed = 0;
 
   showScreen('screen-parade');
-  document.getElementById('paradeSchoolName').textContent = `${gameState.school.name} — ${gameState.school.displayGroup} · Temporada ${gameState.season}`;
 
-  // Build phase progress bar
+  // School name
+  const schoolEl = document.getElementById('prd-school-name');
+  if(schoolEl) schoolEl.textContent = `${gameState.school.name} — ${gameState.school.displayGroup} · ${gameState.year}`;
+
+  // Phase strip
   const bar = document.getElementById('paradePhaseBar');
-  bar.innerHTML = PARADE_PHASES.map((p,i)=>`
-    <div id="phaseChip${i}" style="display:flex;align-items:center;gap:.25rem;padding:.2rem .45rem;border-radius:12px;font-size:.62rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.04em;border:1px solid var(--border);color:var(--text3);white-space:nowrap;transition:all .3s;flex-shrink:0">
+  if(bar) bar.innerHTML = PARADE_PHASES.map((p,i)=>`
+    <div id="phaseChip${i}" style="display:flex;align-items:center;gap:.2rem;padding:.15rem .4rem;border-radius:10px;
+      font-size:.58rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.04em;
+      border:1px solid var(--border);color:var(--text3);white-space:nowrap;transition:all .3s;flex-shrink:0">
       <span>${p.icon}</span><span class="phase-label-text">${p.label}</span>
     </div>
   `).join('');
 
   // Build live scores panel
   const SCORE_KEYS = [
-    {k:'comissao',  label:'Comissão de Frente',             icon:'💃'},
-    {k:'casal',     label:'Mestre-Sala / Porta-Bandeira',   icon:'👑'},
-    {k:'bateria',   label:'Bateria',                        icon:'🥁'},
-    {k:'harmonia',  label:'Harmonia',                       icon:'🎯'},
-    {k:'evolucao',  label:'Evolução',                       icon:'🚀'},
-    {k:'enredo',    label:'Enredo',                         icon:'📜'},
-    {k:'samba',     label:'Samba-Enredo',                   icon:'🎵'},
-    {k:'fantasias', label:'Fantasias',                      icon:'👗'},
-    {k:'alegorias', label:'Alegorias',                      icon:'🎪'},
+    {k:'comissao',  label:'Comissão de Frente',    icon:'💃'},
+    {k:'casal',     label:'Mestre-Sala/Port.-Band.',icon:'👑'},
+    {k:'bateria',   label:'Bateria',                icon:'🥁'},
+    {k:'harmonia',  label:'Harmonia',               icon:'🎯'},
+    {k:'evolucao',  label:'Evolução',               icon:'🚀'},
+    {k:'enredo',    label:'Enredo',                 icon:'📜'},
+    {k:'samba',     label:'Samba-Enredo',           icon:'🎵'},
+    {k:'fantasias', label:'Fantasias',              icon:'👗'},
+    {k:'alegorias', label:'Alegorias',              icon:'🎪'},
   ];
   const scorePanel = document.getElementById('paradeLiveScores');
-  scorePanel.innerHTML = SCORE_KEYS.map(q=>`
-    <div style="display:flex;align-items:center;gap:.4rem">
-      <span style="font-size:.85rem;width:20px;text-align:center;flex-shrink:0">${q.icon}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.67rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${q.label}</div>
-        <div style="background:var(--bg2);border-radius:2px;height:4px;margin-top:2px;overflow:hidden">
-          <div id="scoreFill_${q.k}" style="height:100%;width:0%;background:linear-gradient(90deg,#B8860B,var(--gold-light));border-radius:2px;transition:width .6s ease"></div>
+  if(scorePanel) scorePanel.innerHTML = SCORE_KEYS.map(q=>`
+    <div class="prd-score-row">
+      <span class="prd-score-icon">${q.icon}</span>
+      <div class="prd-score-info">
+        <div class="prd-score-lbl">${q.label}</div>
+        <div class="prd-score-track">
+          <div class="prd-score-fill" id="scoreFill_${q.k}" style="width:0%"></div>
         </div>
       </div>
-      <div id="scoreVal_${q.k}" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1rem;color:var(--text3);min-width:32px;text-align:right">—</div>
+      <div class="prd-score-val" id="scoreVal_${q.k}">—</div>
     </div>
   `).join('');
 
-  // Speed buttons reset
+  // Speed reset
   [1,2,4,10].forEach(v=>{ const b=document.getElementById(`spd${v}`); if(b) b.classList.toggle('active',v===1); });
-  // Reset parade buttons for new season
+
+  // Buttons
   const startBtn = document.getElementById('startParadeBtn');
   const skipBtn  = document.getElementById('skipParadeBtn');
   if(startBtn) startBtn.classList.remove('hidden');
   if(skipBtn)  skipBtn.classList.add('hidden');
-  // Reset parade log
+
+  // Log
   const logEl = document.getElementById('paradeLog');
-  if(logEl) logEl.innerHTML = `<div style="color:var(--text3);font-size:.78rem">🌙 A escola aguarda para entrar na avenida...</div>`;
-  // Reset phase display
+  if(logEl) logEl.innerHTML = `<div class="prd-log-entry"><span class="prd-log-time">00:00</span><span class="prd-log-neutral">🌙 A escola aguarda para entrar na avenida...</span></div>`;
+
+  // Phase/total display
   const phEl = document.getElementById('paradeCurrentPhase');
   if(phEl) phEl.textContent = 'Aguardando início...';
-  // Reset total score display
   const totalEl = document.getElementById('paradeTotalScore');
-  if(totalEl) { totalEl.textContent = '—'; totalEl.style.color = 'var(--text3)'; }
+  if(totalEl) { totalEl.textContent = '—'; totalEl.style.color = 'var(--gold)'; }
   const statusEl = document.getElementById('paradeScoreStatus');
-  if(statusEl) statusEl.textContent = '';
+  if(statusEl) statusEl.textContent = 'Aguardando quesitos...';
 }
 
 function startParade() {
@@ -15467,8 +16469,17 @@ function _runParadeInterval() {
       if(newPhase !== paradePhase) {
         paradePhase = newPhase;
         const ph = PARADE_PHASES[paradePhase];
-        document.getElementById('paradeCurrentPhase').textContent = `${ph.icon}  ${ph.label.toUpperCase()}  —  ${ph.desc}`;
+        const phLabel = document.getElementById('paradeCurrentPhase');
+        if(phLabel) phLabel.textContent = `${ph.icon} ${ph.label.toUpperCase()} — ${ph.desc}`;
+        // Slide-in banner
         if(paradeSpeed <= 4) {
+          const banner = document.getElementById('prd-phase-banner');
+          if(banner) {
+            banner.textContent = `${ph.icon} ${ph.label}`;
+            banner.style.opacity = '1';
+            clearTimeout(banner._bt);
+            banner._bt = setTimeout(()=>{ banner.style.opacity='0'; }, 1800);
+          }
           addParadeLog(`${ph.icon} <strong>${ph.label}</strong> — ${ph.desc}`, 'good');
         }
         // Highlight phase chip
@@ -15480,14 +16491,8 @@ function _runParadeInterval() {
         // Reveal score for this phase's key
         const key = ph.key;
         if(key && gameState.finalNotes?.[key]) {
-          const note = gameState.finalNotes[key];
-          const fill = document.getElementById(`scoreFill_${key}`);
-          const val  = document.getElementById(`scoreVal_${key}`);
-          if(fill) fill.style.width = ((note - 9.0)/1.0*100)+'%';
-          if(val)  { val.textContent = note.toFixed(1); val.style.color='var(--gold)'; val.style.textShadow='0 0 8px rgba(212,175,55,.6)'; }
-          paradeTotalRevealed++;
-          updateParadeTotalScore();
-          if(paradeSpeed <= 4) showParadePopup(`${key==='bateria'?'🥁':key==='samba'?'🎵':key==='enredo'?'📜':key==='casal'?'👑':'⭐'} ${note.toFixed(1)} — ${ph.label}`);
+          _revealParadeScore(key, gameState.finalNotes[key]);
+          if(paradeSpeed <= 4) showParadePopup(`${ph.icon} ${gameState.finalNotes[key].toFixed(1)} — ${ph.label}`);
         }
       }
 
@@ -15507,10 +16512,16 @@ function _runParadeInterval() {
       if(pubEl) pubEl.textContent = Math.round(paradePublicoVal)+'%';
       const enEl = document.getElementById('paradeEnergy');
       if(enEl) enEl.textContent = Math.round(paradeEnergyVal)+'%';
+      // Bars
+      const energyBar = document.getElementById('prd-energy-bar');
+      if(energyBar) { energyBar.style.width = paradeEnergyVal+'%'; energyBar.style.background = paradeEnergyVal>60?'linear-gradient(90deg,#27ae60,#2ecc71)':paradeEnergyVal>30?'linear-gradient(90deg,#e67e22,#f39c12)':'linear-gradient(90deg,#c0392b,#e74c3c)'; }
+      const publicoBar = document.getElementById('prd-publico-bar');
+      if(publicoBar) publicoBar.style.width = paradePublicoVal+'%';
       const progEl = document.getElementById('paradeProgress');
       if(progEl) progEl.style.width = (paradeTime/PARADE_TOTAL_TICKS*100)+'%';
       const fInfoEl = document.getElementById('paradeFooterInfo');
-      if(fInfoEl) fInfoEl.textContent = `Passagem ${Math.round(paradeTime/PARADE_TOTAL_TICKS*100)}% concluída · Fase ${paradePhase+1}/${PARADE_PHASES.length} · Hype ${Math.round(paradeHype)}`;
+      if(fInfoEl) fInfoEl.textContent = `Passagem ${Math.round(paradeTime/PARADE_TOTAL_TICKS*100)}% · Fase ${paradePhase+1}/${PARADE_PHASES.length} · 🔥 ${Math.round(paradeHype)}`;
+
 
       // --- Contextual random events (rate adapts to speed) ---
       const evFreq = paradeSpeed >= 10 ? 15 : paradeSpeed >= 4 ? 10 : 8;
@@ -15536,13 +16547,7 @@ function _runParadeInterval() {
       paradeInterval = null;
       // Reveal all remaining scores
       ['comissao','casal','bateria','harmonia','evolucao','enredo','samba','fantasias','alegorias'].forEach(k=>{
-        if(gameState.finalNotes?.[k]) {
-          const note = gameState.finalNotes[k];
-          const fill = document.getElementById(`scoreFill_${k}`);
-          const val  = document.getElementById(`scoreVal_${k}`);
-          if(fill) fill.style.width = ((note-9.0)/1.0*100)+'%';
-          if(val)  { val.textContent = note.toFixed(1); val.style.color='var(--gold)'; }
-        }
+        if(gameState.finalNotes?.[k]) _revealParadeScore(k, gameState.finalNotes[k]);
       });
       updateParadeTotalScore();
       addParadeLog('🎊 <strong>DESFILE ENCERRADO!</strong> A escola sai pela rampa entre ovações! Aguardando apuração...', 'good');
@@ -15564,12 +16569,10 @@ function updateParadeTotalScore() {
   const totalEl = document.getElementById('paradeTotalScore');
   const statusEl = document.getElementById('paradeScoreStatus');
   if(count > 0) {
-    // Soma real das notas de quesito reveladas (cada uma já é soma de 3 jurados)
-    // Projeção: extrapola para os 9 quesitos pela média atual
     const avgPerQuesito = total / count;
     const projected = Math.round(avgPerQuesito * 9 * 10) / 10;
     totalEl.textContent = projected.toFixed(1);
-    totalEl.style.color = projected > 265 ? 'var(--success)' : projected > 255 ? 'var(--gold)' : 'var(--warn)';
+    totalEl.style.color = projected >= 269 ? 'var(--success)' : projected >= 266 ? 'var(--gold)' : 'var(--warn)';
     statusEl.textContent = `${count}/9 quesitos · Projeção: ${projected.toFixed(1)} pts`;
   }
 }
@@ -15796,14 +16799,32 @@ function drawParadeCanvas(ctx, w, h, frame) {
 
 function addParadeLog(text, cls='') {
   const log = document.getElementById('paradeLog');
+  if(!log) return;
   const mins = Math.floor(paradeTime/60).toString().padStart(2,'0');
   const secs = (paradeTime%60).toString().padStart(2,'0');
-  const colors = { good:'var(--success)', bad:'var(--danger)', '':'var(--text2)' };
+  const colorClass = cls==='good'?'prd-log-good':cls==='bad'?'prd-log-bad':'prd-log-neutral';
   const div = document.createElement('div');
-  div.style.cssText = `padding:.2rem 0;border-bottom:1px solid rgba(42,42,69,.3);font-size:.76rem;color:${colors[cls]||colors['']};display:flex;gap:.4rem;align-items:flex-start`;
-  div.innerHTML = `<span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;color:var(--gold);font-size:.72rem;flex-shrink:0">${mins}:${secs}</span><span>${text}</span>`;
+  div.className = 'prd-log-entry';
+  div.innerHTML = `<span class="prd-log-time">${mins}:${secs}</span><span class="${colorClass}">${text}</span>`;
   log.appendChild(div);
+  // Keep at most 60 entries
+  while(log.children.length > 60) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+}
+
+function _revealParadeScore(key, note) {
+  const fill = document.getElementById(`scoreFill_${key}`);
+  const val  = document.getElementById(`scoreVal_${key}`);
+  // Map 9.6–10.0 → 0–100%
+  const pct = Math.round(clamp((note - 9.6) / 0.4 * 100, 0, 100));
+  if(fill) fill.style.width = pct + '%';
+  if(val) {
+    val.textContent = note.toFixed(1);
+    val.classList.add('revealed');
+    val.style.color = 'var(--gold)';
+  }
+  paradeTotalRevealed++;
+  updateParadeTotalScore();
 }
 
 function skipToResults() {
@@ -15812,13 +16833,7 @@ function skipToResults() {
   calculateFinalNotes();
   // Reveal all scores instantly
   ['comissao','casal','bateria','harmonia','evolucao','enredo','samba','fantasias','alegorias'].forEach(k=>{
-    if(gameState.finalNotes?.[k]) {
-      const note = gameState.finalNotes[k];
-      const fill = document.getElementById(`scoreFill_${k}`);
-      const val  = document.getElementById(`scoreVal_${k}`);
-      if(fill) fill.style.width = ((note-9.0)/1.0*100)+'%';
-      if(val)  { val.textContent = note.toFixed(1); val.style.color='var(--gold)'; }
-    }
+    if(gameState.finalNotes?.[k]) _revealParadeScore(k, gameState.finalNotes[k]);
   });
   updateParadeTotalScore();
   goToApuracao();
@@ -15837,11 +16852,11 @@ function skipToResults() {
 // ============================================================
 
 const PESO_BANDEIRA_NIVEIS = {
-  mitico:    {label:'Mítico',    icon:'🔱', minFloor:9.85, descColor:'var(--accent)', desc:'Raramente abaixo de 9.9', protBonus:3},
-  historico: {label:'Histórico', icon:'👑', minFloor:9.80, descColor:'var(--gold)',   desc:'Dificilmente abaixo de 9.8', protBonus:2},
-  forte:     {label:'Forte',     icon:'⭐', minFloor:9.70, descColor:'var(--info)',   desc:'Dificilmente abaixo de 9.7', protBonus:1},
-  medio:     {label:'Médio',     icon:'⚪', minFloor:0,    descColor:'var(--text2)',  desc:'Sem proteção de nota', protBonus:0},
-  fraco:     {label:'Fraco',     icon:'🔸', minFloor:0,    descColor:'var(--text3)',  desc:'Pouca tradição', protBonus:-1},
+  mitico:    {label:'Mítico',    icon:'🔱', piso:9.8, pisoCent:980, descColor:'var(--accent)', desc:'Nenhuma nota abaixo de 9,8'},
+  historico: {label:'Histórico', icon:'👑', piso:9.8, pisoCent:980, descColor:'var(--gold)',   desc:'Nenhuma nota abaixo de 9,8'},
+  forte:     {label:'Forte',     icon:'⭐', piso:9.7, pisoCent:970, descColor:'var(--info)',   desc:'Nenhuma nota abaixo de 9,7'},
+  medio:     {label:'Médio',     icon:'⚪', piso:0,   pisoCent:0,   descColor:'var(--text2)',  desc:'Sem proteção de nota'},
+  fraco:     {label:'Fraco',     icon:'🔸', piso:0,   pisoCent:0,   descColor:'var(--text3)',  desc:'Sem proteção de nota'},
 };
 
 // Schools with historical peso (Grupo Especial only)
@@ -15856,37 +16871,39 @@ const ESCOLA_PESO_BANDEIRA = {
   unidosdarocinha: 'forte',
   mocidadeindependente: 'forte',
   saocrementino: 'medio',
-  granderioprata: 'fraco',
-  paraíso: 'fraco',
+  granderioprata: 'medio',
+  paraíso: 'medio',
 };
 
 function getEscolaPesoBandeira(schoolId, seasonHistory) {
-  // Base from static data
   let base = ESCOLA_PESO_BANDEIRA[schoolId] || 'medio';
-  // Dynamic adjustment based on history
   const history = seasonHistory || [];
   const titulos = history.filter(h=>h.position===1).length;
   const rebaixamentos = history.filter(h=>h.relegated).length;
   const yearsInEspecial = history.filter(h=>h.group==='especial').length;
-  // Earn weight
   if(titulos >= 3 && yearsInEspecial >= 5) base = 'mitico';
-  else if(titulos >= 2 || yearsInEspecial >= 4) base = base==='mitico'?'mitico':'historico';
-  else if(titulos >= 1) base = base==='medio'||base==='fraco'?'forte':base;
-  // Lose weight
+  else if(titulos >= 2 || yearsInEspecial >= 10) base = base==='mitico'?'mitico':'historico';
+  else if(titulos >= 1 || yearsInEspecial >= 5) base = (base==='medio'||base==='fraco')?'forte':base;
   if(rebaixamentos >= 2) base = base==='mitico'?'historico':base==='historico'?'forte':base==='forte'?'medio':'fraco';
-  else if(rebaixamentos >= 1) base = base==='mitico'?'mitico':base==='historico'?'forte':base==='forte'?'medio':base;
+  else if(rebaixamentos >= 1) base = base==='historico'?'forte':base==='forte'?'medio':base;
   return base;
 }
 
+// Retorna o pisoCent (centésimos do piso por nota) para uma escola no grupo especial
+// Usado em judgeNote para aplicar o floor APÓS o sorteio
+function getPisoBandeira(schoolId, seasonHistory, group) {
+  if(group !== 'especial') return 0;
+  const pesoKey = getEscolaPesoBandeira(schoolId, seasonHistory);
+  return PESO_BANDEIRA_NIVEIS[pesoKey]?.pisoCent || 0;
+}
+
+// Legacy: mantido para compatibilidade — agora só ajusta qualidade pelo bônus de tradição
 function applyPesoBandeira(quality, schoolId, seasonHistory, group) {
   if(group !== 'especial') return quality;
   const pesoKey = getEscolaPesoBandeira(schoolId, seasonHistory);
-  const peso = PESO_BANDEIRA_NIVEIS[pesoKey];
-  if(!peso || peso.minFloor === 0) return quality + peso.protBonus;
-  // Map minFloor note to minimum quality that generates that note
-  // 9.85→quality≈93, 9.80→quality≈88, 9.70→quality≈76
-  const qualityFloor = {9.85:90, 9.80:85, 9.70:75}[peso.minFloor] || 0;
-  return Math.max(quality + peso.protBonus, qualityFloor);
+  // Bônus de qualidade leve para escolas tradicionais (sem alterar a distribuição base)
+  const bonusMap = {mitico:2, historico:1, forte:0, medio:0, fraco:-1};
+  return clamp(quality + (bonusMap[pesoKey]||0), 0, 100);
 }
 
 // ============================================================
@@ -15894,24 +16911,32 @@ function applyPesoBandeira(quality, schoolId, seasonHistory, group) {
 // ============================================================
 
 const GROUP_JUDGING_RULES = {
-  especial:  {jurados:4, descarta:true,  topTotal:[269.5,270.0], botTotal:[267.0,268.5], spreadMin:0.5, spreadMax:1.5},
-  ouro:      {jurados:4, descarta:true,  topTotal:[268.0,269.5], botTotal:[265.5,267.0], spreadMin:0.4, spreadMax:1.2},
-  prata:     {jurados:3, descarta:true,  topTotal:[266.5,268.0], botTotal:[263.5,265.5], spreadMin:0.4, spreadMax:1.0},
-  bronze:    {jurados:3, descarta:false, topTotal:[261.0,265.0], botTotal:[258.0,262.0], spreadMin:0.5, spreadMax:1.5},
-  avaliacao: {jurados:2, descarta:false, topTotal:[255.0,262.0], botTotal:[250.0,257.0], spreadMin:0.5, spreadMax:1.2},
+  especial:  {jurados:4, descarta:true,  topTotal:[269.0,270.0], botTotal:[266.0,268.0], spreadMin:1.0, spreadMax:4.0},
+  ouro:      {jurados:4, descarta:true,  topTotal:[268.5,270.0], botTotal:[267.0,268.5], spreadMin:0.4, spreadMax:1.2},
+  prata:     {jurados:3, descarta:true,  topTotal:[267.0,268.0], botTotal:[264.0,266.5], spreadMin:0.4, spreadMax:1.0},
+  bronze:    {jurados:3, descarta:false, topTotal:[264.0,265.0], botTotal:[261.0,263.0], spreadMin:0.5, spreadMax:1.5},
+  avaliacao: {jurados:2, descarta:false, topTotal:[260.0,262.0], botTotal:[255.0,259.0], spreadMin:0.5, spreadMax:1.2},
+};
+
+// Alias em centésimos para uso interno
+const GROUP_RULES = {
+  especial:  { jurados:4, descarta:true,  top:2700, bottom:2660 },
+  ouro:      { jurados:4, descarta:true,  top:2700, bottom:2670 },
+  prata:     { jurados:3, descarta:true,  top:2700, bottom:2640 },
+  bronze:    { jurados:3, descarta:false, top:2700, bottom:2610 },
+  avaliacao: { jurados:2, descarta:false, top:2700, bottom:2550 },
 };
 
 function scoreToQuesitoByGroup(quality, group) {
   const rules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
-  const profs = ['rigoroso','tecnico','generoso','critico','neutro'].slice(0, rules.jurados);
-  const judges = profs.map(p => judgeNote(quality, p==='neutro'?'tecnico':p));
+  const profs = ['rigoroso','tecnico','generoso','critico'].slice(0, rules.jurados);
+  const judges = profs.map(p => judgeNote(quality, p));
   if(rules.descarta) {
     let discardIdx = 0;
     for(let i=1;i<judges.length;i++) { if(judges[i]<judges[discardIdx]) discardIdx=i; }
     const sumInt = judges.reduce((s,v,i)=>i===discardIdx?s:s+Math.round(v*10), 0);
     return {judges, discardIdx, discarded:judges[discardIdx], total:sumInt/10};
   } else {
-    // No discard — sum all
     const sumInt = judges.reduce((s,v)=>s+Math.round(v*10), 0);
     return {judges, discardIdx:-1, discarded:null, total:sumInt/10};
   }
@@ -16025,36 +17050,53 @@ function rollMudancaRegulamento(year) {
   return pool[Math.floor(Math.random()*pool.length)];
 }
 
-const JURADOS_POOL = [
-  {name:'Aline Barbosa',    profile:'generoso',  specialty:'Fantasias & Alegorias',  emoji:'👗'},
-  {name:'Carlos Monteiro',  profile:'rigoroso',  specialty:'Bateria & Ritmo',         emoji:'🥁'},
-  {name:'Débora Vilela',    profile:'tecnico',   specialty:'Harmonia & Evolução',     emoji:'🎯'},
-  {name:'Eduardo Pires',    profile:'critico',   specialty:'Enredo & Carnavalesco',   emoji:'📜'},
-  {name:'Fátima Nogueira',  profile:'generoso',  specialty:'Comissão de Frente',      emoji:'💃'},
-  {name:'Gustavo Leite',    profile:'rigoroso',  specialty:'Alegorias & Visual',      emoji:'🎪'},
-  {name:'Helena Carvalho',  profile:'tecnico',   specialty:'Samba-Enredo & Canto',   emoji:'🎵'},
-  {name:'Ivan Rodrigues',   profile:'critico',   specialty:'Harmonia & Gestão',       emoji:'⚖️'},
-  {name:'Juliana Mota',     profile:'generoso',  specialty:'Fantasias & Ateliê',      emoji:'✨'},
-  {name:'Klaus Werner',     profile:'rigoroso',  specialty:'Evolução & Coreografia',  emoji:'🚶'},
-  {name:'Letícia Cunha',    profile:'tecnico',   specialty:'Mestre-Sala & Porta-Bandeira', emoji:'👑'},
-  {name:'Marcos Silveira',  profile:'critico',   specialty:'Bateria & Percussão',     emoji:'🎶'},
-  {name:'Nathalia Ramos',   profile:'generoso',  specialty:'Enredo & Literatura',     emoji:'📚'},
-  {name:'Otávio Ferreira',  profile:'rigoroso',  specialty:'Harmonia & Ordem',        emoji:'📋'},
-  {name:'Priscila Assis',   profile:'tecnico',   specialty:'Alegorias & Escultura',   emoji:'🗿'},
-  {name:'Roberto Lins',     profile:'critico',   specialty:'Samba & Melodia',         emoji:'🎼'},
-];
+// ============================================================
+// JURADOS FIXOS POR QUESITO — conforme regulamento LIESA
+// ============================================================
+const JURADOS = {
+  bateria:   ['Geiza Carvalho',      'Nelson Pestana',        'Marcio Lopes',            'Rafael Barros Castro'],
+  harmonia:  ['Rodrigo Lima',        'Júlia Félix',           'Cainã Alves',             'Sinésio Silva'],
+  alegorias: ['Walber Ângelo',       'Aislane Nobre',         'Luciana Porto',           'Madson Oliveira'],
+  comissao:  ['Tayná Vieira',        'Paola Novaes',          'Rafaela Ribeiro',         'Ronabio Lima'],
+  enredo:    ['Johnny Soares',       'Monica Mançur',         'Lucinea Ferreira',        'Maíza da Silva'],
+  evolucao:  ['Gerson Martins',      'Mateus Dutra',          'Lucila de Beaurepaire',   'Verônica Torres'],
+  fantasias: ['Paulo Paradela',      'Cátia Vianna',          'Betto Gomes',             'Pryscila Dias'],
+  casal:     ['Eduardo Torres',      'Mônica Barbosa',        'Raquel Rosa',             'Fernando Zikan'],
+  samba:     ['Christiano Abelardo', 'Ivan Paparguerius',     'Vandelir Camilo',         'Alfredo Del-Penho'],
+};
 
-// Pick judges for a quesito — group-aware count
+// Emojis de identificação por quesito (para exibição na apuração)
+const JURADO_QUESITO_EMOJI = {
+  bateria:'🥁', harmonia:'🎯', alegorias:'🎪', comissao:'💃',
+  enredo:'📜', evolucao:'🚀', fantasias:'👗', casal:'👑', samba:'🎵',
+};
+
+const PERFIS_DISPONIVEIS = ['rigoroso', 'tecnico', 'generoso', 'critico'];
+
+// Gera (e cacheia em gameState) os perfis dos jurados para toda a temporada.
+// Perfis são sorteados uma vez por temporada e ficam fixos.
+function getOrCreateJuradoProfiles() {
+  if(gameState.juradoProfiles) return gameState.juradoProfiles;
+  const profiles = {};
+  for(const [key, names] of Object.entries(JURADOS)) {
+    // Embaralha os 4 perfis e atribui um por jurado
+    const shuffled = [...PERFIS_DISPONIVEIS].sort(() => Math.random() - 0.5);
+    profiles[key] = names.map((_, i) => shuffled[i % shuffled.length]);
+  }
+  gameState.juradoProfiles = profiles;
+  return profiles;
+}
+
+// Retorna os jurados do quesito (count limitado pelo grupo) com nome, perfil e emoji
 function pickJuradosForQuesito(queKey, year) {
   const group = gameState?.school?.group || 'especial';
   const rules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
   const count = rules.jurados;
-  const seed = queKey.split('').reduce((s,c)=>s+c.charCodeAt(0),0) + (year||2024)*7;
-  const shuffled = [...JURADOS_POOL].sort((a,b)=>{
-    const h=(x)=>{ let h=seed^x; h=Math.imul(h^(h>>>16),0x45d9f3b); return h^(h>>>16); };
-    return h(JURADOS_POOL.indexOf(a)) - h(JURADOS_POOL.indexOf(b));
-  });
-  return shuffled.slice(0, count);
+  const names   = (JURADOS[queKey] || JURADOS.bateria).slice(0, count);
+  const allProfs = getOrCreateJuradoProfiles();
+  const profs   = (allProfs[queKey] || PERFIS_DISPONIVEIS).slice(0, count);
+  const emoji   = JURADO_QUESITO_EMOJI[queKey] || '⚖️';
+  return names.map((name, i) => ({ name, profile: profs[i] || 'tecnico', emoji }));
 }
 
 const APURACAO_QUESITOS = [
@@ -16073,67 +17115,64 @@ let apuracaoQuesIndex = 0;
 
 // ============================================================
 // ==================== SISTEMA DE NOTAS REALISTA ============
-// Baseado nas planilhas reais do LIESA:
-//   notas: 9.7–10.0 (mínimo absoluto 9.7)
-//   diferença máxima entre escolas por quesito: 0.4
-//   totais: 265–270 (máximo 270)
+// Escala 9,6–10,0 (5 valores) — mínimo absoluto 9,6
 // ============================================================
 
-// Escala real: mínimo 9.7, máximo 10.0
-// [9.7, 9.8, 9.9, 10.0]
-const NOTE_STEPS = [9.7, 9.8, 9.9, 10.0];
+const NOTE_STEPS      = [9.6, 9.7, 9.8, 9.9, 10.0];
+const NOTE_STEPS_CENT = [960, 970, 980, 990, 1000];
 
-// Per-quesito realistic floor notes
-const QUESITO_FLOOR = {
-  casal:     { good: 9.9, bad: 9.8 },   // MS/PB raramente perde
-  comissao:  { good: 9.9, bad: 9.8 },   // Comissão: impacto ou penalidade
-  bateria:   { good: 9.9, bad: 9.9 },   // Bateria: sempre 9.9–10.0
-  samba:     { good: 9.8, bad: 9.7 },
-  harmonia:  { good: 9.8, bad: 9.7 },
-  evolucao:  { good: 9.8, bad: 9.7 },
-  alegorias: { good: 9.8, bad: 9.7 },
-  fantasias: { good: 9.7, bad: 9.7 },
-  enredo:    { good: 9.7, bad: 9.7 },
-};
-
-// quality 0–100 → pesos para [9.7, 9.8, 9.9, 10.0]
-function getNoteDist(quality, quesito) {
-  //                           9.7   9.8   9.9  10.0
-  let dist;
-  if(quality >= 98)   dist = [  0,    5,   30,   65];
-  else if(quality>=94)dist = [  0,   12,   48,   40];
-  else if(quality>=90)dist = [  2,   22,   52,   24];
-  else if(quality>=86)dist = [  8,   38,   44,   10];
-  else if(quality>=82)dist = [ 18,   52,   26,    4];
-  else if(quality>=76)dist = [ 35,   50,   14,    1];
-  else if(quality>=68)dist = [ 55,   38,    7,    0];
-  else if(quality>=58)dist = [ 72,   24,    4,    0];
-  else                dist = [ 88,   11,    1,    0];
-
-  // Apply per-quesito floor
-  if(quesito && QUESITO_FLOOR[quesito]) {
-    const floor = quality >= 70 ? QUESITO_FLOOR[quesito].good : QUESITO_FLOOR[quesito].bad;
-    const floorIdx = NOTE_STEPS.indexOf(floor);
-    if(floorIdx > 0) {
-      let moved = 0;
-      for(let i=0; i<floorIdx; i++) { moved += dist[i]; dist[i] = 0; }
-      dist[floorIdx] = (dist[floorIdx]||0) + moved;
-    }
-  }
-  return dist;
+// Tabela de distribuição por faixa de qualidade
+// Índices: [9.6, 9.7, 9.8, 9.9, 10.0]
+function getNoteDist(quality) {
+  if     (quality >= 95) return [ 0,  0,  8, 32, 60];
+  else if(quality >= 90) return [ 0,  3, 18, 45, 34];
+  else if(quality >= 85) return [ 0,  8, 32, 42, 18];
+  else if(quality >= 80) return [ 2, 18, 48, 28,  4];
+  else if(quality >= 75) return [ 5, 32, 48, 14,  1];
+  else if(quality >= 70) return [12, 48, 34,  5,  0];
+  else if(quality >= 65) return [28, 45, 15,  2,  0];
+  else if(quality >= 60) return [40, 20,  2,  0,  0];
+  else if(quality >= 55) return [22,  6,  0,  0,  0];
+  else if(quality >= 50) return [10,  2,  0,  0,  0];
+  else                   return [ 5,  0,  0,  0,  0];
 }
 
 function pickNote(dist) {
-  const total = dist.reduce((a,b)=>a+b, 0);
+  const total = dist.reduce((a, b) => a + b, 0);
+  if(total <= 0) return NOTE_STEPS[0];
   let r = Math.random() * total;
-  for(let i=0;i<dist.length;i++) { r -= dist[i]; if(r<=0) return NOTE_STEPS[i]; }
-  return NOTE_STEPS[NOTE_STEPS.length-1];
+  for(let i = 0; i < dist.length; i++) { r -= dist[i]; if(r <= 0) return NOTE_STEPS[i]; }
+  return NOTE_STEPS[NOTE_STEPS.length - 1];
 }
 
-// Um jurado individual: pega a distribuição do quality e opcionalmente
-// inclina ±1 step conforme perfil de julgamento
-// Regenera notas de jurado que somam EXATAMENTE um total-alvo.
-// Garante que verifiedTotal (soma dos jurados) bate com finalNotes[k].
+// Gera nota de um jurado com perfil e piso de peso de bandeira
+// pisoCent: centésimos mínimos (960, 970, 980) ou 0 para sem piso
+function judgeNote(quality, profile, quesito, pisoCent) {
+  const dist = [...getNoteDist(quality)];
+  if(profile === 'rigoroso') {
+    for(let i = dist.length - 1; i > 0; i--) {
+      const t = dist[i] * 0.3; dist[i] -= t; dist[i - 1] += t;
+    }
+  } else if(profile === 'generoso') {
+    for(let i = 0; i < dist.length - 1; i++) {
+      const t = dist[i] * 0.3; dist[i] -= t; dist[i + 1] += t;
+    }
+  } else if(profile === 'critico') {
+    // Reduz 10,0 em 50%, distribui entre 9,8 e 9,9
+    const t = dist[4] * 0.5; dist[4] -= t; dist[3] += t * 0.6; dist[2] += t * 0.4;
+  }
+  // tecnico: mantém distribuição original
+
+  let note = pickNote(dist);
+
+  // Aplica piso de peso de bandeira (após perfil)
+  if(pisoCent && pisoCent > 0) {
+    const pisoPt = pisoCent / 100;
+    if(note < pisoPt) note = pisoPt;
+  }
+
+  return Math.max(NOTE_STEPS[0], note);
+}
 function regenJudgesFromTotal(targetTotal, numJudges, descarta) {
   const T = Math.round(targetTotal * 10); // integer cents, e.g. 298 for 29.8
   const kept = descarta ? numJudges - 1 : numJudges; // quantas notas contam
@@ -16198,36 +17237,18 @@ function regenJudgesFromTotal(targetTotal, numJudges, descarta) {
   return { judges: shuffled, discardIdx: -1 };
 }
 
-function judgeNote(quality, profile, quesito) {
-  const dist = [...getNoteDist(quality, quesito)];
-  // perfil rigoroso: desloca peso para baixo
-  if(profile==='rigoroso') {
-    for(let i=dist.length-1;i>0;i--) { dist[i-1]+=dist[i]*0.3; dist[i]*=0.7; }
-  }
-  // perfil generoso: desloca peso para cima
-  else if(profile==='generoso') {
-    for(let i=0;i<dist.length-1;i++) { dist[i+1]+=dist[i]*0.3; dist[i]*=0.7; }
-  }
-  // critico: mais 9.8, menos 10.0
-  else if(profile==='critico') {
-    if(dist[9]>0) { dist[8]+=dist[9]*0.4; dist[9]*=0.6; }
-  }
-  // tecnico: neutro
-
-  const note = pickNote(dist);
-  return Math.max(NOTE_STEPS[0], note);
-}
-
 function scoreToQuesito(quality, profiles, group, schoolId, seasonHistory, quesito) {
   const g = group || gameState?.school?.group || 'especial';
   const rules = GROUP_JUDGING_RULES[g] || GROUP_JUDGING_RULES.especial;
   const count = rules.jurados;
   const adjQuality = applyPesoBandeira(quality, schoolId || gameState?.school?.id || '', seasonHistory || gameState?.seasonHistory || [], g);
-  const profs = profiles || (['rigoroso','tecnico','generoso','critico','neutro'].slice(0, count));
+  const pisoCent = getPisoBandeira(schoolId || gameState?.school?.id || '', seasonHistory || gameState?.seasonHistory || [], g);
+  const profs = profiles || (['rigoroso','tecnico','generoso','critico'].slice(0, count));
   const q = clamp(adjQuality, 0, 100);
-  const judges = profs.slice(0, count).map(p => judgeNote(q, p==='neutro'?'tecnico':p, quesito));
+  // Passa pisoCent para judgeNote — piso é aplicado APÓS perfil
+  const judges = profs.slice(0, count).map(p => judgeNote(q, p, quesito, pisoCent));
 
-  // Detect discrepancy — polêmica
+  // Polêmica: diferença ≥ 0,2 entre maior e menor nota
   const maxJ = Math.max(...judges), minJ = Math.min(...judges);
   const isPolemico = (maxJ - minJ) >= 0.2;
 
@@ -16244,10 +17265,9 @@ function scoreToQuesito(quality, profiles, group, schoolId, seasonHistory, quesi
 
 // Legacy stubs (compatibilidade)
 function qualityToBaseNote(q) {
-  if(q>=95) return 10.0; if(q>=90) return 9.9; if(q>=80) return 9.8;
-  return 9.7; // mínimo absoluto
+  if(q>=95) return 10.0; if(q>=90) return 9.9; if(q>=85) return 9.8;
+  if(q>=75) return 9.7;  return 9.6;
 }
-function juradoVariation(base, profile) { return judgeNote(Math.round((base-9.7)/0.1*20+80), profile); }
 function scoreToNote(q) { return qualityToBaseNote(q); }
 function generate4Judges(b) { return ['rigoroso','tecnico','generoso','critico'].map(p=>judgeNote(80,p)); }
 
@@ -16404,6 +17424,28 @@ function calculateFinalNotes() {
     raw.bateria = clamp(raw.bateria + rBonus, raw.bateria, 100);
   }
 
+  // Jurados influenciados via Liga (presente ou suborno)
+  const jBonuses = gameState.ligaJuradosBonuses || {};
+  for(const [queKey, jb] of Object.entries(jBonuses)) {
+    if(jb.descoberto) continue;
+    if(jb.garantido10) {
+      raw[queKey] = 100; // garante nota máxima no quesito
+    } else if(jb.bonus) {
+      raw[queKey] = clamp((raw[queKey]||70) + Math.round(jb.bonus * 12), 0, 100);
+    }
+  }
+
+  // Time de Musas — bônus em alegorias e fantasias na avenida
+  if(gameState.timeMusas) {
+    const musasBonus = calcMusasBonus(gameState.timeMusas);
+    raw.alegorias = clamp(raw.alegorias + musasBonus.alegorias, 40, 100);
+    raw.fantasias = clamp(raw.fantasias + musasBonus.fantasias, 40, 100);
+    // Comunidade: musas da comunidade também animam a harmonia
+    if(gameState.timeMusas.origem === 'comunidade') {
+      raw.harmonia = clamp(raw.harmonia + 2, 40, 100);
+    }
+  }
+
   // Apply seasonal event score modifiers to raw quality
   const sm = gameState.seasonalMods || {};
   if(sm.desfileRisk && Math.random() < sm.desfileRisk) {
@@ -16426,11 +17468,13 @@ function calculateFinalNotes() {
   gameState.finalNotesDetail = {};
   let total = 0;
   const openerPenalty = (gameState.isOpenerThisYear && gameState.school.group === 'especial') ? -0.1 : 0;
+  // Usa perfis fixos da temporada (mesmos que serão exibidos na apuração)
+  const seasonProfiles = getOrCreateJuradoProfiles();
   for(const [k,sc] of Object.entries(raw)) {
-    const profs = [...['rigoroso','tecnico','generoso','critico']].sort(()=>Math.random()-.5);
+    const profs = seasonProfiles[k] || [...['rigoroso','tecnico','generoso','critico']].sort(()=>Math.random()-.5);
     // Pass quesito key so floor notes are respected
     const q = scoreToQuesito(sc + (Math.random()-.5)*4, profs, null, null, null, k);
-    const noteWithPenalty = Math.max(29.1, Math.round((q.total + openerPenalty)*10)/10);
+    const noteWithPenalty = Math.max(28.8, Math.round((q.total + openerPenalty)*10)/10);
     gameState.finalNotes[k] = noteWithPenalty;
     gameState.finalNotesDetail[k] = q;
     total += noteWithPenalty;
@@ -16448,94 +17492,152 @@ function calculateFinalNotes() {
 // Gera totais para rivais baseados na posição histórica esperada,
 // garantindo que a diferença entre escolas seja realista (max ~0.4 por quesito)
 function simulateRivalScores() {
-  const playerTotal = gameState.finalNotes._total || 268.5;
+  const playerTotal = gameState.finalNotes._total || 268.0;
   const group = gameState.school.group;
-  const rules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
+  const gRules = GROUP_RULES[group] || GROUP_RULES.especial;
+  const jRules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
 
   // Evolve AI cycles
   evolveAICycles(gameState.rivals, gameState.year);
 
+  // ── 1. Gerar notas brutas dos rivais ──────────────────────
   gameState.rivals.forEach((r) => {
     const baseQuality = r._baseQuality || clamp((r.tradition+r.community+(r.barracão||r.barracaoAttr||60)+r.creativity+r.org)/5, 50, 97);
     const cycleMod = getCycleQualityMod(r.id);
     const adjBase = clamp(baseQuality + cycleMod, 40, 100);
+    const seasonProfiles = getOrCreateJuradoProfiles();
 
     const notes = {}, detail = {};
     let total = 0;
     APURACAO_QUESITOS.forEach(({k}) => {
       const sc = clamp(adjBase + (Math.random()-.5)*10, 45, 100);
-      const profs = ['rigoroso','tecnico','generoso','critico','neutro'].slice(0, rules.jurados);
-      const shuffled = [...profs].sort(()=>Math.random()-.5);
-      const res = scoreToQuesito(sc, shuffled, group, r.id, [], k);
+      const profs = (seasonProfiles[k] || ['rigoroso','tecnico','generoso','critico']).slice(0, jRules.jurados);
+      const res = scoreToQuesito(sc, profs, group, r.id, [], k);
       notes[k]=res.total; detail[k]=res; total+=res.total;
     });
-
     r._simulatedNotes = notes;
     r._simulatedDetail = detail;
     r._simulatedTotal = Math.round(total*10)/10;
   });
 
-  // EQUALIZAÇÃO usando os ranges realistas por grupo
-  const spreadTotal = rules.spreadMin + Math.random()*(rules.spreadMax - rules.spreadMin);
+  // ── 2. Montar lista unificada jogador + rivais ─────────────
   const allEntries = [
-    { isPlayer: true, total: playerTotal },
-    ...gameState.rivals.map(r => ({ rival: r, total: r._simulatedTotal }))
+    { isPlayer:true,  total: playerTotal },
+    ...gameState.rivals.map(r => ({ isPlayer:false, rival:r, total: r._simulatedTotal }))
   ];
+  const N = allEntries.length;
+
+  // ── 3. Ordenar pelo total bruto (desc) ────────────────────
   allEntries.sort((a,b) => b.total - a.total);
 
-  // Top total range from group rules
-  const [topMin, topMax] = rules.topTotal;
-  const topTotal = topMin + Math.random()*(topMax - topMin);
-  const step = spreadTotal / Math.max(allEntries.length - 1, 1);
+  // ── 4. Calcular targets (centésimos) ──────────────────────
+  // Campeão recebe aleatório entre top-5 e top (ex.: 2695–2700)
+  const topCent   = (gRules.top - 5) + Math.floor(Math.random() * 6); // top-5 to top inclusive
+  const botCent   = gRules.bottom;
+  const step      = (topCent - botCent) / Math.max(N - 1, 1);
+  const targets   = [];
+  for(let i = 0; i < N; i++) {
+    let t = Math.round(topCent - i * step);
+    // Garantir distinção consecutiva
+    if(i > 0 && t >= targets[i-1]) t = targets[i-1] - 1;
+    // Nunca abaixo de bottom
+    t = Math.max(t, botCent);
+    targets.push(t);
+  }
+
+  // ── 5. Aplicar equalização a cada escola ──────────────────
+  const queKeys  = APURACAO_QUESITOS.map(q=>q.k);
+  const minQCent = gRules.descarta
+    ? (gRules.jurados - 1) * 960          // 3 jurados × 9.6 = 2880 (especial/ouro)
+    : gRules.jurados * 960;               // 2 jurados × 9.6 = 1920 (avaliação)
+  const maxQCent = gRules.descarta
+    ? (gRules.jurados - 1) * 1000         // 3 × 10.0 = 3000
+    : gRules.jurados * 1000;              // 2 × 10.0 = 2000
 
   allEntries.forEach((e, idx) => {
-    const noise = (Math.random()-.5) * 0.2;
-    const [botMin] = rules.botTotal;
-    const newTotal = Math.max(botMin, Math.round((topTotal - idx * step + noise) * 10) / 10);
+    const newTotalCent = targets[idx];
 
     if(e.isPlayer) {
-      const diff = newTotal - gameState.finalNotes._total;
-      const noteKeys = Object.keys(gameState.finalNotes).filter(k=>k!=='_total');
-      const rules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
-      for(const k of noteKeys) {
-        const maxQue = rules.jurados===2 ? 20.0 : 30.0;
-        const minQue = rules.descarta ? (9.7 * (rules.jurados-1)) : (9.7 * rules.jurados);
-        const raw = gameState.finalNotes[k] + diff/9;
-        // Snap to nearest valid quesito total (multiples of 0.1 in range)
-        const snapped = Math.round(clamp(raw, minQue, maxQue) * 10) / 10;
-        gameState.finalNotes[k] = snapped;
-        // Regenera jurado notes para bater com o total equalizado
-        const regen = regenJudgesFromTotal(snapped, rules.jurados, rules.descarta);
+      // Total atual em centésimos
+      const oldTotalCent = Math.round(gameState.finalNotes._total * 10);
+      const factor = newTotalCent / Math.max(oldTotalCent, 1);
+
+      // Distribuir proporcionalmente pelos quesitos
+      let sumAdjusted = 0;
+      const adjusted = {};
+      for(const k of queKeys) {
+        const oldQ = Math.round((gameState.finalNotes[k]||29.0) * 10);
+        let newQ   = Math.round(oldQ * factor);
+        newQ = clamp(newQ, minQCent, maxQCent);
+        adjusted[k] = newQ;
+        sumAdjusted += newQ;
+      }
+      // Corrigir arredondamento distribuindo diff pelo quesito de maior peso
+      let diff = newTotalCent - sumAdjusted;
+      if(diff !== 0) {
+        const sortedQ = [...queKeys].sort((a,b) => adjusted[b]-adjusted[a]);
+        for(const k of sortedQ) {
+          const inc = diff > 0 ? 1 : -1;
+          const clamped = clamp(adjusted[k] + inc, minQCent, maxQCent);
+          diff -= (clamped - adjusted[k]);
+          adjusted[k] = clamped;
+          if(diff === 0) break;
+        }
+      }
+
+      // Aplicar e regerar notas dos jurados
+      for(const k of queKeys) {
+        const snappedTotal = adjusted[k] / 10;
+        gameState.finalNotes[k] = snappedTotal;
+        const regen = regenJudgesFromTotal(snappedTotal, jRules.jurados, jRules.descarta);
         if(gameState.finalNotesDetail?.[k]) {
-          gameState.finalNotesDetail[k].judges      = regen.judges;
-          gameState.finalNotesDetail[k].discardIdx  = regen.discardIdx;
-          gameState.finalNotesDetail[k].discarded   = regen.discardIdx >= 0 ? regen.judges[regen.discardIdx] : null;
-          gameState.finalNotesDetail[k].total       = snapped;
+          gameState.finalNotesDetail[k].judges     = regen.judges;
+          gameState.finalNotesDetail[k].discardIdx = regen.discardIdx;
+          gameState.finalNotesDetail[k].discarded  = regen.discardIdx >= 0 ? regen.judges[regen.discardIdx] : null;
+          gameState.finalNotesDetail[k].total      = snappedTotal;
         }
       }
-      // Total = soma exata dos quesitos
-      const totalInt = noteKeys.reduce((s,k)=>s+Math.round((gameState.finalNotes[k]||0)*10), 0);
-      gameState.finalNotes._total = totalInt / 10;
+      gameState.finalNotes._total = newTotalCent / 10;
+
     } else {
-      const scale = newTotal / (e.rival._simulatedTotal || 268);
-      let scaledTotal = 0;
-      const [qMin, qMax] = [botMin/9, 30.0];
-      const rRules = GROUP_JUDGING_RULES[group] || GROUP_JUDGING_RULES.especial;
-      for(const k of Object.keys(e.rival._simulatedNotes)) {
-        const raw = e.rival._simulatedNotes[k] * scale;
-        const snapped = Math.round(clamp(raw, qMin, qMax) * 10) / 10;
-        e.rival._simulatedNotes[k] = snapped;
-        // Regenera jurado notes do rival para consistência
-        const regen = regenJudgesFromTotal(snapped, rRules.jurados, rRules.descarta);
-        if(e.rival._simulatedDetail?.[k]) {
-          e.rival._simulatedDetail[k].judges     = regen.judges;
-          e.rival._simulatedDetail[k].discardIdx = regen.discardIdx;
-          e.rival._simulatedDetail[k].discarded  = regen.discardIdx >= 0 ? regen.judges[regen.discardIdx] : null;
-          e.rival._simulatedDetail[k].total      = snapped;
-        }
-        scaledTotal += snapped;
+      const r = e.rival;
+      const oldTotalCent = Math.round((r._simulatedTotal||268.0) * 10);
+      const factor = newTotalCent / Math.max(oldTotalCent, 1);
+
+      let sumAdjusted = 0;
+      const adjusted = {};
+      for(const k of queKeys) {
+        const oldQ = Math.round((r._simulatedNotes[k]||29.0) * 10);
+        let newQ   = Math.round(oldQ * factor);
+        newQ = clamp(newQ, minQCent, maxQCent);
+        adjusted[k] = newQ;
+        sumAdjusted += newQ;
       }
-      e.rival._simulatedTotal = Math.round(scaledTotal*10)/10;
+      // Corrigir resíduo
+      let diff = newTotalCent - sumAdjusted;
+      if(diff !== 0) {
+        const sortedQ = [...queKeys].sort((a,b) => adjusted[b]-adjusted[a]);
+        for(const k of sortedQ) {
+          const inc = diff > 0 ? 1 : -1;
+          const clamped = clamp(adjusted[k] + inc, minQCent, maxQCent);
+          diff -= (clamped - adjusted[k]);
+          adjusted[k] = clamped;
+          if(diff === 0) break;
+        }
+      }
+
+      for(const k of queKeys) {
+        const snappedTotal = adjusted[k] / 10;
+        r._simulatedNotes[k] = snappedTotal;
+        const regen = regenJudgesFromTotal(snappedTotal, jRules.jurados, jRules.descarta);
+        if(r._simulatedDetail?.[k]) {
+          r._simulatedDetail[k].judges     = regen.judges;
+          r._simulatedDetail[k].discardIdx = regen.discardIdx;
+          r._simulatedDetail[k].discarded  = regen.discardIdx >= 0 ? regen.judges[regen.discardIdx] : null;
+          r._simulatedDetail[k].total      = snappedTotal;
+        }
+      }
+      r._simulatedTotal = newTotalCent / 10;
     }
   });
 }
@@ -17023,6 +18125,9 @@ function showFinalResults() {
     ranking: allSchools.map((s,i) => ({pos:i+1,name:s.name,note:s.note,isPlayer:s.isPlayer})),
   });
 
+  // Registrar campeãs de todos os grupos desta temporada
+  registrarCampeas(allSchools, group);
+
   // ── HANDLE PLAYER PROMOTION/RELEGATION ───────────────────────
   const effectivelyPromoted = isPromoted;
 
@@ -17335,6 +18440,15 @@ function startNextSeason() {
   gameState.negociacoesOpen = true;
   gameState.ligaMeetingsDone = {};    // reset annual meetings
   gameState.ligaElectionPending = false;
+  // Time de Musas: contratos são anuais — reinicia a cada temporada
+  gameState.timeMusas = null;
+  // Perfis dos jurados: novos a cada temporada
+  gameState.juradoProfiles = null;
+  // Cúpula da Liga: regenera a cada temporada
+  gameState.ligaCupula = null;
+  gameState.ligaPautas = [];
+  gameState.ligaInteracoes = [];
+  gameState.ligaJuradosBonuses = {};
 
   // Apply economic multiplier for this year
   const eco = getEconomyData(gameState.year);
@@ -17370,31 +18484,111 @@ function startNextSeason() {
 // ==================== HISTÓRICO =============================
 // ============================================================
 
+// ============================================================
+// ==================== HISTÓRICO DE CAMPEÃS ================
+// ============================================================
+
+// Dados históricos reais 2010–2026 (Grupo Especial)
+const HISTORICAL_CHAMPIONS = [
+  {year:2010,group:'especial',school:'Imperatriz Leopoldinense',score:269.8,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Rinaldo',rainha:'Quitéria Chagas',enredo:'O Meu Destino é Ser Estrela'},
+  {year:2011,group:'especial',school:'Mangueira',score:269.5,carnavalesco:'Milton Cunha',mestreBateria:'Mestre Andrezinho',rainha:'Sheron Menezes',enredo:'Sou Simples, Sou Amor, Sou Mangueira'},
+  {year:2012,group:'especial',school:'Unidos do Viradouro',score:269.4,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Robertinho',rainha:'Milena Nogueira',enredo:'Minha Terra Tem Palmeiras — Brasil em Mim'},
+  {year:2013,group:'especial',school:'Portela',score:269.6,carnavalesco:'Renato Lage',mestreBateria:'Mestre Ciça',rainha:'Tatiane Melo',enredo:'Ilu Ayê — A Festa do Povo Preto'},
+  {year:2014,group:'especial',school:'Unidos da Tijuca',score:269.8,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Wagner',rainha:'Carol Nakamura',enredo:'Planeta Sonhos'},
+  {year:2015,group:'especial',school:'Imperatriz Leopoldinense',score:269.5,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Falcão',rainha:'Evelyn Bastos',enredo:'Não Há Segundo Reinado Sem o Povo Negro'},
+  {year:2016,group:'especial',school:'Mangueira',score:269.7,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Bruna Caltabiano',enredo:'Com Deus, Minha Vida Tem Mais Cor'},
+  {year:2017,group:'especial',school:'Porto da Pedra',score:269.5,carnavalesco:'Leonardo Bora',mestreBateria:'Mestre Robertinho',rainha:'Evelyn Bastos',enredo:'Sublime Questão'},
+  {year:2018,group:'especial',school:'Beija-Flor',score:269.8,carnavalesco:'Alexandre Louzada',mestreBateria:'Mestre Ciça',rainha:'Evelyn Bastos',enredo:'Eu Sou Monarca, Soberano das Passarelas'},
+  {year:2019,group:'especial',school:'Mangueira',score:270.0,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Evelyn Bastos',enredo:'História para Ninar Gente Grande'},
+  {year:2020,group:'especial',school:'Vila Isabel',score:269.6,carnavalesco:'Paulo Barros',mestreBateria:'Mestre Ciça',rainha:'Camila Silva',enredo:'Conselho de Deus'},
+  {year:2021,group:'especial',school:null,score:null,carnavalesco:null,mestreBateria:null,rainha:null,enredo:'Carnaval cancelado (COVID-19)'},
+  {year:2022,group:'especial',school:'Imperatriz Leopoldinense',score:269.8,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Falcão',rainha:'Quitéria Chagas',enredo:'Arranca Ísis, Abre o Coração'},
+  {year:2023,group:'especial',school:'Portela',score:269.7,carnavalesco:'Renato Lage',mestreBateria:'Mestre Ciça',rainha:'Bianca Monteiro',enredo:'Boca de Ouro'},
+  {year:2024,group:'especial',school:'Mangueira',score:269.9,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Marcão',rainha:'Evelyn Bastos',enredo:'Imagens de um Rio que Não Existe Mais'},
+  {year:2025,group:'especial',school:'Beija-Flor',score:269.8,carnavalesco:'Alexandre Louzada',mestreBateria:'Mestre Ciça',rainha:'Gracyanne Barbosa',enredo:'A Suprema Corte do Samba'},
+  {year:2026,group:'especial',school:'Imperatriz Leopoldinense',score:269.7,carnavalesco:'Leandro Vieira',mestreBateria:'Mestre Falcão',rainha:'Viviane Araújo',enredo:'Dona do Baile, Rainha da Passarela'},
+];
+
+function registrarCampeas(allSchools, playerGroup) {
+  if(!gameState.championsHistory) gameState.championsHistory = [];
+
+  // Pré-popula histórico real na primeira chamada de registrarCampeas
+  if(gameState.championsHistory.length === 0) {
+    const startYear = gameState.year;
+    HISTORICAL_CHAMPIONS
+      .filter(h => h.year < startYear && h.school)
+      .forEach(h => { if(!gameState.championsHistory.some(c=>c.year===h.year&&c.group===h.group)) gameState.championsHistory.push({...h}); });
+  }
+
+  // Registrar campeão do grupo do jogador (allSchools já ordenado)
+  const playerChampion = allSchools[0];
+  const playerEntry = {
+    year: gameState.year,
+    group: playerGroup,
+    school: playerChampion.name,
+    score: playerChampion.note,
+    isPlayer: playerChampion.isPlayer,
+    carnavalesco: gameState.team?.carnavalesco?.name || null,
+    mestreBateria: gameState.team?.mestre?.name || null,
+    rainha: gameState.rainha?.name || null,
+    enredo: gameState.enredoTitle || (gameState.enredo ? ENREDO_TYPES?.find(e=>e.id===gameState.enredo)?.name : null) || null,
+  };
+  // Evitar duplicata
+  if(!gameState.championsHistory.some(c=>c.year===gameState.year && c.group===playerGroup)) {
+    gameState.championsHistory.push(playerEntry);
+  }
+
+  // Registrar campeão simulado de outros grupos (rivais promovidos/rebaixados têm grupos diferentes)
+  // Geramos entradas genéricas para grupos sem dados
+  const allGroups = ['especial','ouro','prata','bronze','avaliacao'];
+  allGroups.filter(g => g !== playerGroup).forEach(g => {
+    if(gameState.championsHistory.some(c=>c.year===gameState.year && c.group===g)) return;
+    // Selecionar rival desse grupo
+    const riv = (gameState.rivals||[]).filter(r=>r.group===g);
+    if(!riv.length) return;
+    const champ = riv.sort((a,b)=>(b._simulatedTotal||0)-(a._simulatedTotal||0))[0];
+    gameState.championsHistory.push({
+      year: gameState.year, group: g,
+      school: champ.name, score: champ._simulatedTotal||268.0,
+      isPlayer: false, carnavalesco:null, mestreBateria:null, rainha:null, enredo:null,
+    });
+  });
+}
+
 function renderHistorico() {
   const el = document.getElementById('tabHistorico');
-  const history = gameState.seasonHistory || [];
+  const subTab = gameState._historicoSubTab || 'historico';
 
+  const subNav = ['historico','campeas'].map(s => {
+    const labels = {historico:'📜 Minha Escola', campeas:'🏆 Livro das Campeãs'};
+    const active = subTab === s;
+    return `<button onclick="gameState._historicoSubTab='${s}';renderHistorico()" style="padding:.35rem .75rem;border-radius:5px;border:1px solid ${active?'var(--gold)':'var(--border)'};background:${active?'rgba(212,175,55,.12)':'var(--panel2)'};color:${active?'var(--gold)':'var(--text2)'};font-size:.78rem;cursor:pointer;font-family:inherit">${labels[s]}</button>`;
+  }).join('');
+
+  el.innerHTML = `<div style="display:flex;gap:.3rem;margin-bottom:1rem">${subNav}</div>` +
+    (subTab === 'historico' ? _renderHistoricoEscola() : _renderHistoricoCampeas());
+}
+
+function _renderHistoricoEscola() {
+  const history = gameState.seasonHistory || [];
   const titles     = history.filter(h=>h.position===1).length;
   const bestPos    = history.length ? Math.min(...history.map(h=>h.position)) : '-';
   const bestNote   = history.length ? Math.max(...history.map(h=>h.note||0)).toFixed(1) : '-';
   const avgNote    = history.length ? (history.reduce((s,h)=>s+(h.note||0),0)/history.length).toFixed(1) : '-';
 
-  el.innerHTML = `
+  return `
   <div class="grid-4" style="margin-bottom:1.5rem">
     <div class="stat-block"><div class="sb-val" style="color:var(--gold)">${titles}</div><div class="sb-lbl">🏆 Títulos</div></div>
     <div class="stat-block"><div class="sb-val">${history.length}</div><div class="sb-lbl">Temporadas</div></div>
     <div class="stat-block"><div class="sb-val" style="color:var(--success)">${bestPos}</div><div class="sb-lbl">Melhor Colocação</div></div>
     <div class="stat-block"><div class="sb-val" style="color:var(--info)">${bestNote}</div><div class="sb-lbl">Maior Nota</div></div>
   </div>
-
   ${history.length === 0 ? `
-    <div class="panel">
-      <div class="panel-body" style="text-align:center;padding:3rem">
-        <div style="font-size:3rem;margin-bottom:1rem">📚</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;color:var(--text2)">Nenhuma temporada concluída ainda.</div>
-        <div style="color:var(--text3);font-size:.85rem;margin-top:.5rem">Complete seu primeiro carnaval para construir o histórico da escola!</div>
-      </div>
-    </div>
+    <div class="panel"><div class="panel-body" style="text-align:center;padding:3rem">
+      <div style="font-size:3rem;margin-bottom:1rem">📚</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;color:var(--text2)">Nenhuma temporada concluída ainda.</div>
+      <div style="color:var(--text3);font-size:.85rem;margin-top:.5rem">Complete seu primeiro carnaval para construir o histórico!</div>
+    </div></div>
   ` : `
     <div class="panel">
       <div class="panel-header">
@@ -17402,43 +18596,119 @@ function renderHistorico() {
         <span style="font-size:.72rem;color:var(--text3)">Clique em uma temporada para ver a classificação completa</span>
       </div>
       <div class="panel-body" style="padding:0">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Ano</th>
-              <th>Grupo</th>
-              <th>Colocação</th>
-              <th>Nota Final</th>
-              <th>Enredo</th>
-              <th>Destaque</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${[...history].reverse().map((h,i)=>{
-              const idx = history.length - 1 - i;
-              const posColor = h.position===1?'var(--gold)':h.position<=3?'var(--success)':h.relegated?'var(--danger)':'var(--text)';
-              const hasRanking = h.ranking && h.ranking.length > 0;
-              return `
-              <tr style="cursor:${hasRanking?'pointer':'default'};transition:background .15s"
-                  onclick="${hasRanking?`showHistoricoClassificacao(${idx})`:''}">
-                <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1rem;color:var(--gold)">${h.season}</td>
-                <td><span class="card-tag ${h.group==='especial'?'tag-gold':h.group==='ouro'?'tag-purple':'tag-blue'}">${LEAGUE_NAMES[h.group]||h.group}</span></td>
-                <td style="font-weight:700;color:${posColor}">
-                  ${h.position}º
-                  ${h.position===1?' 🏆':h.position<=3?' 🥉':h.relegated?' 💔':''}
-                </td>
-                <td style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;color:var(--info);font-weight:700">${(h.note||0).toFixed(1)}</td>
-                <td style="color:var(--text2);font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.enredo||'—'}</td>
-                <td style="font-size:.8rem;color:var(--text3)">${h.highlight||'—'}</td>
-                <td>${hasRanking?`<span style="font-size:.7rem;color:var(--text3);background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:.15rem .4rem;white-space:nowrap">Ver classificação →</span>`:'<span style="font-size:.65rem;color:var(--text3)">—</span>'}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
+        <table class="table"><thead><tr>
+          <th>Ano</th><th>Grupo</th><th>Colocação</th><th>Nota Final</th><th>Enredo</th><th>Destaque</th><th></th>
+        </tr></thead><tbody>
+          ${[...history].reverse().map((h,i)=>{
+            const idx = history.length - 1 - i;
+            const posColor = h.position===1?'var(--gold)':h.position<=3?'var(--success)':h.relegated?'var(--danger)':'var(--text)';
+            const hasRanking = h.ranking && h.ranking.length > 0;
+            return `<tr style="cursor:${hasRanking?'pointer':'default'};transition:background .15s"
+                onclick="${hasRanking?`showHistoricoClassificacao(${idx})`:''}">
+              <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1rem;color:var(--gold)">${h.season}</td>
+              <td><span class="card-tag ${h.group==='especial'?'tag-gold':h.group==='ouro'?'tag-purple':'tag-blue'}">${LEAGUE_NAMES[h.group]||h.group}</span></td>
+              <td style="font-weight:700;color:${posColor}">${h.position}°${h.position===1?' 🏆':h.position<=3?' 🥉':h.relegated?' 💔':''}</td>
+              <td style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;color:var(--info);font-weight:700">${(h.note||0).toFixed(1)}</td>
+              <td style="color:var(--text2);font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.enredo||'—'}</td>
+              <td style="font-size:.8rem;color:var(--text3)">${h.highlight||'—'}</td>
+              <td>${hasRanking?`<span style="font-size:.7rem;color:var(--text3);background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:.15rem .4rem;white-space:nowrap">Ver →</span>`:'<span style="font-size:.65rem;color:var(--text3)">—</span>'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody></table>
       </div>
     </div>
   `}`;
+}
+
+function _renderHistoricoCampeas() {
+  if(!gameState.championsHistory) gameState.championsHistory = [];
+  const all = [...gameState.championsHistory].filter(c=>c.school).sort((a,b)=>b.year-a.year||(a.group>b.group?1:-1));
+
+  // Filtros
+  const fGrp  = gameState._champFilterGrp  || 'todos';
+  const fBusca = gameState._champFilterBusca || '';
+
+  const grpOpts = ['todos','especial','ouro','prata','bronze','avaliacao'];
+  const grpFilter = `<div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    ${grpOpts.map(g=>`<button onclick="gameState._champFilterGrp='${g}';renderHistorico()" style="padding:.22rem .55rem;border-radius:4px;border:1px solid ${fGrp===g?'var(--gold)':'var(--border)'};background:${fGrp===g?'rgba(212,175,55,.12)':'var(--panel2)'};color:${fGrp===g?'var(--gold)':'var(--text2)'};font-size:.7rem;cursor:pointer;font-family:inherit">${g==='todos'?'Todos':LEAGUE_NAMES[g]||g}</button>`).join('')}
+    <input oninput="gameState._champFilterBusca=this.value;renderHistorico()" value="${fBusca}" placeholder="🔍 Buscar escola..." style="padding:.2rem .5rem;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:.72rem;font-family:inherit;min-width:140px">
+  </div>`;
+
+  const filtered = all.filter(c =>
+    (fGrp === 'todos' || c.group === fGrp) &&
+    (!fBusca || c.school.toLowerCase().includes(fBusca.toLowerCase()))
+  );
+
+  if(!filtered.length) return grpFilter + `<div style="text-align:center;padding:2rem;color:var(--text3)">Nenhum registro encontrado.</div>`;
+
+  // Contagem de títulos por escola
+  const titleCount = {};
+  filtered.forEach(c => { titleCount[c.school] = (titleCount[c.school]||0) + 1; });
+
+  const grpColor = {especial:'var(--gold)',ouro:'var(--accent)',prata:'var(--info)',bronze:'var(--warn)',avaliacao:'var(--text3)'};
+
+  const rows = filtered.map(c => {
+    const gc = grpColor[c.group]||'var(--text2)';
+    return `<tr onclick="abrirDetalhesCampea(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(212,175,55,.04)'" onmouseout="this.style.background=''">
+      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--gold);font-size:.95rem">${c.year}</td>
+      <td><span style="font-size:.65rem;padding:.1rem .35rem;border-radius:3px;background:${gc}22;color:${gc};white-space:nowrap">${LEAGUE_NAMES[c.group]||c.group}</span></td>
+      <td style="font-weight:700;color:${c.isPlayer?'var(--gold-light)':'var(--text)'}">${c.school}${c.isPlayer?' 🎭':''} ${titleCount[c.school]>1?`<sup style="color:var(--gold);font-size:.6rem">×${titleCount[c.school]}</sup>`:''}</td>
+      <td style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:.95rem;color:var(--success)">${c.score?c.score.toFixed(1):'—'}</td>
+      <td style="font-size:.75rem;color:var(--text2)">${c.carnavalesco||'—'}</td>
+      <td style="font-size:.75rem;color:var(--text2)">${c.mestreBateria||'—'}</td>
+      <td style="font-size:.75rem;color:var(--text2)">${c.rainha||'—'}</td>
+      <td style="font-size:.75rem;color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.enredo||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Top campeãs (ranking)
+  const ranking = Object.entries(titleCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const rankingHtml = `
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+    ${ranking.map(([sc,ct],i)=>`
+    <div style="padding:.3rem .65rem;background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.2);border-radius:6px;font-size:.72rem">
+      <span style="color:var(--gold);font-weight:700">${['🥇','🥈','🥉','4°','5°'][i]}</span>
+      <span style="color:var(--text2);margin-left:.3rem">${sc}</span>
+      <span style="color:var(--gold);font-weight:700;margin-left:.4rem">${ct}×</span>
+    </div>`).join('')}
+  </div>`;
+
+  return grpFilter + rankingHtml + `
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">🏆 Livro das Campeãs</span>
+      <span style="font-size:.72rem;color:var(--text3)">${filtered.length} registro(s) · Clique para detalhes</span>
+    </div>
+    <div class="panel-body" style="padding:0;overflow-x:auto">
+      <table class="table">
+        <thead><tr>
+          <th>Ano</th><th>Grupo</th><th>Campeã</th><th>Nota</th>
+          <th>Carnavalesco</th><th>Mestre</th><th>Rainha</th><th>Enredo</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function abrirDetalhesCampea(c) {
+  if(typeof c === 'string') c = JSON.parse(c);
+  const gc = {especial:'var(--gold)',ouro:'var(--accent)',prata:'var(--info)',bronze:'var(--warn)',avaliacao:'var(--text3)'}[c.group]||'var(--text2)';
+  openModal(`🏆 Campeã ${c.year} — ${LEAGUE_NAMES[c.group]||c.group}`, `
+  <div style="text-align:center;margin-bottom:1rem">
+    <div style="font-family:'Playfair Display',serif;font-style:italic;font-size:1.6rem;color:var(--gold);line-height:1">${c.school}</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--success);margin-top:.3rem">${c.score?c.score.toFixed(1)+' pts':'—'}</div>
+    <span style="font-size:.68rem;padding:.15rem .5rem;border-radius:3px;background:${gc}22;color:${gc}">${LEAGUE_NAMES[c.group]||c.group} · ${c.year}</span>
+    ${c.isPlayer?'<div style="font-size:.72rem;color:var(--accent);margin-top:.3rem">🎭 Sua escola</div>':''}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.8rem">
+    ${[['🎨 Carnavalesco',c.carnavalesco],['🥁 Mestre de Bateria',c.mestreBateria],['👸 Rainha de Bateria',c.rainha],['📜 Enredo',c.enredo]].map(([lbl,val])=>`
+    <div style="padding:.4rem .6rem;background:var(--panel2);border-radius:5px">
+      <div style="font-size:.62rem;color:var(--text3)">${lbl}</div>
+      <div style="font-weight:600;color:var(--text);margin-top:.15rem">${val||'—'}</div>
+    </div>`).join('')}
+  </div>
+  `, [{text:'Fechar', action:closeModal, cls:'btn-gray'}]);
 }
 
 function showHistoricoClassificacao(histIdx) {
@@ -19008,10 +20278,7 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
 });
 
 // Init confetti on load
-window.addEventListener('load', ()=>{
-  document.getElementById('loadingOverlay').style.display = 'none';
-  initConfetti();
-});
+window.addEventListener('load', ()=>{ initConfetti(); });
 
 // ============================================================
 // ==================== SISTEMA CASAL MSPB ====================
@@ -19919,13 +21186,13 @@ window._verResultadoEnsaio = function(ordem) {
   mostrarModalEnsaioTecnico(ordem, entry.resultados);
 };
 
-// Init ensaiosTecnicos on load
-window.addEventListener('load', ()=>{
-  document.getElementById('loadingOverlay').style.display = 'none';
-  initConfetti();
+// Esconde overlay assim que o DOM estiver pronto (não espera fontes externas)
+document.addEventListener('DOMContentLoaded', ()=>{
+  const ov = document.getElementById('loadingOverlay');
+  if(ov) ov.style.display = 'none';
 });
-// Fallback: esconde após 3s se load demorar
-setTimeout(()=>{ document.getElementById('loadingOverlay').style.display = 'none'; }, 3000);
+// Fallback extra: esconde em 800ms de qualquer forma
+setTimeout(()=>{ const ov = document.getElementById('loadingOverlay'); if(ov) ov.style.display = 'none'; }, 800);
 
 </script>
 </body>
